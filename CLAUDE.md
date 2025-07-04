@@ -61,23 +61,31 @@ The `claude/` directory serves as your persistent memory and knowledge cache. Us
 
 ## Project Overview
 
-This is a monorepo project called "defivalley" built with Turborepo that combines:
-- **Web frontend**: Next.js 15 app with React 19 (port 3000)
-- **Game server**: Colyseus multiplayer game server 
-- **Smart contracts**: Hardhat 3 (alpha) with Solidity contracts for blockchain integration
+DeFi Valley is a cozy farming game where players plant virtual seeds that create real DeFi yield positions. This cross-chain gaming + DeFi project combines:
+
+- **Web frontend**: Next.js 15 with Phaser game engine and multi-chain wallet integration
+- **Game server**: Colyseus multiplayer server with real-time synchronization
+- **Smart contracts**: Cross-chain architecture using Axelar GMP
+  - **GameController.sol**: Deployed on Saga Chainlet (gasless gaming)
+  - **DeFiVault.sol**: Deployed on Arbitrum (DeFi yield farming)
+
+### Core Innovation
+Players plant seeds in a farming game → Real USDC deposits into EulerSwap vaults → Actual DeFi yield generation → Harvest yields as game rewards
 
 ## Common Commands
 
 ### Development
 ```bash
-# Start all services in development mode
+# Start all services in development mode (recommended)
 pnpm dev
 
 # Start specific service
-pnpm dev --filter=web    # Frontend only
-pnpm dev --filter=server # Game server only
+pnpm dev --filter=web    # Frontend only (Next.js on port 3000)
+pnpm dev --filter=server # Game server only (Colyseus on port 2567)
 
-# Web app runs on port 3000 with Turbopack
+# Manual startup (run in separate terminals)
+cd apps/web && pnpm dev     # Web app with Turbopack
+cd apps/server && pnpm dev  # Multiplayer game server
 ```
 
 ### Building and Testing
@@ -103,18 +111,20 @@ pnpm format
 # Navigate to packages directory first
 cd packages
 
-# Run all tests (both Solidity and Node.js)
-npx hardhat test
+# Compile contracts
+npx hardhat compile
 
-# Run specific test types
-npx hardhat test solidity
-npx hardhat test nodejs
+# Deploy DeFiVault to Arbitrum Sepolia
+npx hardhat run scripts/deploy-defivault.ts --network arbitrumSepolia
 
-# Deploy to local chain
-npx hardhat ignition deploy ignition/modules/Counter.ts
+# Deploy GameController to Saga Chainlet
+npx hardhat run scripts/deploy-gamecontroller.ts --network sagaTestnet
 
-# Deploy to Sepolia (requires SEPOLIA_PRIVATE_KEY config)
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+# Configure cross-chain communication
+npx hardhat run scripts/configure-contracts.ts --network sagaTestnet
+
+# Test complete cross-chain flow
+npx hardhat run scripts/test-cross-chain.ts --network sagaTestnet
 ```
 
 ## Project Architecture
@@ -125,32 +135,118 @@ npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
 - `packages/` - Smart contracts (Hardhat 3) and shared utilities
 
 ### Key Technologies
-- **Frontend**: Next.js 15 + React 19 + TypeScript
-- **Game Server**: Colyseus for real-time multiplayer
+- **Frontend**: Next.js 15 + React 19 + Phaser 3 + TypeScript
+- **Game Server**: Colyseus 0.16 for real-time multiplayer
 - **Blockchain**: Hardhat 3 (alpha) with Solidity 0.8.28
+- **Cross-chain**: Axelar GMP for secure message passing
+- **DeFi Integration**: EulerSwap vaults for yield generation
 - **Package Management**: pnpm with workspace configuration
 - **Build System**: Turborepo with intelligent caching
 
-### Smart Contract Setup
-- Uses Hardhat 3 alpha with viem integration
-- Configured for Ethereum L1 and Optimism networks
-- Includes Foundry-compatible Solidity tests
-- Node.js integration tests using native `node:test` runner
-
-### Development Notes
-- The project uses Hardhat 3 alpha (not production-ready)
-- Web app uses Turbopack for faster development builds
-- All packages are written in TypeScript
-- Turborepo handles task orchestration and caching
+### Cross-Chain Architecture
+```
+Saga Chainlet (Gasless Gaming)     Arbitrum (DeFi Yield)
+┌─────────────────────────┐       ┌──────────────────────┐
+│   GameController.sol    │◄─────►│    DeFiVault.sol     │
+│                         │       │                      │
+│ • Player registration   │ Axelar│ • USDC deposits      │
+│ • Seed planting         │  GMP  │ • EulerSwap yield    │
+│ • Experience system     │       │ • Yield claiming     │
+└─────────────────────────┘       └──────────────────────┘
+```
 
 ### Network Configuration
-- `hardhatMainnet` - Local L1 simulation
-- `hardhatOp` - Local Optimism simulation  
-- `sepolia` - Ethereum Sepolia testnet (requires private key config)
+- `arbitrumSepolia` - Arbitrum testnet for DeFi vault
+- `sagaTestnet` - Saga chainlet for game controller
+- **Axelar Addresses**:
+  - Arbitrum Gateway: `0xe1cE95479C84e9809269227C7F8524aE051Ae77a`
+  - Arbitrum GasService: `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6`
+
+### Multiplayer Game Implementation
+
+#### Server Architecture (Colyseus)
+- **Local access**: `http://localhost:2567`
+- **Network sharing**: `http://[LOCAL_IP]:2567` (e.g., `http://172.31.50.134:2567`)
+- **Test client**: `/test.html` for debugging connections
+- **Colyseus playground**: `/colyseus` for server monitoring
+
+#### Client Architecture (Phaser + React)
+- **Game Engine**: Phaser 3.90.0 with TypeScript
+- **React Integration**: Dynamic loading to avoid SSR issues
+- **Real-time Features**: Player movement, chat system, state synchronization
+- **Network Detection**: Auto-detects server URL for local/network connections
+
+#### Game Features
+- **Player Movement**: WASD/Arrow key controls with real-time synchronization
+- **Chat System**: Press Enter to open chat, real-time messaging between players
+- **Visual Players**: Green circle for current player, red for others with name tags
+- **Connection Management**: Auto-reconnection, fallback URLs, error handling
+
+#### Network Configuration
+```bash
+# Local development
+Web App: http://localhost:3000
+Game Server: http://localhost:2567
+Test Client: http://localhost:2567/test.html
+
+# Network sharing (replace with your IP)
+Web App: http://172.31.50.134:3000
+Game Server: http://172.31.50.134:2567
+Test Client: http://172.31.50.134:2567/test.html
+```
+
+#### Troubleshooting
+- **Connection Refused**: Ensure game server is running on port 2567
+- **WASD Interference**: Fixed - movement disabled when chat is active
+- **SSR Issues**: Game component uses dynamic loading with `ssr: false`
+- **Network Access**: Test with `/test.html` client for connection debugging
 
 ## Configuration Variables
-For blockchain deployment, configure these variables:
-- `SEPOLIA_RPC_URL` - Sepolia network RPC endpoint
-- `SEPOLIA_PRIVATE_KEY` - Private key for deployment account
+For cross-chain deployment, configure these variables in `packages/.env`:
 
-Use `npx hardhat keystore set SEPOLIA_PRIVATE_KEY` to securely store the private key.
+### Required Environment Variables
+```bash
+# Arbitrum Sepolia (DeFi Vault)
+ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
+ARBITRUM_SEPOLIA_PRIVATE_KEY=your_private_key_here
+
+# Saga Chainlet (Game Controller)  
+SAGA_TESTNET_RPC_URL=https://chainlet.saga.xyz/
+SAGA_TESTNET_PRIVATE_KEY=your_private_key_here
+
+# Contract addresses (filled after deployment)
+DEFI_VAULT_ADDRESS=
+GAME_CONTROLLER_ADDRESS=
+```
+
+### Pre-configured Addresses
+- **USDC Arbitrum Sepolia**: `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`
+- **Axelar Gateway (Arbitrum)**: `0xe1cE95479C84e9809269227C7F8524aE051Ae77a`
+- **Axelar GasService (Arbitrum)**: `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6`
+
+### Security Notes
+- Use `npx hardhat keystore set PRIVATE_KEY` for secure key storage
+- Never commit private keys to git
+- Use different keys for testnet vs mainnet deployment
+
+## Game Mechanics
+
+### Seed Types & Investment Tiers
+| Seed Type | Min Investment | Growth Time | APY Target |
+|-----------|---------------|-------------|------------|
+| USDC Sprout | 10 USDC | 24 hours | ~5% |
+| Premium Tree | 100 USDC | 48 hours | ~5% |
+| Whale Forest | 1000 USDC | 72 hours | ~5% |
+
+### Player Progression
+- **XP System**: 1 XP per 10 USDC invested
+- **Real Yield**: Actual DeFi returns from EulerSwap
+- **Multiplayer**: Real-time farming with friends via Colyseus
+
+### Cross-Chain Flow
+1. Register player on Saga (gasless)
+2. Plant seed with USDC amount 
+3. Axelar sends message to Arbitrum
+4. DeFi vault deposits USDC into EulerSwap
+5. Yield accumulates over growth period
+6. Harvest triggers yield claim on Arbitrum

@@ -10,9 +10,10 @@ DeFi Valley is a multiplayer farming game that transforms complex DeFi yield far
 
 - **🌱 Seed Planting = DeFi Deposits**: Plant USDC seeds that automatically deposit into EulerSwap vaults
 - **⚡ Gas-Free Gaming**: Built on Saga Chainlets for seamless, zero-cost gameplay  
-- **🔗 Cross-Chain Magic**: Uses Avail Nexus for one-click bridging from any chain to Arbitrum
-- **🎮 Real-Time Multiplayer**: See other farmers in your world via Colyseus
-- **🎨 Cozy Aesthetic**: Beautiful, hand-drawn sprites with satisfying "juice" animations
+- **🔗 Cross-Chain Magic**: Uses Axelar GMP for secure cross-chain communication
+- **🎮 Real-Time Multiplayer**: Live multiplayer with player movement and chat via Colyseus
+- **🕹️ Phaser Game Engine**: Smooth 2D graphics with TypeScript integration
+- **💬 Interactive Chat**: Real-time messaging system between players
 
 ### Architecture
 
@@ -49,9 +50,28 @@ pnpm dev
 ```
 
 This starts:
-- **Frontend**: http://localhost:3000 (Next.js with Turbopack)
-- **Game Server**: Colyseus multiplayer server
+- **Frontend**: http://localhost:3000 (Next.js with Turbopack + Phaser)
+- **Game Server**: http://localhost:2567 (Colyseus multiplayer server)
 - **Smart Contracts**: Local Hardhat network
+
+### 🎮 Playing the Game
+
+#### Local Development
+1. **Start both servers**: `pnpm dev`
+2. **Open game**: http://localhost:3000
+3. **Move around**: Use WASD or Arrow keys
+4. **Chat**: Press Enter to open chat, type message, press Enter to send
+5. **Test multiplayer**: Open multiple browser tabs
+
+#### Network Multiplayer
+1. **Find your local IP**: Check server logs for network address (e.g., `172.31.50.134`)
+2. **Share with friends**: http://[YOUR_IP]:3000
+3. **Debug connections**: Use test client at http://[YOUR_IP]:2567/test.html
+
+#### Game Controls
+- **Movement**: WASD keys or Arrow keys
+- **Chat**: Press Enter to open/send, Escape to cancel
+- **Visual Indicators**: You appear as green circle, others as red circles
 
 ## 🛠️ Development
 
@@ -101,7 +121,42 @@ pnpm dev
 
 # Development for specific package
 pnpm dev --filter=web
+pnpm dev --filter=server
+
+# Manual startup (run in separate terminals)
+cd apps/web && pnpm dev     # Frontend on port 3000
+cd apps/server && pnpm dev  # Game server on port 2567
 ```
+
+### 🚨 Troubleshooting
+
+#### Common Issues
+
+**Connection Refused Error**
+- Ensure game server is running: `cd apps/server && pnpm dev`
+- Check server is listening on port 2567
+- For network access, use IP address instead of localhost
+
+**WASD Keys Not Working in Chat**
+- Fixed! Movement is automatically disabled when chat input is focused
+- Press Escape to close chat and resume movement
+
+**Game Not Loading**
+- Refresh the page if you see "Loading game..." stuck
+- Check browser console for error messages
+- Try the test client: http://localhost:2567/test.html
+
+**Network Multiplayer Issues**
+1. Check your local IP in server startup logs
+2. Use test client first: http://[YOUR_IP]:2567/test.html
+3. Ensure both players are on same network
+4. Check firewall settings if connection fails
+
+#### Development Tips
+- Use browser developer tools to debug WebSocket connections
+- Server logs show player connections and disconnections
+- Test client provides detailed connection diagnostics
+- Multiple browser tabs can simulate multiple players
 
 ### Remote Caching
 
