@@ -1,91 +1,106 @@
-# Turborepo starter
+# DeFi Valley 🏕️
 
-This Turborepo starter is maintained by the Turborepo core team.
+A cozy farming game where your crops are powered by real DeFi protocols. Plant seeds, earn yield, and watch your digital farm grow with actual blockchain value.
 
-## Using this example
+## 🎯 Project Overview
 
-Run the following command:
+DeFi Valley is a multiplayer farming game that transforms complex DeFi yield farming into an intuitive, delightful gaming experience. Built for the hackathon with a focus on cross-chain interoperability and user experience.
 
-```sh
-npx create-turbo@latest
-```
+### Key Features
 
-## What's inside?
+- **🌱 Seed Planting = DeFi Deposits**: Plant USDC seeds that automatically deposit into EulerSwap vaults
+- **⚡ Gas-Free Gaming**: Built on Saga Chainlets for seamless, zero-cost gameplay  
+- **🔗 Cross-Chain Magic**: Uses Avail Nexus for one-click bridging from any chain to Arbitrum
+- **🎮 Real-Time Multiplayer**: See other farmers in your world via Colyseus
+- **🎨 Cozy Aesthetic**: Beautiful, hand-drawn sprites with satisfying "juice" animations
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
+### Architecture
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Game Server    │    │ Smart Contracts │
+│   (Next.js)     │◄──►│   (Colyseus)     │    │                 │
+│                 │    │                  │    │ GameController  │
+│ - Phaser Game   │    │ - Player Sync    │    │ (Saga Testnet)  │
+│ - Privy Auth    │    │ - Real-time      │    │                 │
+│ - Wagmi/Viem    │    │   Multiplayer    │    │ DeFiVault      │
+│                 │    │                  │    │ (Arbitrum)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+## 🚀 Quick Start
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+### Prerequisites
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+- **Node.js v22+** (Required for Hardhat 3 Alpha)
+- **pnpm** (Package manager)
+- **Metamask** or compatible wallet
 
-### Develop
+### Installation
 
-To develop all apps and packages, run the following command:
+```bash
+# Clone and install
+git clone <your-repo>
+cd defivalley
+pnpm install
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+# Start development environment
+pnpm dev
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+This starts:
+- **Frontend**: http://localhost:3000 (Next.js with Turbopack)
+- **Game Server**: Colyseus multiplayer server
+- **Smart Contracts**: Local Hardhat network
+
+## 🛠️ Development
+
+### Project Structure
 
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+defivalley/
+├── apps/
+│   ├── web/           # Next.js frontend + Phaser game
+│   └── server/        # Colyseus multiplayer server
+├── packages/
+│   └── (contracts)/   # Hardhat 3 Alpha smart contracts
+├── turbo.json         # Turborepo configuration
+└── pnpm-workspace.yaml
+```
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+### Smart Contract Development
+
+```bash
+# Navigate to packages directory
+cd packages
+
+# Compile contracts
+npx hardhat compile
+
+# Run tests (both Solidity and TypeScript)
+npx hardhat test
+
+# Deploy to Saga testnet
+npx hardhat run scripts/deploy.ts --network sagaTestnet
+
+# Deploy to Arbitrum testnet  
+npx hardhat run scripts/deploy.ts --network arbitrumSepolia
+```
+
+### Build Commands
+
+```bash
+# Build all packages
+pnpm build
+
+# Build specific package
+pnpm build --filter=web
+
+# Development mode
+pnpm dev
+
+# Development for specific package
+pnpm dev --filter=web
 ```
 
 ### Remote Caching
