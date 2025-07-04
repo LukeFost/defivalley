@@ -13,6 +13,7 @@
   "dependencies": {
     "@privy-io/react-auth": "^2.17.3",
     "@tanstack/react-query": "^5.81.5",
+    "colyseus.js": "^0.16.4",
     "next": "^15.3.0",
     "phaser": "^3.90.0",
     "react": "^19.1.0",
