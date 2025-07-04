@@ -27,6 +27,18 @@ out/
 build
 dist
 
+# Smart Contract Build Artifacts
+packages/contracts/artifacts/
+packages/contracts/cache/
+packages/contracts/typechain-types/
+packages/contracts/deployments/
+packages/contracts/ignition/deployments/
+
+# Hardhat
+packages/contracts/.openzeppelin/
+
+# Web3 & Wallet
+.secret
 
 # Debug
 npm-debug.log*
@@ -36,3 +48,12 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
