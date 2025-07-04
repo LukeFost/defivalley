@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colyseus Test Client</title>
+    <script src="https://unpkg.com/colyseus.js@^0.16.0/dist/colyseus.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .players {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .player {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            border: 2px solid #2196f3;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { opacity: 0.8; }
+        .primary { background-color: #2196f3; color: white; }
+        .secondary { background-color: #6c757d; color: white; }
+        .success { background-color: #28a745; color: white; }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .chat {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f8f9fa;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Colyseus Multiplayer Test</h1>
+        
+        <div class="controls">
+            <input type="text" id="playerName" placeholder="Enter your name" value="TestPlayer">
+            <button class="primary" onclick="connect()">Auto Connect</button>
+            <button class="secondary" onclick="disconnect()">Disconnect</button>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="manualUrl" placeholder="ws://172.31.50.134:2567" style="flex: 1;">
+            <button class="primary" onclick="connectManual()">Manual Connect</button>
+        </div>
+        
+        <div id="status" class="status disconnected">Not connected</div>
+        
+        <div class="controls">
+            <button class="success" onclick="sendPing()">Send Ping</button>
+            <button class="success" onclick="moveRandomly()">Move Randomly</button>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="chatInput" placeholder="Type a message..." maxlength="100">
+            <button class="primary" onclick="sendChat()">Send Chat</button>
+        </div>
+        
+        <div class="chat" id="chatMessages"></div>
+        
+        <h3>Connected Players:</h3>
+        <div id="players" class="players"></div>
+        
+        <h3>Connection Info:</h3>
+        <div id="info"></div>
+        
+        <h3>Network Diagnostics:</h3>
+        <div id="diagnostics">
+            <p><strong>Current Page URL:</strong> <span id="currentUrl"></span></p>
+            <p><strong>Auto-detected Server:</strong> <span id="autoServer"></span></p>
+            <p><strong>Status:</strong> <span id="networkStatus">Checking...</span></p>
+        </div>
+    </div>
+
+    <script>
+        let client = null;
+        let room = null;
+        let myPlayerId = null;
+
+        function updateStatus(message, isConnected) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = isConnected ? 'status connected' : 'status disconnected';
+        }
+
+        function addChatMessage(message) {
+            const chatEl = document.getElementById('chatMessages');
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message';
+            messageEl.textContent = message;
+            chatEl.appendChild(messageEl);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        function updatePlayers(players) {
+            const playersEl = document.getElementById('players');
+            playersEl.innerHTML = '';
+            
+            players.forEach((player, playerId) => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player';
+                playerEl.innerHTML = `
+                    <strong>${player.name}</strong> ${playerId === myPlayerId ? '(You)' : ''}
+                    <br>Position: (${Math.round(player.x)}, ${Math.round(player.y)})
+                    <br>Status: ${player.connected ? 'Online' : 'Offline'}
+                `;
+                playersEl.appendChild(playerEl);
+            });
+        }
+
+        async function connect() {
+            const playerName = document.getElementById('playerName').value || 'TestPlayer';
+            
+            try {
+                updateStatus('Connecting...', false);
+                
+                // Detect the server URL from current page
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const serverUrl = `${protocol}//${window.location.host}`;
+                
+                addChatMessage(`🔌 Attempting connection to: ${serverUrl}`);
+                
+                client = new Colyseus.Client(serverUrl);
+                
+                room = await client.joinOrCreate('game', { name: playerName });
+                
+                updateStatus(`Connected as ${playerName}`, true);
+                
+                // Set up event listeners
+                setupEventListeners();
+                
+            } catch (error) {
+                updateStatus('Connection failed', false);
+                addChatMessage(`❌ Connection failed: ${error.message}`);
+                addChatMessage(`💡 Debug info: ${JSON.stringify({
+                    url: serverUrl,
+                    host: window.location.host,
+                    protocol: window.location.protocol,
+                    userAgent: navigator.userAgent.substring(0, 50)
+                })}`);
+                console.error('Connection error:', error);
+                
+                // Try alternative connection methods
+                addChatMessage(`🔄 You can try manually connecting to:`);
+                addChatMessage(`   • ws://localhost:2567 (if on same device)`);
+                addChatMessage(`   • ws://172.31.50.134:2567 (local network)`);
+            }
+        }
+
+        async function connectManual() {
+            const playerName = document.getElementById('playerName').value || 'TestPlayer';
+            const manualUrl = document.getElementById('manualUrl').value.trim();
+            
+            if (!manualUrl) {
+                addChatMessage('❌ Please enter a server URL');
+                return;
+            }
+            
+            try {
+                updateStatus('Connecting...', false);
+                addChatMessage(`🔌 Manually connecting to: ${manualUrl}`);
+                
+                client = new Colyseus.Client(manualUrl);
+                room = await client.joinOrCreate('game', { name: playerName });
+                
+                updateStatus(`Connected as ${playerName}`, true);
+                
+                // Set up event listeners (same as auto connect)
+                setupEventListeners();
+                
+            } catch (error) {
+                updateStatus('Connection failed', false);
+                addChatMessage(`❌ Manual connection failed: ${error.message}`);
+                console.error('Manual connection error:', error);
+            }
+        }
+
+        function setupEventListeners() {
+            if (!room) return;
+            
+            // Set up event listeners
+            room.onMessage('welcome', (message) => {
+                addChatMessage(`🎉 ${message.message}`);
+                myPlayerId = message.playerId;
+                document.getElementById('info').innerHTML = `
+                    <strong>Player ID:</strong> ${myPlayerId}<br>
+                    <strong>Room ID:</strong> ${room.id}<br>
+                    <strong>Server:</strong> ${client.endpoint}
+                `;
+            });
+            
+            room.onMessage('player-joined', (message) => {
+                addChatMessage(`👋 ${message.name} joined the game! (${message.totalPlayers} players online)`);
+            });
+            
+            room.onMessage('player-left', (message) => {
+                addChatMessage(`👋 A player left the game (${message.totalPlayers} players online)`);
+            });
+            
+            room.onMessage('chat', (message) => {
+                addChatMessage(`💬 ${message.name}: ${message.message}`);
+            });
+            
+            room.onMessage('pong', (message) => {
+                addChatMessage(`🏓 Pong! Server time: ${new Date(message.timestamp).toLocaleTimeString()}`);
+            });
+            
+            room.onStateChange((state) => {
+                updatePlayers(state.players);
+            });
+            
+            room.onError((code, message) => {
+                addChatMessage(`❌ Error: ${message}`);
+            });
+            
+            room.onLeave((code) => {
+                updateStatus('Disconnected', false);
+                addChatMessage(`👋 Left the room (code: ${code})`);
+            });
+        }
+
+        function disconnect() {
+            if (room) {
+                room.leave();
+                room = null;
+                client = null;
+                updateStatus('Disconnected', false);
+                document.getElementById('players').innerHTML = '';
+                document.getElementById('info').innerHTML = '';
+            }
+        }
+
+        function sendPing() {
+            if (room) {
+                room.send('ping', { timestamp: Date.now() });
+            }
+        }
+
+        function moveRandomly() {
+            if (room) {
+                const x = Math.random() * 800;
+                const y = Math.random() * 600;
+                room.send('move', { x, y });
+                addChatMessage(`🚀 Moved to (${Math.round(x)}, ${Math.round(y)})`);
+            }
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (message && room) {
+                room.send('chat', { text: message });
+                input.value = '';
+            }
+        }
+
+        // Allow enter key to send chat
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChat();
+            }
+        });
+
+        // Auto-connect on page load for testing
+        window.addEventListener('load', () => {
+            addChatMessage('🎮 Ready to connect! Click "Connect" to join the game.');
+            
+            // Update diagnostics
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const serverUrl = `${protocol}//${window.location.host}`;
+            
+            document.getElementById('currentUrl').textContent = window.location.href;
+            document.getElementById('autoServer').textContent = serverUrl;
+            document.getElementById('networkStatus').textContent = 'Ready to connect';
+            
+            // Pre-fill manual URL with detected server
+            document.getElementById('manualUrl').value = serverUrl;
+        });
+    </script>
+</body>
+</html>
