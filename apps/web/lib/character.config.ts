@@ -41,17 +41,6 @@ interface AnimationPreset {
 
 // Animation preset configurations for DRY principle
 const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
-  knight: {
-    frameWidth: 120,
-    frameHeight: 80,
-    scale: 0.8,
-    basePath: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets',
-    animations: {
-      idle: { frames: 10, frameRate: 8, file: '_Idle.png' },
-      walk: { frames: 10, frameRate: 12, file: '_Run.png' },
-      run: { frames: 10, frameRate: 16, file: '_Run.png' },
-    },
-  },
   cowboy: {
     frameWidth: 80,
     frameHeight: 102,
@@ -107,7 +96,6 @@ function createCharacterConfig(name: string, preset: keyof typeof ANIMATION_PRES
 
 // Character definitions using the new configuration system
 export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
-  knight: createCharacterConfig('knight', 'knight'),
   cowboy: createCharacterConfig('cowboy', 'cowboy'),
 };
 
@@ -115,46 +103,32 @@ export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
 export const CharacterConfig = {
   player: {
     key: 'player_characters',
-    path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png',
-    frameWidth: 120,
-    frameHeight: 80,
+    path: '/sprites/Cowboy/Walk_Cycle_Cowboy.png',
+    frameWidth: 80,
+    frameHeight: 102,
     directions: {
       down: 0,
       left: 1,
       right: 2,
       up: 3,
     },
-    framesPerCharacter: 10,
+    framesPerCharacter: 11,
     characters: {
-      knight: 0,
-      cowboy: 1,
+      cowboy: 0,
     },
-  },
-  knight: {
-    key: 'knight_character',
-    path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png',
-    frameWidth: 120,
-    frameHeight: 80,
-    directions: {
-      down: 0,
-      left: 1,
-      right: 2,
-      up: 3,
-    },
-    framesPerCharacter: 10,
   },
   cowboy: {
     key: 'cowboy_character',
     path: '/sprites/Cowboy/Rotation_Cycle_Cowboy.png',
-    frameWidth: 53,
-    frameHeight: 115,
+    frameWidth: 80,
+    frameHeight: 102,
     directions: {
-      down: 0,
-      left: 1,
-      right: 2,
-      up: 3,
+      down: 2,  // Use frame 2 (front-facing) for down
+      left: 0,  // Use frame 0 (left-facing) for left
+      right: 4, // Use frame 4 (right-facing) for right
+      up: 2,    // Use frame 2 (front-facing) for up (no back view)
     },
-    framesPerCharacter: 6,
+    framesPerCharacter: 5,
   },
 } as const;
 

@@ -169,17 +169,15 @@ export class Player extends Phaser.GameObjects.Container {
         let startFrame = 0;
         let endFrame = animation.frames - 1;
         
-        // Special handling for cowboy walk cycle
-        if (this.playerInfo.character === 'cowboy') {
-          if (animationState === 'idle') {
-            // Idle uses only frame 0
-            startFrame = 0;
-            endFrame = 0;
-          } else if (animationState === 'walk' || animationState === 'run') {
-            // Walk/run uses frames 1-7 (avoiding problematic frames and non-existent frames)
-            startFrame = 1;
-            endFrame = 7;
-          }
+        // Frame handling for cowboy animations
+        if (animationState === 'idle') {
+          // Idle uses only frame 0
+          startFrame = 0;
+          endFrame = 0;
+        } else if (animationState === 'walk' || animationState === 'run') {
+          // Walk/run uses frames 1-7 (avoiding problematic frames and non-existent frames)
+          startFrame = 1;
+          endFrame = 7;
         }
         
         this.scene.anims.create({
@@ -251,12 +249,10 @@ export class Player extends Phaser.GameObjects.Container {
           let startFrame = 0;
           let endFrame = walkAnimation.frames - 1;
           
-          // Special handling for cowboy walk cycle
-          if (this.playerInfo.character === 'cowboy') {
-            if (animationState === 'walk' || animationState === 'run') {
-              startFrame = 1;
-              endFrame = 7;
-            }
+          // Frame handling for walk/run animations
+          if (animationState === 'walk' || animationState === 'run') {
+            startFrame = 1;
+            endFrame = 7;
           }
           
           this.scene.anims.create({

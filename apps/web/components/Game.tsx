@@ -1199,52 +1199,9 @@ class MainScene extends Phaser.Scene {
         console.log('🎯 Current player spawned at center:', player.x, player.y);
       }
       
-      // Determine character type - check global selection first, then fall back to player-specific
-      let characterType: CharacterType;
-      
-      if (isCurrentPlayer) {
-        // For current player, check global settings first
-        const globalCharacterSelection = MainScene.safeLocalStorage.getItem('character-selection') as CharacterType;
-        
-        if (globalCharacterSelection && CharacterDefinitions[globalCharacterSelection] !== undefined) {
-          characterType = globalCharacterSelection;
-          console.log(`🎭 Current player using global character selection: ${characterType}`);
-        } else {
-          // Fall back to player-specific or generate new
-          const playerAddress = player.address || sessionId;
-          const storageKey = `defi-valley-character-${playerAddress}`;
-          const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
-          
-          if (savedCharacter) {
-            characterType = savedCharacter as CharacterType;
-            console.log(`🎭 Current player using saved character ${characterType}`);
-          } else {
-            // First time - generate a character based on address and save it
-            const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
-            const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
-            characterType = characterTypes[characterIndex];
-            MainScene.safeLocalStorage.setItem(storageKey, characterType);
-            console.log(`🎭 Current player assigned new character ${characterType}`);
-          }
-        }
-      } else {
-        // For other players, use player-specific storage
-        const playerAddress = player.address || sessionId;
-        const storageKey = `defi-valley-character-${playerAddress}`;
-        const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
-        
-        if (savedCharacter) {
-          characterType = savedCharacter as CharacterType;
-          console.log(`🎭 Player ${player.name} using saved character ${characterType}`);
-        } else {
-          // Generate a character based on address and save it
-          const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
-          const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
-          characterType = characterTypes[characterIndex];
-          MainScene.safeLocalStorage.setItem(storageKey, characterType);
-          console.log(`🎭 Player ${player.name} assigned new character ${characterType}`);
-        }
-      }
+      // All players are cowboys now - simplified character assignment
+      const characterType: CharacterType = 'cowboy';
+      console.log(`🤠 Player ${player.name} assigned cowboy character`);
       
       // Create PlayerInfo object
       const playerInfo: PlayerInfo = {
