@@ -24,7 +24,29 @@ export const CharacterConfig = {
       berserker: 7,
     },
   },
+  knight: {
+    key: 'knight_character',
+    idlePath: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png',
+    runPath: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png',
+    frameWidth: 120,
+    frameHeight: 80,
+    // Knight sprite sheets have different frame counts
+    idleFrames: 4,
+    runFrames: 10,
+    // Knight uses single animation states (not directional)
+    directions: {
+      down: 'idle',
+      left: 'run',
+      right: 'run',
+      up: 'run',
+    },
+  },
 } as const;
 
-export type CharacterType = keyof typeof CharacterConfig.player.characters;
+export type CharacterType = keyof typeof CharacterConfig.player.characters | 'knight';
 export type Direction = keyof typeof CharacterConfig.player.directions;
+
+// Helper function to determine if a character is a knight
+export function isKnightCharacter(character: CharacterType): character is 'knight' {
+  return character === 'knight';
+}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
-import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CharacterConfig, CharacterType, isKnightCharacter } from '../lib/character.config';
 
 interface GameState {
   players: Map<string, {
@@ -49,6 +49,12 @@ class MainScene extends Phaser.Scene {
     this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
+    });
+    
+    // Load knight character sprites
+    this.load.spritesheet(CharacterConfig.knight.key, CharacterConfig.knight.idlePath, {
+      frameWidth: CharacterConfig.knight.frameWidth,
+      frameHeight: CharacterConfig.knight.frameHeight
     });
   }
 
@@ -344,7 +350,7 @@ class MainScene extends Phaser.Scene {
         // For current player, check global settings first
         const globalCharacterSelection = MainScene.safeLocalStorage.getItem('character-selection') as CharacterType;
         
-        if (globalCharacterSelection && CharacterConfig.player.characters[globalCharacterSelection] !== undefined) {
+        if (globalCharacterSelection && (isKnightCharacter(globalCharacterSelection) || CharacterConfig.player.characters[globalCharacterSelection as keyof typeof CharacterConfig.player.characters] !== undefined)) {
           characterType = globalCharacterSelection;
           console.log(`🎭 Current player using global character selection: ${characterType}`);
         } else {

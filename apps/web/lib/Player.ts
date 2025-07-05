@@ -1,4 +1,4 @@
-import { CharacterConfig, CharacterType, Direction } from './character.config';
+import { CharacterConfig, CharacterType, Direction, isKnightCharacter } from './character.config';
 
 export interface PlayerInfo {
   id: string;
@@ -23,8 +23,12 @@ export class Player extends Phaser.GameObjects.Container {
     
     this.playerInfo = playerInfo;
     
-    // Create sprite
-    this.sprite = scene.add.sprite(0, 0, CharacterConfig.player.key);
+    // Create sprite based on character type
+    if (isKnightCharacter(playerInfo.character)) {
+      this.sprite = scene.add.sprite(0, 0, CharacterConfig.knight.key);
+    } else {
+      this.sprite = scene.add.sprite(0, 0, CharacterConfig.player.key);
+    }
     this.updateSprite();
     
     // Create nameplate
@@ -56,13 +60,24 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private updateSprite(): void {
-    const config = CharacterConfig.player;
-    const characterIndex = config.characters[this.playerInfo.character];
-    const directionIndex = config.directions[this.playerInfo.direction];
-    
-    // Calculate the frame index based on character and direction
-    const frameIndex = characterIndex * config.framesPerCharacter + directionIndex;
-    this.sprite.setFrame(frameIndex);
+    if (isKnightCharacter(this.playerInfo.character)) {
+      // Knight character uses different sprite handling
+      const knightConfig = CharacterConfig.knight;
+      const animationState = knightConfig.directions[this.playerInfo.direction];
+      
+      // For knight, we'll use frame 0 for idle and frame 1 for run (simplified)
+      const frameIndex = animationState === 'idle' ? 0 : 1;
+      this.sprite.setFrame(frameIndex);
+    } else {
+      // Regular character sprite handling
+      const config = CharacterConfig.player;
+      const characterIndex = config.characters[this.playerInfo.character as keyof typeof config.characters];
+      const directionIndex = config.directions[this.playerInfo.direction];
+      
+      // Calculate the frame index based on character and direction
+      const frameIndex = characterIndex * config.framesPerCharacter + directionIndex;
+      this.sprite.setFrame(frameIndex);
+    }
   }
 
   public updatePosition(x: number, y: number): void {
@@ -85,6 +100,15 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   public changeCharacter(newCharacter: CharacterType): void {
+    const wasKnight = isKnightCharacter(this.playerInfo.character);
+    const isNewKnight = isKnightCharacter(newCharacter);
+    
+    // If switching between knight and regular characters, we need to change the sprite texture
+    if (wasKnight !== isNewKnight) {
+      const newTexture = isNewKnight ? CharacterConfig.knight.key : CharacterConfig.player.key;
+      this.sprite.setTexture(newTexture);
+    }
+    
     this.playerInfo.character = newCharacter;
     this.updateSprite();
     console.log(`🎭 Player ${this.playerInfo.name} changed character to ${newCharacter}`);

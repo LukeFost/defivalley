@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../app/store';
-import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CharacterConfig, CharacterType, isKnightCharacter } from '../lib/character.config';
 import {
   Dialog,
   DialogContent,
@@ -18,20 +18,37 @@ interface CharacterPreviewProps {
 }
 
 function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewProps) {
-  const characterIndex = CharacterConfig.player.characters[character];
-  const spriteSheetPath = CharacterConfig.player.path;
+  let spriteSheetPath: string;
+  let frameWidth: number;
+  let frameHeight: number;
+  let spriteX: number;
+  let spriteY: number;
   
-  // Calculate sprite position
-  const frameWidth = CharacterConfig.player.frameWidth;
-  const frameHeight = CharacterConfig.player.frameHeight;
-  const framesPerRow = 8; // Assuming 8 characters per row based on sprite sheet
-  const row = Math.floor(characterIndex / framesPerRow);
-  const col = characterIndex % framesPerRow;
-  
-  // Use down-facing sprite (direction 0)
-  const downDirection = CharacterConfig.player.directions.down;
-  const spriteX = col * frameWidth * CharacterConfig.player.framesPerCharacter + downDirection * frameWidth;
-  const spriteY = row * frameHeight;
+  if (isKnightCharacter(character)) {
+    // Knight character uses different sprite format
+    spriteSheetPath = CharacterConfig.knight.idlePath;
+    frameWidth = CharacterConfig.knight.frameWidth;
+    frameHeight = CharacterConfig.knight.frameHeight;
+    // Use first frame of idle animation
+    spriteX = 0;
+    spriteY = 0;
+  } else {
+    // Regular character sprite handling
+    const characterIndex = CharacterConfig.player.characters[character as keyof typeof CharacterConfig.player.characters];
+    spriteSheetPath = CharacterConfig.player.path;
+    frameWidth = CharacterConfig.player.frameWidth;
+    frameHeight = CharacterConfig.player.frameHeight;
+    
+    // Calculate sprite position
+    const framesPerRow = 8; // Assuming 8 characters per row based on sprite sheet
+    const row = Math.floor(characterIndex / framesPerRow);
+    const col = characterIndex % framesPerRow;
+    
+    // Use down-facing sprite (direction 0)
+    const downDirection = CharacterConfig.player.directions.down;
+    spriteX = col * frameWidth * CharacterConfig.player.framesPerCharacter + downDirection * frameWidth;
+    spriteY = row * frameHeight;
+  }
   
   return (
     <div
@@ -50,9 +67,11 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
             style={{
               backgroundImage: `url(${spriteSheetPath})`,
               backgroundPosition: `-${spriteX}px -${spriteY}px`,
-              backgroundSize: `${frameWidth * 8 * CharacterConfig.player.framesPerCharacter}px auto`,
+              backgroundSize: isKnightCharacter(character) 
+                ? `${CharacterConfig.knight.frameWidth * CharacterConfig.knight.idleFrames}px auto`
+                : `${frameWidth * 8 * CharacterConfig.player.framesPerCharacter}px auto`,
               imageRendering: 'pixelated',
-              transform: 'scale(2)',
+              transform: isKnightCharacter(character) ? 'scale(0.5)' : 'scale(2)',
               transformOrigin: 'top left',
             }}
           />
@@ -89,7 +108,7 @@ export default function SettingsDialog() {
   useEffect(() => {
     setIsMounted(true);
     const savedCharacter = localStorage.getItem('character-selection') as CharacterType;
-    if (savedCharacter && CharacterConfig.player.characters[savedCharacter] !== undefined) {
+    if (savedCharacter && (isKnightCharacter(savedCharacter) || CharacterConfig.player.characters[savedCharacter as keyof typeof CharacterConfig.player.characters] !== undefined)) {
       setCurrentCharacter(savedCharacter);
       setSelectedCharacter(savedCharacter);
       console.log('⚙️ [SETTINGS] Loaded saved character:', savedCharacter);
@@ -126,7 +145,7 @@ export default function SettingsDialog() {
     hideSettingsModal();
   };
   
-  const availableCharacters = Object.keys(CharacterConfig.player.characters) as CharacterType[];
+  const availableCharacters = [...Object.keys(CharacterConfig.player.characters), 'knight'] as CharacterType[];
   const hasChanges = selectedCharacter !== currentCharacter;
   
   // Prevent rendering until client-side hydration is complete
