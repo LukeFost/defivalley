@@ -18,6 +18,50 @@ interface CharacterPreviewProps {
 }
 
 function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewProps) {
+  // Handle knight character differently
+  if (character === 'knight') {
+    return (
+      <div
+        onClick={onSelect}
+        className={`cursor-pointer rounded-lg border-2 p-4 transition-all duration-200 ${
+          isSelected
+            ? 'border-green-500 bg-green-50 shadow-md scale-105'
+            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm hover:scale-102'
+        }`}
+      >
+        <div className="flex flex-col items-center space-y-3">
+          {/* Knight Sprite Preview */}
+          <div className="relative">
+            <div
+              className="w-16 h-16 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100"
+              style={{
+                backgroundImage: `url(${CharacterConfig.knight.path})`,
+                backgroundPosition: '0px 0px',
+                backgroundSize: 'cover',
+                imageRendering: 'pixelated',
+              }}
+            />
+            {isSelected && (
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </div>
+          
+          {/* Character Name */}
+          <h3 className={`font-semibold text-center capitalize ${
+            isSelected ? 'text-green-700' : 'text-gray-900'
+          }`}>
+            {character}
+          </h3>
+        </div>
+      </div>
+    );
+  }
+  
+  // Standard character preview
   const characterIndex = CharacterConfig.player.characters[character];
   const spriteSheetPath = CharacterConfig.player.path;
   
@@ -77,28 +121,24 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
 }
 
 export default function SettingsDialog() {
-  const [isMounted, setIsMounted] = useState(false);
   const isSettingsModalOpen = useAppStore((state) => state.ui.showSettingsModal ?? false);
   const hideSettingsModal = useAppStore((state) => state.hideSettingsModal);
   const addNotification = useAppStore((state) => state.addNotification);
   
-  const [selectedCharacter, setSelectedCharacter] = useState<CharacterType>('warrior');
-  const [currentCharacter, setCurrentCharacter] = useState<CharacterType>('warrior');
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterType>('knight');
+  const [currentCharacter, setCurrentCharacter] = useState<CharacterType>('knight');
   
-  // Set mounted state and load current character selection from localStorage on mount
+  // Load current character selection from localStorage on mount
   useEffect(() => {
-    setIsMounted(true);
     const savedCharacter = localStorage.getItem('character-selection') as CharacterType;
     if (savedCharacter && CharacterConfig.player.characters[savedCharacter] !== undefined) {
       setCurrentCharacter(savedCharacter);
       setSelectedCharacter(savedCharacter);
-      console.log('⚙️ [SETTINGS] Loaded saved character:', savedCharacter);
+      console.log(`🎭 Loaded saved character: ${savedCharacter}`);
     } else {
-      console.log('⚙️ [SETTINGS] No saved character found, using default warrior');
+      console.log('🎭 No saved character found, using default knight');
     }
   }, []);
-  
-  console.log('⚙️ [SETTINGS] Rendering SettingsDialog, isOpen:', isSettingsModalOpen, 'isMounted:', isMounted);
   
   const handleCharacterSelect = (character: CharacterType) => {
     setSelectedCharacter(character);
@@ -128,11 +168,6 @@ export default function SettingsDialog() {
   
   const availableCharacters = Object.keys(CharacterConfig.player.characters) as CharacterType[];
   const hasChanges = selectedCharacter !== currentCharacter;
-  
-  // Prevent rendering until client-side hydration is complete
-  if (!isMounted) {
-    return null;
-  }
   
   return (
     <Dialog 
