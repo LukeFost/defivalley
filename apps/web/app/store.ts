@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 // Transaction status types
@@ -95,6 +95,7 @@ export interface UIState {
   showTransactionTracker: boolean;
   showPlantModal: boolean;
   showHarvestModal: boolean;
+  showSettingsModal: boolean;
   notifications: Notification[];
 }
 
@@ -124,8 +125,8 @@ export interface AppState {
   
   // Configuration
   config: {
-    sagaChainId: number;
-    arbitrumChainId: number;
+    sagaChainId: 2751669528484000;
+    arbitrumChainId: 421614;
     gameControllerAddress: `0x${string}`;
     defiVaultAddress: `0x${string}`;
     usdcAddress: `0x${string}`;
@@ -159,6 +160,8 @@ export interface AppActions {
   hidePlantModal: () => void;
   showHarvestModal: () => void;
   hideHarvestModal: () => void;
+  showSettingsModal: () => void;
+  hideSettingsModal: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -168,6 +171,30 @@ export interface AppActions {
   calculateLevel: (experience: number) => number;
   estimateYield: (amount: bigint, seedType: number, plantTime: number) => bigint;
 }
+
+// Create SSR-safe storage that only works on the client
+const storage = createJSONStorage(() => ({
+  getItem: (name) => {
+    // On the client, use localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(name);
+    }
+    // On the server, return null
+    return null;
+  },
+  setItem: (name, value) => {
+    // On the client, use localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(name, value);
+    }
+  },
+  removeItem: (name) => {
+    // On the client, use localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(name);
+    }
+  },
+}));
 
 // Initial state
 const initialState: AppState = {
@@ -211,6 +238,7 @@ const initialState: AppState = {
     showTransactionTracker: false,
     showPlantModal: false,
     showHarvestModal: false,
+    showSettingsModal: false,
     notifications: []
   },
   config: {
@@ -321,7 +349,7 @@ export const useAppStore = create<AppState & AppActions>()(
           set((state) => {
             state.seedPositions = positions.map(pos => ({
               ...pos,
-              isReady: Date.now() / 1000 > pos.plantTime + get().seedTypes.find(t => t.id === pos.seedType)?.growthTime || 0,
+              isReady: Date.now() / 1000 > pos.plantTime + (get().seedTypes.find(t => t.id === pos.seedType)?.growthTime || 0),
               estimatedYield: get().estimateYield(pos.amount, pos.seedType, pos.plantTime)
             }));
           });
@@ -388,16 +416,24 @@ export const useAppStore = create<AppState & AppActions>()(
         },
         
         showPlantModal: () => {
+          console.log('🌱 [STORE] showPlantModal action called');
+          console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
           set((state) => {
             state.ui.showPlantModal = true;
+            console.log('🌱 [STORE] Setting showPlantModal to true');
           });
+          console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
         },
         
         hidePlantModal: () => {
+          console.log('🌱 [STORE] hidePlantModal action called');
+          console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
           set((state) => {
             state.ui.showPlantModal = false;
             state.ui.plantAmount = '';
+            console.log('🌱 [STORE] Setting showPlantModal to false');
           });
+          console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
         },
         
         showHarvestModal: () => {
@@ -409,6 +445,18 @@ export const useAppStore = create<AppState & AppActions>()(
         hideHarvestModal: () => {
           set((state) => {
             state.ui.showHarvestModal = false;
+          });
+        },
+        
+        showSettingsModal: () => {
+          set((state) => {
+            state.ui.showSettingsModal = true;
+          });
+        },
+        
+        hideSettingsModal: () => {
+          set((state) => {
+            state.ui.showSettingsModal = false;
           });
         },
         
@@ -469,6 +517,7 @@ export const useAppStore = create<AppState & AppActions>()(
       })),
       {
         name: 'defi-valley-store',
+        storage: storage, // Use our SSR-safe storage
         partialize: (state) => ({
           transactionHistory: state.transactionHistory,
           ui: {
@@ -485,8 +534,8 @@ export const useAppStore = create<AppState & AppActions>()(
 
 // Selectors for easy access to specific state slices
 export const useTransactions = () => useAppStore(state => ({
-  active: state.activeTransactions,
-  history: state.transactionHistory,
+  active: state.activeTransactions || [],
+  history: state.transactionHistory || [],
   add: state.addTransaction,
   update: state.updateTransaction,
   complete: state.completeTransaction,
@@ -501,7 +550,8 @@ export const usePlayerData = () => useAppStore(state => ({
   seedTypes: state.seedTypes,
   setPlayerState: state.setPlayerState,
   updateSeedPositions: state.updateSeedPositions,
-  setVaultPosition: state.setVaultPosition
+  setVaultPosition: state.setVaultPosition,
+  addOptimisticSeed: state.addOptimisticSeed
 }));
 
 export const useUI = () => useAppStore(state => ({
@@ -521,7 +571,8 @@ export const useUI = () => useAppStore(state => ({
   showHarvestModal: state.showHarvestModal,
   hideHarvestModal: state.hideHarvestModal,
   addNotification: state.addNotification,
-  removeNotification: state.removeNotification
+  removeNotification: state.removeNotification,
+  clearNotifications: state.clearNotifications
 }));
 
 export const useConfig = () => useAppStore(state => state.config);

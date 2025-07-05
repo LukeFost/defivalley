@@ -248,7 +248,7 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
               <div>
                 <span className="text-gray-500">Amount:</span>
                 <span className="ml-2 font-medium">
-                  {(Number(transaction.amount) / 1e6).toFixed(2)} USDC
+                  {transaction.amount ? (Number(transaction.amount) / 1e6).toFixed(2) : '0.00'} USDC
                 </span>
               </div>
             )}
@@ -318,16 +318,19 @@ export default function TransactionTracker() {
   const { active: activeTransactions, history: transactionHistory, retry } = useTransactions();
   const { showTransactionTracker, toggleTransactionTracker, clearNotifications } = useUI();
   
-  console.log('TransactionTracker render - showTransactionTracker:', showTransactionTracker);
+  // Debug: Check transaction state
+  if (activeTransactions?.length === 0 && transactionHistory?.length === 0) {
+    console.log('📊 TransactionTracker: No transactions to display');
+  }
   
   if (!showTransactionTracker) {
-    console.log('TransactionTracker is hidden');
     return null;
   }
   
-  console.log('TransactionTracker should be visible!');
-  
-  const allTransactions = [...activeTransactions, ...transactionHistory.slice(0, 10)];
+  const allTransactions = [
+    ...(activeTransactions || []), 
+    ...(transactionHistory || []).slice(0, 10)
+  ];
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

@@ -83,3 +83,9 @@ temp_package.json
 # IDE (additional patterns)
 .vscode/
 .idea/
+
+# Repomix output files
+repomix-output.xml
+repomix-output.txt
+*.repomix.xml
+*.repomix.txt

@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { useCrossChainTx } from '../hooks/useCrossChainTx';
-import { useUI, usePlayerData, useConfig, SeedType } from '../store';
+import { useCrossChainTx } from '../app/hooks/useCrossChainTx';
+import { useAppStore, usePlayerData, useConfig, SeedType } from '../app/store';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface SeedCardProps {
   seed: SeedType;
@@ -74,7 +81,8 @@ function SeedCard({ seed, isSelected, onSelect }: SeedCardProps) {
   );
 }
 
-export default function PlantSeed() {
+export default function PlantSeedDialog() {
+  const [isMounted, setIsMounted] = useState(false);
   const { address } = useAccount();
   const config = useConfig();
   
@@ -85,20 +93,20 @@ export default function PlantSeed() {
     chainId: config.sagaChainId
   });
   
-  const ui = useUI();
-  const {
-    isPlantModalOpen,
-    showPlantModal,
-    hidePlantModal,
-    selectedSeedType,
-    setSelectedSeedType,
-    plantAmount,
-    setPlantAmount,
-    addNotification
-  } = ui;
+  // Use granular selectors to prevent unnecessary re-renders
+  const isPlantModalOpen = useAppStore((state) => {
+    console.log('🌱 [DIALOG] Reading isPlantModalOpen from store:', state.ui.showPlantModal);
+    return state.ui.showPlantModal ?? false; // Handle undefined during hydration
+  });
+  const hidePlantModal = useAppStore((state) => state.hidePlantModal);
+  const selectedSeedType = useAppStore((state) => state.ui.selectedSeedType);
+  const setSelectedSeedType = useAppStore((state) => state.setSelectedSeedType);
+  const plantAmount = useAppStore((state) => state.ui.plantAmount);
+  const setPlantAmount = useAppStore((state) => state.setPlantAmount);
+  const addNotification = useAppStore((state) => state.addNotification);
   
-  // Debug: Check modal state
-  console.log('PlantSeed - isPlantModalOpen:', isPlantModalOpen);
+  console.log('🌱 [DIALOG] PlantSeedDialog render - isPlantModalOpen:', isPlantModalOpen);
+  console.log('🌱 [DIALOG] PlantSeedDialog render - hidePlantModal function:', typeof hidePlantModal);
   
   const { seedTypes } = usePlayerData();
   const { plantSeed, isLoading, estimateGas } = useCrossChainTx();
@@ -108,48 +116,58 @@ export default function PlantSeed() {
   const [amountError, setAmountError] = useState('');
   
   const selectedSeed = seedTypes.find(s => s.id === selectedSeedType);
-  
-  // Validate amount and estimate gas
+
+  // Set mounted state after hydration
   useEffect(() => {
-    const validateAmount = async () => {
-      if (!plantAmount || !selectedSeed) {
+    setIsMounted(true);
+  }, []);
+  
+  // Debounced validation function
+  const validateAmount = useCallback(async (amount: string, seed: SeedType | undefined) => {
+    if (!amount || !seed) {
+      setIsValidAmount(false);
+      setAmountError('');
+      return;
+    }
+    
+    try {
+      const parsedAmount = parseUnits(amount, 6);
+      
+      // Check minimum amount
+      if (parsedAmount < seed.minAmount) {
         setIsValidAmount(false);
-        setAmountError('');
+        setAmountError(`Minimum amount is ${Number(formatUnits(seed.minAmount, 6))} USDC`);
         return;
       }
       
-      try {
-        const parsedAmount = parseUnits(plantAmount, 6);
-        
-        // Check minimum amount
-        if (parsedAmount < selectedSeed.minAmount) {
-          setIsValidAmount(false);
-          setAmountError(`Minimum amount is ${Number(formatUnits(selectedSeed.minAmount, 6))} USDC`);
-          return;
-        }
-        
-        // Check balance
-        if (usdcBalance && parsedAmount > usdcBalance.value) {
-          setIsValidAmount(false);
-          setAmountError('Insufficient USDC balance');
-          return;
-        }
-        
-        // Estimate gas for cross-chain transaction
-        const gasEstimate = await estimateGas(selectedSeedType, plantAmount);
-        setEstimatedGas(gasEstimate);
-        
-        setIsValidAmount(true);
-        setAmountError('');
-        
-      } catch (error) {
+      // Check balance
+      if (usdcBalance && parsedAmount > usdcBalance.value) {
         setIsValidAmount(false);
-        setAmountError('Invalid amount');
+        setAmountError('Insufficient USDC balance');
+        return;
       }
-    };
+      
+      // Estimate gas for cross-chain transaction
+      const gasEstimate = await estimateGas(selectedSeedType, amount);
+      setEstimatedGas(gasEstimate);
+      
+      setIsValidAmount(true);
+      setAmountError('');
+      
+    } catch (error) {
+      setIsValidAmount(false);
+      setAmountError('Invalid amount');
+    }
+  }, [usdcBalance, selectedSeedType, estimateGas]);
+  
+  // Debounced validation with 400ms delay
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      validateAmount(plantAmount, selectedSeed);
+    }, 400);
     
-    validateAmount();
-  }, [plantAmount, selectedSeed, usdcBalance, selectedSeedType, estimateGas]);
+    return () => clearTimeout(timeoutId);
+  }, [plantAmount, selectedSeed, validateAmount]);
   
   const handlePlantSeed = async () => {
     if (!isValidAmount || !selectedSeed || !plantAmount) {
@@ -177,7 +195,7 @@ export default function PlantSeed() {
         });
       }
     } catch (error) {
-      console.error('Plant seed error:', error);
+      // Error handling is managed by the useCrossChainTx hook
     }
   };
   
@@ -192,32 +210,38 @@ export default function PlantSeed() {
     setPlantAmount(formatUnits(finalAmount, 6));
   };
   
-  if (!isPlantModalOpen) {
+  console.log('🌱 [DIALOG] About to render Dialog with open =', isPlantModalOpen);
+  console.log('🌱 [DIALOG] hidePlantModal function available:', typeof hidePlantModal === 'function');
+  
+  // Prevent rendering until client-side hydration is complete
+  if (!isMounted) {
     return null;
   }
   
-  console.log('🎉 PlantSeed modal rendering now!');
-  
   return (
-    <div className="fixed inset-0 bg-red-500 bg-opacity-90 flex items-center justify-center z-50 p-4" style={{zIndex: 9999}}>
-      <div className="bg-yellow-300 border-4 border-red-600 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Plant Seeds for DeFi Yield</h2>
-          <button
-            onClick={hidePlantModal}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Dialog 
+      open={isPlantModalOpen} 
+      onOpenChange={(open) => {
+        console.log('🌱 [DIALOG] Dialog onOpenChange called with:', open);
+        console.log('🌱 [DIALOG] Current isPlantModalOpen:', isPlantModalOpen);
+        if (!open) {
+          console.log('🌱 [DIALOG] Calling hidePlantModal...');
+          hidePlantModal();
+          console.log('🌱 [DIALOG] hidePlantModal called');
+        }
+      }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Plant Seeds for DeFi Yield</DialogTitle>
+          <DialogDescription>
+            Choose your seed type and investment amount to start earning real DeFi yields
+          </DialogDescription>
+        </DialogHeader>
         
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+        <div className="space-y-6">
           {/* Wallet Status */}
           {address && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="font-semibold text-blue-900 mb-2">Your Wallet</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -237,7 +261,7 @@ export default function PlantSeed() {
           )}
           
           {/* Seed Selection */}
-          <div className="mb-6">
+          <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Your Seed Type</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {seedTypes.map((seed) => (
@@ -253,7 +277,7 @@ export default function PlantSeed() {
           
           {/* Amount Input */}
           {selectedSeed && (
-            <div className="mb-6">
+            <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Investment Amount</h3>
               <div className="space-y-4">
                 <div>
@@ -314,7 +338,7 @@ export default function PlantSeed() {
           
           {/* Transaction Summary */}
           {selectedSeed && isValidAmount && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="font-semibold text-green-900 mb-3">Transaction Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -346,7 +370,7 @@ export default function PlantSeed() {
           )}
           
           {/* Cross-chain Info */}
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <h3 className="font-semibold text-yellow-900 mb-2">Cross-chain Process</h3>
             <div className="text-sm text-yellow-800 space-y-1">
               <p>• Transaction starts on Saga Chainlet (gasless gaming)</p>
@@ -358,7 +382,7 @@ export default function PlantSeed() {
         </div>
         
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between pt-6 border-t border-gray-200">
           <button
             onClick={hidePlantModal}
             className="px-6 py-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -385,7 +409,7 @@ export default function PlantSeed() {
             )}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

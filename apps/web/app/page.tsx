@@ -1,6 +1,8 @@
 import GameWrapper from './components/GameWrapper';
 import { Auth } from './components/Auth';
-import PlantSeed from './components/PlantSeed';
+import PlantSeedDialog from '../components/PlantSeedDialog';
+import SettingsDialog from '../components/SettingsDialog';
+import TestModal from '../components/TestModal';
 import TransactionTracker from './components/TransactionTracker';
 import Notifications from './components/Notifications';
 
@@ -25,8 +27,12 @@ export default function Home() {
       </main>
       
       {/* DeFi Valley Modal Components */}
-      <PlantSeed />
+      <PlantSeedDialog />
+      <SettingsDialog />
       <TransactionTracker />
+      
+      {/* Test Modal for debugging */}
+      <TestModal />
       
       {/* Global Notification System */}
       <Notifications />

@@ -5,7 +5,7 @@ import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
 import { sagaChainlet } from '../wagmi'
 import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
-import { useTransactions, useUI, usePlayerData, useConfig } from '../store'
+import { useAppStore, useTransactions, usePlayerData, useConfig } from '../store'
 
 export function Auth() {
   const { ready, authenticated, user, login, logout } = usePrivy()
@@ -17,11 +17,11 @@ export function Auth() {
   
   // DeFi Valley state integration
   const { active: activeTransactions } = useTransactions()
-  const { 
-    showPlantModal, 
-    showTransactionTracker, 
-    toggleTransactionTracker 
-  } = useUI()
+  // Use granular selectors for better performance
+  const showPlantModal = useAppStore((state) => state.showPlantModal)
+  const showTransactionTracker = useAppStore((state) => state.ui.showTransactionTracker)
+  const toggleTransactionTracker = useAppStore((state) => state.toggleTransactionTracker)
+  const showSettingsModal = useAppStore((state) => state.showSettingsModal)
   const { playerState, seedPositions, vaultPosition } = usePlayerData()
   const config = useConfig()
 
@@ -178,15 +178,27 @@ export function Auth() {
             <div className="defi-dashboard">
               <div className="dashboard-header">
                 <h4>🌱 Your Farm</h4>
-                {activeTransactions.length > 0 && (
+                <div className="header-buttons">
                   <button 
-                    onClick={toggleTransactionTracker}
-                    className="tx-indicator"
+                    onClick={showSettingsModal}
+                    className="settings-btn"
+                    title="Settings"
                   >
-                    <div className="tx-count">{activeTransactions.length}</div>
-                    <div className="tx-pulse"></div>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                   </button>
-                )}
+                  {activeTransactions.length > 0 && (
+                    <button 
+                      onClick={toggleTransactionTracker}
+                      className="tx-indicator"
+                    >
+                      <div className="tx-count">{activeTransactions.length}</div>
+                      <div className="tx-pulse"></div>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="farm-stats">
@@ -226,11 +238,15 @@ export function Auth() {
               <div className="farm-actions">
                 <button 
                   onClick={() => {
-                    console.log('Plant Seeds button clicked!');
-                    console.log('Chain ID:', chainId, 'Expected:', config.sagaChainId, 'Match:', chainId === config.sagaChainId);
-                    console.log('showPlantModal function:', showPlantModal);
+                    console.log('🌱 [AUTH] Plant Seeds button clicked!');
+                    console.log('🌱 [AUTH] showPlantModal function type:', typeof showPlantModal);
+                    console.log('🌱 [AUTH] showPlantModal function:', showPlantModal);
+                    console.log('🌱 [AUTH] Current chain ID:', chainId);
+                    console.log('🌱 [AUTH] Expected chain ID:', config.sagaChainId);
+                    console.log('🌱 [AUTH] Button disabled?', chainId !== config.sagaChainId);
+                    console.log('🌱 [AUTH] Calling showPlantModal...');
                     showPlantModal();
-                    console.log('showPlantModal called');
+                    console.log('🌱 [AUTH] showPlantModal called successfully');
                   }}
                   className="action-btn plant"
                   disabled={chainId !== config.sagaChainId}
@@ -508,6 +524,32 @@ export function Auth() {
           margin: 0;
           color: #2d5016;
           font-size: 18px;
+        }
+        
+        .header-buttons {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .settings-btn {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 6px;
+          width: 32px;
+          height: 32px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6c757d;
+          transition: all 0.2s;
+        }
+        
+        .settings-btn:hover {
+          background: #e9ecef;
+          color: #495057;
+          border-color: #adb5bd;
         }
         
         .tx-indicator {

@@ -26,7 +26,7 @@ export function usePlantSeed() {
   const { address } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { writeContract } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   
   const { add: addTransaction, update: updateTransaction } = useTransactions();
   const { seedTypes, addOptimisticSeed } = usePlayerData();
@@ -115,7 +115,7 @@ export function usePlantSeed() {
       });
       
       // Execute the plant seed transaction on Saga
-      const txHash = await writeContract({
+      const txHash = await writeContractAsync({
         address: config.gameControllerAddress,
         abi: GameControllerABI,
         functionName: 'plantSeed',
@@ -129,7 +129,7 @@ export function usePlantSeed() {
       
       updateTransaction(txId, { 
         status: 'saga_pending',
-        sagaTxHash: txHash 
+        sagaTxHash: txHash // Actual transaction hash
       });
       
       addNotification({
@@ -206,7 +206,7 @@ export function usePlantSeed() {
     address,
     chainId,
     switchChain,
-    writeContract,
+    writeContractAsync,
     addTransaction,
     updateTransaction,
     seedTypes,
@@ -306,7 +306,7 @@ export function useClaimYield() {
   const { address } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { writeContract } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   
   const { add: addTransaction, update: updateTransaction } = useTransactions();
   const { addNotification } = useUI();
@@ -352,7 +352,7 @@ export function useClaimYield() {
       });
       
       // Execute yield claim on DeFi vault
-      const txHash = await writeContract({
+      const txHash = await writeContractAsync({
         address: config.defiVaultAddress,
         abi: [
           {
@@ -368,7 +368,7 @@ export function useClaimYield() {
       
       updateTransaction(txId, { 
         status: 'arbitrum_pending',
-        arbitrumTxHash: txHash 
+        arbitrumTxHash: txHash // Actual transaction hash
       });
       
       addNotification({
@@ -407,7 +407,7 @@ export function useClaimYield() {
     address,
     chainId,
     switchChain,
-    writeContract,
+    writeContractAsync,
     addTransaction,
     updateTransaction,
     addNotification,
