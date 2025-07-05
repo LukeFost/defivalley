@@ -101,7 +101,7 @@ const config: HardhatUserConfig = {
       url: process.env.SAGA_TESTNET_RPC_URL ?? "",
       accounts: [process.env.SAGA_TESTNET_PRIVATE_KEY ?? ""],
       chainId: 2751669528484000, // Your actual Saga chainlet chain ID
-      gasPrice: 0, // Gasless transactions on Saga
+      gasPrice: 100000000, // 0.1 Gwei minimum required by Saga
     },
   },
 };
