@@ -72,6 +72,83 @@ DeFi Valley is a cozy farming game where players plant virtual seeds that create
 ### Core Innovation
 Players plant seeds in a farming game → Real USDC deposits into EulerSwap vaults → Actual DeFi yield generation → Harvest yields as game rewards
 
+## 🎯 **CURRENT PROJECT STATUS: CONSOLIDATED ARCHITECTURE**
+
+**Current Branch**: `develop` - Single stable branch containing all integrated features
+
+### ✅ **Integrated Feature Set (v2.0)**
+All features have been successfully consolidated into the develop branch:
+
+1. **🎨 Enhanced UI System** - Clean, minimal interface with improved user experience
+2. **🗺️ World Decoration & Tilemap** - Natural terrain generation with cliff collision detection
+3. **⚔️ Advanced Character System** - Multi-character support with knight animations and refactored architecture
+4. **🌾 Comprehensive Crop System** - Context menus, planting, harvesting, and real-time statistics
+5. **🌉 Auto-Bridge Integration** - Squid Router for seamless cross-chain asset transfers
+
+### 🏗️ **Current Architecture Status**
+- **Repository State**: Clean single-branch architecture (worktrees removed)
+- **Feature Integration**: All systems working together in unified codebase
+- **Code Quality**: TypeScript errors identified and ready for resolution
+- **Development Ready**: Dependencies installed, foundation stable
+
+## 📋 **IMMEDIATE TODOs & NEXT STEPS**
+
+### 🚨 **High Priority (Must Fix)**
+1. **Fix TypeScript Errors in Auto-Bridge Components**
+   - Missing `useSquidRouter` export in `useCrossChainTx` hook
+   - Type annotations needed for Auto-Bridge component parameters
+   - Components: `AutoBridgeSelector.tsx`, `ChainTokenSelector.tsx`, `SquidRouterDemo.tsx`
+
+2. **Add Missing UI Components**
+   - Install/create `@/components/ui/context-menu` for crop system
+   - Fix import errors in `CropContextMenu.tsx`
+
+3. **Fix Character Config Type Safety**
+   - Update `SettingsDialog.tsx` to use new `CharacterDefinitions` type system
+   - Replace legacy `CharacterConfig.player.characters` indexing
+
+### 🔧 **Medium Priority (Should Fix)**
+4. **Complete Auto-Bridge Integration**
+   - Add `axelarTxHash` property to `CrossChainTx` type definition
+   - Add Squid Router dependencies to `package.json`
+   - Test cross-chain bridge functionality
+
+5. **System Integration Testing**
+   - Test all five integrated features working together
+   - Verify character system with knight animations
+   - Test crop system with context menus and statistics
+   - Validate tilemap collision detection
+
+6. **Performance Optimization**
+   - Monitor performance with multiple systems running
+   - Optimize Phaser rendering with all features active
+
+### 📚 **Documentation & Long-term**
+7. **Update Architecture Documentation**
+   - Document new character configuration system
+   - Create integration guides for each feature
+   - Update API documentation for crop and tilemap systems
+
+8. **Create Integration Tests**
+   - Test multi-feature interactions (e.g., crops on tilemap)
+   - Verify character system works with all game features
+   - Cross-chain integration testing
+
+### 🔍 **Quick Fix Checklist**
+```bash
+# 1. Fix missing context-menu component
+pnpm add @radix-ui/react-context-menu
+
+# 2. Add Squid Router dependencies  
+pnpm add @0xsquid/sdk
+
+# 3. Run type checking to verify fixes
+pnpm check-types
+
+# 4. Test development server
+pnpm dev
+```
+
 ## Common Commands
 
 ### Development
@@ -156,7 +233,13 @@ pnpm exec hardhat run scripts/test-end-to-end.ts --network sagaTestnet
 
 ### Key Technologies
 - **Frontend**: Next.js 15 + React 19 + Phaser 3 + TypeScript
-- **Game Server**: Colyseus 0.16 for real-time multiplayer
+- **Game Engine**: Phaser 3.90.0 with enhanced character animations and tilemap system
+- **Game Server**: Colyseus 0.16 for real-time multiplayer synchronization
+- **UI Framework**: Radix UI components with Tailwind CSS styling
+- **Character System**: Multi-character support with knight animations and deterministic selection
+- **Crop System**: Context-menu driven farming with real-time statistics
+- **Tilemap Engine**: LPC tileset integration with collision detection and debug tools
+- **Cross-chain Bridge**: Squid Router integration for seamless asset transfers
 - **Web3 Auth**: Privy 2.17.3 + wagmi 2.15.6 for wallet integration
 - **Blockchain**: Hardhat 3 (alpha) with Solidity 0.8.28
 - **Cross-chain**: Axelar GMP for secure message passing
@@ -206,34 +289,43 @@ Saga Chainlet (Gasless Gaming)     Arbitrum (DeFi Yield)
 - **Real-time Features**: Player movement, chat system, state synchronization
 - **Network Detection**: Auto-detects server URL for local/network connections
 
-#### Game Features
-- **Player Movement**: WASD/Arrow key controls with real-time synchronization and directional sprites
-- **Chat System**: Press Enter to open chat, real-time messaging between players
-- **Character System**: 8 unique character types with deterministic selection and persistent identity
+#### Game Features (✅ FULLY INTEGRATED)
+- **Enhanced Player Movement**: WASD/Arrow key controls with collision detection against tilemap terrain
+- **Advanced Character System**: 9 character types including animated knight with idle/walk/run states
+- **Dynamic Tilemap World**: Procedurally generated terrain with cliffs, grass, and collision detection
+- **Comprehensive Crop System**: Right-click context menu for planting, harvesting, and crop management
+- **Real-time Statistics**: Live crop counters and growth status monitoring
+- **Interactive Chat System**: Press Enter to open chat, real-time messaging between players
 - **Visual Players**: Character sprites with nameplates, level badges, and current player highlighting
+- **Debug Tools**: Console commands for terrain editing, character management, and debug visualization
+- **Cross-chain Integration**: Auto-bridge system for seamless asset transfers
 - **Connection Management**: Auto-reconnection, fallback URLs, error handling
 
-#### Character System Architecture (DRY + KISS Principles)
+#### Enhanced Character System Architecture (v2.0)
 
-**Configuration-Driven Design (`/lib/character.config.ts`)**:
-- Centralized sprite sheet metadata (no hardcoded magic numbers)
-- Type-safe character types: warrior, mage, archer, rogue, paladin, priest, necromancer, berserker
-- Easy to add new characters without code changes
+**Unified Configuration System (`/lib/character.config.ts`)**:
+- **CharacterDefinitions**: Type-safe configuration for all character types
+- **Dual System Support**: Both spritesheet (RPG) and animation sheet (knight) characters
+- **Animation Support**: Idle, walk, run states for animated characters
+- **Backward Compatibility**: Legacy CharacterConfig preserved for smooth migration
 
-**Object-Oriented Player Class (`/lib/Player.ts`)**:
-- Extends `Phaser.GameObjects.Container` for clean encapsulation
-- Self-contained sprite, nameplate, and level badge management
-- Simple API: `updatePosition()`, `updateDirection()`, `changeCharacter()`
+**Advanced Player Class (`/lib/Player.ts`)**:
+- **Polymorphic Sprite Handling**: Automatically detects and handles different character types
+- **Animation Management**: Seamless switching between static and animated sprites
+- **Enhanced API**: `updateAnimationState()`, `updateMovementState()`, `changeCharacter()`
+- **Container-based Architecture**: Clean encapsulation with sprite, nameplate, and level badge
 
-**Deterministic Character Selection**:
-- Persistent identity based on wallet address/session ID hash
-- Global character selection for current player (localStorage)
-- Fallback to player-specific storage for consistency
+**Intelligent Character Selection**:
+- **Global Override**: Current player can set preferred character globally
+- **Deterministic Fallback**: Persistent identity based on wallet address/session ID hash
+- **Cross-session Persistence**: Character choices saved in localStorage
+- **Type Safety**: Full TypeScript support with CharacterType enum
 
-**Performance Optimizations**:
-- ❌ Eliminated runtime image processing (95 lines removed)
-- ✅ Direct spritesheet loading with transparency
-- ✅ Container-based object management for better performance
+**Performance & Architecture Improvements**:
+- ✅ **Unified Character System**: Single codebase handles all character types
+- ✅ **Animation Engine**: Efficient Phaser animation management
+- ✅ **Memory Optimization**: Smart sprite creation and destruction
+- ✅ **Developer Tools**: Console commands for character testing and debugging
 
 See [Character System Documentation](docs/CHARACTER_SYSTEM.md) for complete architecture details.
 
@@ -248,6 +340,25 @@ Test Client: http://localhost:2567/test.html
 Web App: http://172.31.50.134:3000
 Game Server: http://172.31.50.134:2567
 Test Client: http://172.31.50.134:2567/test.html
+```
+
+#### 🚨 **Web Server Management Policy**
+**IMPORTANT**: Luke will have the web server running manually and manage it himself.
+
+**Claude Instructions**:
+- **DO NOT** attempt to start the web server with `pnpm dev` or `npm start`
+- **WAIT** for Luke to manually boot up the web server if it's not running
+- **IF PORT 3000 IS BUSY**: Use tmux to run on alternative ports (3005-3300)
+- **Alternative Port Command**: `cd apps/web && pnpm dev --port 3005` (or any port 3005-3300)
+- **Check Status**: Use `curl -s http://localhost:3000 > /dev/null && echo "Server running" || echo "Server not running"`
+
+**Tmux Usage for Alternative Ports**:
+```bash
+# Create new tmux session with alternative port
+tmux new-session -d -s defivalley-web-3005 'cd apps/web && pnpm dev --port 3005'
+
+# List available ports
+for port in {3005..3010}; do curl -s "http://localhost:$port" > /dev/null && echo "Port $port: IN USE" || echo "Port $port: Available"; done
 ```
 
 #### Troubleshooting

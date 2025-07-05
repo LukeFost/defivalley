@@ -369,8 +369,23 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
 }
 
 export default function TransactionTracker() {
-  const { active: activeTransactions, history: transactionHistory, retry } = useTransactions();
-  const { showTransactionTracker, toggleTransactionTracker, clearNotifications } = useUI();
+  const { active: activeTransactions, history: transactionHistory, retry, clearCompleted, complete } = useTransactions();
+  const { showTransactionTracker, toggleTransactionTracker } = useUI();
+  
+  // Clean up stuck transactions on component mount
+  useEffect(() => {
+    // Find active transactions that are actually completed/failed but stuck in active state
+    const stuckTransactions = activeTransactions.filter(tx => 
+      tx.status === 'completed' || tx.status === 'failed'
+    );
+    
+    // Move stuck transactions to history
+    stuckTransactions.forEach(tx => {
+      if (tx.status === 'completed') {
+        complete(tx.id);
+      }
+    });
+  }, [activeTransactions, complete]);
   
   // Debug: Check transaction state
   if (activeTransactions?.length === 0 && transactionHistory?.length === 0) {
@@ -451,7 +466,7 @@ export default function TransactionTracker() {
           </div>
           
           <button
-            onClick={clearNotifications}
+            onClick={clearCompleted}
             className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
           >
             Clear All
