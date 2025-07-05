@@ -28,7 +28,7 @@ export const sagaChainlet = {
   },
   contracts: {
     gameController: {
-      address: '0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673',
+      address: '0x896C39e19EcA825cE6bA66102E6752052049a4b1',
     },
   },
 } as const

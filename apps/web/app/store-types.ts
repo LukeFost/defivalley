@@ -216,7 +216,7 @@ export const initialState: AppState = {
   config: {
     sagaChainId: 2751669528484000,
     arbitrumChainId: 421614,
-    gameControllerAddress: '0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673',
+    gameControllerAddress: '0x896C39e19EcA825cE6bA66102E6752052049a4b1',
     defiVaultAddress: '0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673',
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     refreshInterval: 30000 // 30 seconds
