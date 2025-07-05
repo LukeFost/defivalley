@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { join } from 'path';
+import { SeedType } from '../types/game.types';
+import { MigrationService } from './MigrationService';
 
 export interface Player {
   id: string;
@@ -12,28 +14,42 @@ export interface Player {
 export interface Crop {
   id: string;
   player_id: string;
-  seed_type: string;
+  seed_type: SeedType;
   x: number;
   y: number;
   planted_at: string;
   growth_time: number;
   investment_amount: number;
   harvested: boolean;
+  yield_amount?: number;
+  harvested_at?: string;
   created_at: string;
   updated_at: string;
 }
 
 export class DatabaseService {
   public db: Database.Database;
+  private migrationService: MigrationService;
 
   constructor() {
-    // Create database in the server directory
-    const dbPath = join(__dirname, '..', '..', 'defivalley.db');
+    // Create database in configurable location
+    const dbDir = process.env.DATABASE_DIR || join(__dirname, '..', '..');
+    const dbPath = join(dbDir, 'defivalley.db');
+    console.log(`📁 Database location: ${dbPath}`);
+    
     this.db = new Database(dbPath);
+    this.db.pragma('journal_mode = WAL'); // Enable Write-Ahead Logging for better concurrency
+    
+    // Initialize migration service
+    this.migrationService = new MigrationService(this.db);
+    
     this.init();
   }
 
   private init() {
+    // Create initial tables if they don't exist
+    // The migration system will handle schema updates
+    
     // Create players table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS players (
@@ -45,7 +61,7 @@ export class DatabaseService {
       )
     `);
 
-    // Create crops table
+    // Initial crops table (migrations will update it)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS crops (
         id TEXT PRIMARY KEY,
@@ -55,8 +71,10 @@ export class DatabaseService {
         y INTEGER NOT NULL,
         planted_at DATETIME NOT NULL,
         growth_time INTEGER NOT NULL,
-        investment_amount INTEGER NOT NULL,
+        investment_amount REAL NOT NULL,
         harvested BOOLEAN DEFAULT FALSE,
+        yield_amount REAL DEFAULT NULL,
+        harvested_at DATETIME DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
@@ -69,6 +87,14 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_crops_harvested ON crops (harvested);
       CREATE INDEX IF NOT EXISTS idx_crops_position ON crops (x, y);
     `);
+
+    // Run any pending migrations
+    try {
+      this.migrationService.runMigrations();
+    } catch (error) {
+      console.error('❌ Failed to run migrations:', error);
+      // Continue without migrations - database might still work
+    }
   }
 
   /**
@@ -164,12 +190,38 @@ export class DatabaseService {
   }
 
   /**
-   * Check if a position is occupied by a crop
+   * Check if a position is occupied by a crop (with radius checking)
    */
-  isPositionOccupied(x: number, y: number): boolean {
-    const selectStmt = this.db.prepare('SELECT COUNT(*) as count FROM crops WHERE x = ? AND y = ? AND harvested = FALSE');
-    const result = selectStmt.get(x, y) as { count: number };
+  isPositionOccupied(x: number, y: number, radius: number = 50): boolean {
+    // Check for crops within the collision radius
+    const selectStmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM crops 
+      WHERE harvested = FALSE 
+      AND ((x - ?) * (x - ?) + (y - ?) * (y - ?)) <= ? * ?
+    `);
+    const result = selectStmt.get(x, x, y, y, radius, radius) as { count: number };
     return result.count > 0;
+  }
+
+  /**
+   * Execute a database transaction
+   */
+  transaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
+  }
+
+  /**
+   * Calculate yield for a crop based on time elapsed
+   */
+  calculateYield(investmentAmount: number, plantedAt: string, baseYieldRate: number): number {
+    const plantedTime = new Date(plantedAt).getTime();
+    const currentTime = Date.now();
+    const timeElapsedMs = currentTime - plantedTime;
+    const timeElapsedYears = timeElapsedMs / (365 * 24 * 60 * 60 * 1000);
+    
+    // Simple interest calculation for demo
+    const yieldAmount = investmentAmount * baseYieldRate * timeElapsedYears;
+    return Math.round(yieldAmount * 100) / 100; // Round to 2 decimal places
   }
 
   /**
