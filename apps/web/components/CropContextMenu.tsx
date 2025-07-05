@@ -50,7 +50,6 @@ export function CropContextMenu({
     const gameX = e.clientX - gameContainerRect.left;
     const gameY = e.clientY - gameContainerRect.top;
     
-    console.log(`🎯 Context menu at game coordinates: (${gameX}, ${gameY})`);
     setContextMenuPosition({ x: gameX, y: gameY });
   }, [gameContainerRect]);
 
@@ -61,9 +60,7 @@ export function CropContextMenu({
     
     if (canPlantAt(x, y)) {
       onPlantCrop(cropType, x, y);
-      console.log(`🌱 Planting ${cropType} at (${x}, ${y})`);
     } else {
-      console.log(`❌ Cannot plant ${cropType} at (${x}, ${y})`);
     }
     
     setContextMenuPosition(null);
@@ -74,7 +71,6 @@ export function CropContextMenu({
     
     const { x, y } = contextMenuPosition;
     onRemoveCrop(x, y);
-    console.log(`🗑️ Removing crop at (${x}, ${y})`);
     setContextMenuPosition(null);
   };
 
@@ -83,7 +79,6 @@ export function CropContextMenu({
     
     const { x, y } = contextMenuPosition;
     onHarvestCrop(x, y);
-    console.log(`🚜 Harvesting crop at (${x}, ${y})`);
     setContextMenuPosition(null);
   };
 
