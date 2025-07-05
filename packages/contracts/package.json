@@ -21,6 +21,7 @@
     "viem": "^2.30.0"
   },
   "dependencies": {
-    "@axelar-network/axelar-gmp-sdk-solidity": "^6.0.6"
+    "@axelar-network/axelar-gmp-sdk-solidity": "^6.0.6",
+    "dotenv": "^17.0.1"
   }
 }

@@ -418,7 +418,103 @@ paths: {
 2. **Compilation**: `pnpm exec hardhat compile`
 3. **Deployment**: Use Ignition modules instead of scripts
 4. **Configuration**: Use Ignition for contract interactions
-5. **Verification**: Run status scripts for confirmation
+5. **Security Setup**: Configure pause operators and deposit caps
+6. **Verification**: Run status scripts for confirmation
+
+## 🛡️ Security Architecture (PRODUCTION-READY)
+
+### Circuit Breaker System
+**DeFiVault.sol** includes OpenZeppelin Pausable with enhanced controls:
+
+```solidity
+// Emergency pause controls
+function emergencyPause(string reason) external onlyPauseOperator
+function emergencyUnpause() external onlyOwner
+function addPauseOperator(address operator) external onlyOwner
+function removePauseOperator(address operator) external onlyOwner
+```
+
+**Protected Functions:**
+- `claimYield()` - ✅ `whenNotPaused` 
+- `_processDeposit()` - ✅ `whenNotPaused`
+- `_processHarvest()` - ✅ `whenNotPaused`
+- `_execute()` - ✅ `whenNotPaused`
+
+**Emergency Functions (work when paused):**
+- `emergencyWithdraw()` - ✅ `whenPaused` (players can withdraw principal)
+
+### Deposit Cap Protection
+```solidity
+// Deposit cap validation
+uint256 public totalDepositCap; // Default: 1M USDC
+uint256 public totalDeposited;  // Running counter
+
+function setDepositCap(uint256 newCap) external onlyOwner {
+    require(newCap >= totalDeposited, "cap < current deposits");
+    totalDepositCap = newCap;
+}
+```
+
+### Command Routing Security
+**Enhanced cross-chain message routing:**
+```solidity
+enum Command { INVALID, DEPOSIT, HARVEST, EMERGENCY_WITHDRAW, UPDATE_PLAYER_STATE }
+
+function _execute(bytes32 commandId, string sourceChain, string sourceAddress, bytes payload) 
+    internal override whenNotPaused {
+    // Command validation and routing
+    (Command command, address player, uint256 amount, bytes32 txId) = abi.decode(payload, (...));
+    
+    if (command == Command.DEPOSIT) _processDeposit(...);
+    else if (command == Command.HARVEST) _processHarvest(...);
+    else if (command == Command.EMERGENCY_WITHDRAW) _processEmergencyWithdraw(...);
+    else revert InvalidCommand();
+}
+```
+
+### One-Click Harvest Implementation
+**GameController.sol** enhanced harvest functions:
+```solidity
+// Single seed harvest with cross-chain yield claim
+function harvestSeed(uint256 seedId, address gasToken) external payable nonReentrant
+
+// Batch harvest multiple seeds
+function batchHarvestSeeds(uint256[] seedIds, address gasToken) external payable nonReentrant
+
+// Emergency harvest (local only, no cross-chain)
+function emergencyHarvestSeed(uint256 seedId) external
+
+// Utility: Get all harvestable seeds for a player
+function getHarvestableSeeds(address player) external view returns (...)
+```
+
+### Security Monitoring & Controls
+```bash
+# Emergency pause (multiple operators can trigger)
+cast send $DEFI_VAULT "emergencyPause(string)" "Suspicious activity detected" --rpc-url $ARBITRUM_RPC
+
+# Owner-only unpause
+cast send $DEFI_VAULT "emergencyUnpause()" --rpc-url $ARBITRUM_RPC
+
+# Update deposit cap
+cast send $DEFI_VAULT "setDepositCap(uint256)" "2000000000000" --rpc-url $ARBITRUM_RPC
+
+# Check security status
+cast call $DEFI_VAULT "getEmergencyState()" --rpc-url $ARBITRUM_RPC
+cast call $DEFI_VAULT "paused()" --rpc-url $ARBITRUM_RPC
+cast call $DEFI_VAULT "totalDeposited()" --rpc-url $ARBITRUM_RPC
+cast call $DEFI_VAULT "totalDepositCap()" --rpc-url $ARBITRUM_RPC
+```
+
+### Security Best Practices Implemented
+✅ **Replay Protection**: Command tracking with `processedCommands` mapping  
+✅ **Circuit Breaker**: Multi-operator pause system with owner-only unpause  
+✅ **Deposit Caps**: Real-time validation with configurable limits  
+✅ **Command Validation**: Enum-based routing with invalid command rejection  
+✅ **Emergency Functions**: Principal withdrawal when protocol is paused  
+✅ **Access Control**: Role-based permissions for critical functions  
+✅ **Gas Optimization**: Nested-if command routing for efficiency  
+✅ **Event Emission**: Comprehensive logging for monitoring and alerts
 
 ## Game Mechanics with Enhanced Security 🛡️
 

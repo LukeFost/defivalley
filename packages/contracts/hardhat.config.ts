@@ -1,107 +1,109 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-viem";
+import type { HardhatUserConfig } from "hardhat/config";
+import { config as dotenvConfig } from "dotenv";
+
+import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
+import { configVariable } from "hardhat/config";
+
+// Load environment variables
+dotenvConfig();
 
 const config: HardhatUserConfig = {
+  /*
+   * In Hardhat 3, plugins are defined as part of the Hardhat config instead of
+   * being based on the side-effect of imports.
+   *
+   * Note: A `hardhat-toolbox` like plugin for Hardhat 3 hasn't been defined yet,
+   * so this list is larger than what you would normally have.
+   */
+  plugins: [hardhatToolboxViemPlugin],
+  paths: {
+    sources: "./", // Contracts are in the root directory
+  },
   solidity: {
-    version: "0.8.28",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
-  },
-  
-  networks: {
-    hardhat: {
-      // Local development network - can fork Arbitrum for testing
-      chainId: 31337,
-      forking: process.env.FORK_ARBITRUM === "true" ? {
-        url: "https://arb1.arbitrum.io/rpc",
-        blockNumber: undefined // Latest block
-      } : undefined
-    },
-    
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      chainId: 31337
-    },
-    
-    // Arbitrum Sepolia Testnet (for EulerSwap integration)
-    arbitrumSepolia: {
-      url: "https://sepolia-rollup.arbitrum.io/rpc",
-      chainId: 421614,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-      gas: "auto"
-    },
-    
-    // Arbitrum Mainnet (production EulerSwap)
-    arbitrum: {
-      url: "https://arb1.arbitrum.io/rpc",
-      chainId: 42161,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-      gas: "auto"
-    },
-    
-    // Saga Testnet Chainlet (for game logic)
-    sagaTestnet: {
-      url: process.env.SAGA_RPC_URL || "https://your-chainlet-rpc-endpoint.saga.xyz",
-      chainId: process.env.SAGA_CHAIN_ID ? parseInt(process.env.SAGA_CHAIN_ID) : 1712762003250914,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-      gas: "auto"
-    },
-    
-    // Saga Mainnet Chainlet (production game)
-    sagaMainnet: {
-      url: process.env.SAGA_MAINNET_RPC_URL || "https://your-mainnet-chainlet-rpc.saga.xyz",
-      chainId: process.env.SAGA_MAINNET_CHAIN_ID ? parseInt(process.env.SAGA_MAINNET_CHAIN_ID) : 1,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-      gas: "auto"
-    }
-  },
-  
-  etherscan: {
-    apiKey: {
-      arbitrumOne: process.env.ARBISCAN_API_KEY || "",
-      arbitrumSepolia: process.env.ARBISCAN_API_KEY || "",
-      // Saga chains may have their own block explorer API keys
-      sagaTestnet: process.env.SAGA_EXPLORER_API_KEY || "",
-      sagaMainnet: process.env.SAGA_EXPLORER_API_KEY || ""
-    },
-    customChains: [
-      {
-        network: "sagaTestnet",
-        chainId: process.env.SAGA_CHAIN_ID ? parseInt(process.env.SAGA_CHAIN_ID) : 1712762003250914,
-        urls: {
-          apiURL: process.env.SAGA_EXPLORER_API_URL || "https://your-chainlet-explorer.saga.xyz/api",
-          browserURL: process.env.SAGA_EXPLORER_URL || "https://your-chainlet-explorer.saga.xyz"
-        }
+    /*
+     * Hardhat 3 supports different build profiles, allowing you to configure
+     * different versions of `solc` and its settings for various use cases.
+     *
+     * Note: Using profiles is optional, and any Hardhat 2 `solidity` config
+     * is still valid in Hardhat 3.
+     */
+    profiles: {
+      /*
+       * The default profile is used when no profile is defined or specified
+       * in the CLI or by the tasks you are running.
+       */
+      default: {
+        version: "0.8.28",
       },
-      {
-        network: "sagaMainnet",
-        chainId: process.env.SAGA_MAINNET_CHAIN_ID ? parseInt(process.env.SAGA_MAINNET_CHAIN_ID) : 1,
-        urls: {
-          apiURL: process.env.SAGA_MAINNET_EXPLORER_API_URL || "https://your-mainnet-chainlet-explorer.saga.xyz/api",
-          browserURL: process.env.SAGA_MAINNET_EXPLORER_URL || "https://your-mainnet-chainlet-explorer.saga.xyz"
-        }
-      }
-    ]
+      /*
+       * The production profile is meant to be used for deployments, providing
+       * more control over settings for production builds and taking some extra
+       * steps to simplify the process of verifying your contracts.
+       */
+      production: {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    },
   },
-  
-  typechain: {
-    outDir: "typechain-types",
-    target: "ethers-v6"
+  /*
+   * The `networks` configuration is mostly compatible with Hardhat 2.
+   * The key differences right now are:
+   *
+   * - You must set a `type` for each network, which is either `edr` or `http`,
+   *   allowing you to have multiple simulated networks.
+   *
+   * - You can set a `chainType` for each network, which is either `generic`,
+   *   `l1`, or `optimism`. This has two uses. It ensures that you always
+   *   connect to the network with the right Chain Type. And, on `edr`
+   *   networks, it makes sure that the simulated chain behaves exactly like the
+   *   real one. More information about this can be found in the test files.
+   *
+   * - The `accounts` field of `http` networks can also receive Configuration
+   *   Variables, which are values that only get loaded when needed. This allows
+   *   Hardhat to still run despite some of its config not being available
+   *   (e.g., a missing private key or API key). More info about this can be
+   *   found in the "Sending a Transaction to Optimism Sepolia" of the README.
+   */
+  networks: {
+    hardhatMainnet: {
+      type: "edr",
+      chainType: "l1",
+    },
+    hardhatOp: {
+      type: "edr",
+      chainType: "optimism",
+    },
+    sepolia: {
+      type: "http",
+      chainType: "l1",
+      url: configVariable("SEPOLIA_RPC_URL"),
+      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+    },
+    // Arbitrum Sepolia for DeFiVault deployment
+    arbitrumSepolia: {
+      type: "http",
+      chainType: "l1",
+      url: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? "",
+      accounts: [process.env.ARBITRUM_SEPOLIA_PRIVATE_KEY ?? ""],
+      chainId: 421614,
+      gasPrice: 100000000, // 0.1 gwei
+    },
+    // Saga Chainlet for GameController deployment
+    sagaTestnet: {
+      type: "http", 
+      chainType: "generic",
+      url: process.env.SAGA_TESTNET_RPC_URL ?? "",
+      accounts: [process.env.SAGA_TESTNET_PRIVATE_KEY ?? ""],
+      chainId: 2751669528484000, // Your actual Saga chainlet chain ID
+      gasPrice: 0, // Gasless transactions on Saga
+    },
   },
-  
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: "USD"
-  }
 };
 
 export default config;
