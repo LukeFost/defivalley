@@ -16,7 +16,12 @@ function HydrationBoundary({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (store) {
-      store.persist.rehydrate().then(() => setIsHydrated(true));
+      const rehydrateResult = store.persist.rehydrate();
+      if (rehydrateResult && typeof rehydrateResult.then === 'function') {
+        rehydrateResult.then(() => setIsHydrated(true));
+      } else {
+        setIsHydrated(true);
+      }
     }
   }, [store]);
 
@@ -37,8 +42,8 @@ export function Providers({ children }: { children: ReactNode }) {
             structuralSharing: false,
           },
         },
-        // Use wagmi's hashFn for proper BigInt handling in query keys
-        queryKeyHashFn: hashFn,
+        // Note: queryKeyHashFn is not available in TanStack Query 5.x
+        // The hashFn from wagmi/query is used internally by wagmi hooks
       })
   )
 

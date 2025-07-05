@@ -314,12 +314,10 @@ export const makeStore = () => {
           name: 'defi-valley-storage',
           // Use the idiomatic one-liner for SSR-safe storage with BigInt serialization
           storage: createJSONStorage(() =>
-            typeof window !== 'undefined' ? localStorage : createMemoryStorage(),
-            {
-              serialize: bigIntSerializer.serialize,
-              deserialize: bigIntSerializer.deserialize,
-            }
+            typeof window !== 'undefined' ? localStorage : createMemoryStorage()
           ),
+          serialize: bigIntSerializer.serialize,
+          deserialize: bigIntSerializer.deserialize,
           skipHydration: true, // Recommended to delay hydration until manual rehydration
           // Exclude transient UI state from persistence - modals should always start closed
           partialize: (state) => ({
