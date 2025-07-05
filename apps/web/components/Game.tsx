@@ -291,7 +291,7 @@ class MainScene extends Phaser.Scene {
         const currentDebug = this.physics.world.debugGraphic;
         if (currentDebug) {
           this.physics.world.debugGraphic.clear();
-          this.physics.world.debugGraphic = null;
+          (this.physics.world as any).debugGraphic = null;
           console.log('🔧 Physics debug: OFF');
         } else {
           this.physics.world.createDebugGraphic();
@@ -420,12 +420,12 @@ class MainScene extends Phaser.Scene {
         // Check rendered tiles
         const tiles = this.children.list.filter(child => child.getData && child.getData('tileType'));
         console.log('Total rendered tiles:', tiles.length);
-        console.log('Visible tiles:', tiles.filter(t => t.visible).length);
-        console.log('Tiles with alpha > 0:', tiles.filter(t => t.alpha > 0).length);
+        console.log('Visible tiles:', tiles.filter(t => (t as any).visible).length);
+        console.log('Tiles with alpha > 0:', tiles.filter(t => (t as any).alpha > 0).length);
         
         // Sample tile details
         if (tiles.length > 0) {
-          const sampleTile = tiles[0];
+          const sampleTile = tiles[0] as any;
           console.log('\nSample tile details:');
           console.log('  Position:', sampleTile.x, sampleTile.y);
           console.log('  Texture:', sampleTile.texture.key);
@@ -447,9 +447,9 @@ class MainScene extends Phaser.Scene {
         
         // Check if tiles are in camera view
         const tilesInView = tiles.filter(tile => {
-          const bounds = tile.getBounds();
-          return camera.worldView.contains(bounds.x, bounds.y) || 
-                 camera.worldView.intersects(bounds);
+          const bounds = (tile as any).getBounds();
+          return (camera.worldView as any).contains(bounds.x, bounds.y) || 
+                 (camera.worldView as any).intersects(bounds);
         });
         console.log('  Tiles in camera view:', tilesInView.length);
       };
@@ -552,7 +552,8 @@ class MainScene extends Phaser.Scene {
     const mapWidth = this.terrainLayout[0].length;
     const mapHeight = this.terrainLayout.length;
     
-    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    // TODO: Implement createTilesFromLayout method for terrain refresh
+    // this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
     this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
     
     // Update debug overlay if active
@@ -1371,9 +1372,16 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    // Update sprite direction if moved
-    if (moved && this.currentPlayer) {
-      this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+    // Update sprite direction and animation state
+    if (this.currentPlayer) {
+      if (moved) {
+        this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+        // Update animation state to walking
+        this.currentPlayer.updateMovementState(true);
+      } else {
+        // Update animation state to idle when not moving
+        this.currentPlayer.updateMovementState(false);
+      }
     }
 
     // Send movement to server
