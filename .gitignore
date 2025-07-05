@@ -21,6 +21,11 @@ coverage
 # Vercel
 .vercel
 
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
 # Build Outputs
 .next/
 out/
