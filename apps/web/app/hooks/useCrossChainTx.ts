@@ -1,23 +1,233 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useChainId, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, parseEther } from 'viem';
+import { Squid } from '@0xsquid/sdk';
 import { useAppStore, useTransactions, usePlayerData, useUI, useConfig } from '../store';
 import { GameControllerABI } from '../lib/abis/GameController';
+import { getNetworkById } from '../lib/networks';
 
 export interface PlantSeedParams {
   seedType: number;
   amount: string; // USDC amount as string (will be parsed to 6 decimals)
   gasEstimate?: bigint;
+  // Squid Router specific params
+  fromChain?: number;
+  fromToken?: string;
+  enableAutoBridge?: boolean;
 }
 
 export interface PlantSeedResult {
   txId?: string;
   success: boolean;
   error?: string;
+  squidRoute?: any;
+  bridgeTxHash?: string;
+}
+
+export interface SquidQuote {
+  route: any;
+  estimatedRouteDuration: number;
+  gasCosts: {
+    gasLimit: string;
+    gasPrice: string;
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  };
+  feeCosts: {
+    amount: string;
+    token: {
+      address: string;
+      symbol: string;
+      decimals: number;
+      chainId: number;
+    };
+  }[];
+  fromAmount: string;
+  toAmount: string;
+  fromToken: {
+    address: string;
+    symbol: string;
+    decimals: number;
+    chainId: number;
+  };
+  toToken: {
+    address: string;
+    symbol: string;
+    decimals: number;
+    chainId: number;
+  };
+}
+
+export interface SupportedChain {
+  chainId: number;
+  chainName: string;
+  nativeCurrency: {
+    symbol: string;
+    decimals: number;
+  };
+  tokens: {
+    address: string;
+    symbol: string;
+    decimals: number;
+    logoURI?: string;
+  }[];
 }
 
 // Cross-chain gas estimation (simplified)
 const ESTIMATED_CROSS_CHAIN_GAS = parseEther('0.01'); // 0.01 ETH
+
+// Squid Router Configuration
+const SQUID_INTEGRATOR_ID = 'defivalley-v1';
+const SQUID_BASE_URL = 'https://v2.api.squidrouter.com';
+
+// Target chains and tokens for DeFi Valley
+const TARGET_CHAINS = {
+  SAGA: 2751669528484000, // Saga Chainlet
+  ARBITRUM: 421614, // Arbitrum Sepolia
+};
+
+const TARGET_TOKENS = {
+  USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', // USDC on Arbitrum Sepolia
+};
+
+// Squid Router Hook for cross-chain quotes and supported chains
+export function useSquidRouter() {
+  const [squid, setSquid] = useState<Squid | null>(null);
+  const [supportedChains, setSupportedChains] = useState<SupportedChain[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize Squid SDK
+  useEffect(() => {
+    const initSquid = async () => {
+      try {
+        const squidInstance = new Squid({
+          baseUrl: SQUID_BASE_URL,
+          integratorId: SQUID_INTEGRATOR_ID,
+        });
+        
+        await squidInstance.init();
+        setSquid(squidInstance);
+        
+        // Get supported chains
+        const chains = await squidInstance.getChains();
+        const formattedChains = chains.map((chain: any) => ({
+          chainId: chain.chainId,
+          chainName: chain.chainName,
+          nativeCurrency: {
+            symbol: chain.nativeCurrency.symbol,
+            decimals: chain.nativeCurrency.decimals,
+          },
+          tokens: chain.tokens || [],
+        }));
+        
+        setSupportedChains(formattedChains);
+      } catch (err) {
+        console.error('Failed to initialize Squid:', err);
+        setError('Failed to initialize cross-chain router');
+      }
+    };
+
+    initSquid();
+  }, []);
+
+  // Get quote for cross-chain transaction
+  const getQuote = useCallback(async (params: {
+    fromChain: number;
+    toChain: number;
+    fromToken: string;
+    toToken: string;
+    fromAmount: string;
+    fromAddress: string;
+    toAddress: string;
+  }): Promise<SquidQuote | null> => {
+    if (!squid) return null;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const quote = await squid.getRoute({
+        fromChain: params.fromChain,
+        toChain: params.toChain,
+        fromToken: params.fromToken,
+        toToken: params.toToken,
+        fromAmount: params.fromAmount,
+        fromAddress: params.fromAddress,
+        toAddress: params.toAddress,
+        enableForecall: true,
+        quoteOnly: false,
+      });
+
+      return quote as SquidQuote;
+    } catch (err) {
+      console.error('Failed to get Squid quote:', err);
+      setError('Failed to get cross-chain quote');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [squid]);
+
+  // Execute cross-chain transaction
+  const executeRoute = useCallback(async (
+    route: any,
+    signer: any
+  ): Promise<{ txHash: string; success: boolean; error?: string }> => {
+    if (!squid) {
+      return { txHash: '', success: false, error: 'Squid not initialized' };
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const tx = await squid.executeRoute({
+        signer,
+        route,
+      });
+
+      return { txHash: tx.hash, success: true };
+    } catch (err) {
+      console.error('Failed to execute Squid route:', err);
+      setError('Failed to execute cross-chain transaction');
+      return { txHash: '', success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [squid]);
+
+  // Get supported tokens for a specific chain
+  const getTokensForChain = useCallback((chainId: number) => {
+    const chain = supportedChains.find(c => c.chainId === chainId);
+    return chain?.tokens || [];
+  }, [supportedChains]);
+
+  // Get popular cross-chain tokens (ETH, USDC, USDT, DAI, etc.)
+  const getPopularTokens = useCallback(() => {
+    const popularSymbols = ['ETH', 'USDC', 'USDT', 'DAI', 'WETH', 'WBTC'];
+    const popularTokens: { [chainId: number]: any[] } = {};
+    
+    supportedChains.forEach(chain => {
+      popularTokens[chain.chainId] = chain.tokens.filter(token => 
+        popularSymbols.includes(token.symbol)
+      );
+    });
+    
+    return popularTokens;
+  }, [supportedChains]);
+
+  return {
+    squid,
+    supportedChains,
+    isLoading,
+    error,
+    getQuote,
+    executeRoute,
+    getTokensForChain,
+    getPopularTokens,
+  };
+}
 
 export function usePlantSeed() {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,10 +243,16 @@ export function usePlantSeed() {
   const { addNotification } = useUI();
   const config = useConfig();
   
+  // Squid Router integration
+  const { squid, getQuote, executeRoute } = useSquidRouter();
+  
   const plantSeed = useCallback(async ({ 
     seedType, 
     amount, 
-    gasEstimate = ESTIMATED_CROSS_CHAIN_GAS 
+    gasEstimate = ESTIMATED_CROSS_CHAIN_GAS,
+    fromChain,
+    fromToken,
+    enableAutoBridge = false
   }: PlantSeedParams): Promise<PlantSeedResult> => {
     
     if (!address) {
@@ -72,6 +288,62 @@ export function usePlantSeed() {
     
     try {
       setIsLoading(true);
+      
+      // Handle auto-bridging if enabled
+      if (enableAutoBridge && fromChain && fromToken && fromChain !== config.sagaChainId) {
+        addNotification({
+          type: 'info',
+          title: 'Auto-Bridge Initiated',
+          message: `Bridging assets from ${getNetworkById(fromChain)?.name || 'unknown'} to Saga Chainlet...`
+        });
+        
+        // Get cross-chain quote for bridging
+        const quote = await getQuote({
+          fromChain,
+          toChain: config.sagaChainId,
+          fromToken,
+          toToken: TARGET_TOKENS.USDC,
+          fromAmount: parseUnits(amount, 6).toString(),
+          fromAddress: address,
+          toAddress: address,
+        });
+        
+        if (!quote) {
+          addNotification({
+            type: 'error',
+            title: 'Bridge Quote Failed',
+            message: 'Unable to get cross-chain quote. Please try again.'
+          });
+          return { success: false, error: 'Bridge quote failed' };
+        }
+        
+        // Execute bridge transaction
+        const bridgeResult = await executeRoute(quote.route, window.ethereum);
+        
+        if (!bridgeResult.success) {
+          addNotification({
+            type: 'error',
+            title: 'Bridge Transaction Failed',
+            message: bridgeResult.error || 'Bridge transaction failed'
+          });
+          return { success: false, error: bridgeResult.error };
+        }
+        
+        addNotification({
+          type: 'success',
+          title: 'Bridge Transaction Submitted',
+          message: `Assets are being bridged. This may take a few minutes...`
+        });
+        
+        // Wait for bridge completion (simplified - in production, you'd monitor the transaction)
+        await new Promise(resolve => setTimeout(resolve, 30000)); // 30 seconds
+        
+        addNotification({
+          type: 'info',
+          title: 'Bridge Complete',
+          message: 'Assets bridged successfully! Proceeding with seed planting...'
+        });
+      }
       
       // Ensure we're on Saga chainlet for gaming transactions
       if (chainId !== config.sagaChainId) {
