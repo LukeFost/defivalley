@@ -5,6 +5,8 @@ import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
+import { TilemapEditor } from '../lib/tilemap.editor';
 
 interface GameState {
   players: Map<string, {
@@ -35,6 +37,9 @@ class MainScene extends Phaser.Scene {
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down'; // Track player direction for sprite animation
+  private cliffTiles: Phaser.GameObjects.Image[] = []; // Store cliff tiles for collision detection
+  private terrainLayout: string[][] = []; // Store terrain layout for collision detection
+  private debugMode: boolean = false; // Toggle for debug visualization
 
   constructor() {
     super({ key: 'MainScene' });
@@ -50,6 +55,9 @@ class MainScene extends Phaser.Scene {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
     });
+    
+    // Load the tileset for world decoration
+    this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
   }
 
   async create() {
@@ -116,13 +124,155 @@ class MainScene extends Phaser.Scene {
           console.log('🎮 Character reset! Reload the page to get a new character.');
         }
       };
+      
+      (window as any).toggleDebugMode = () => {
+        this.debugMode = !this.debugMode;
+        console.log(`🔧 Debug mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+        this.renderDebugOverlay();
+      };
+      
+      (window as any).printTerrainLayout = () => {
+        console.log('🗺️ Terrain Layout:');
+        console.table(this.terrainLayout);
+      };
+      
+      (window as any).editTile = (x: number, y: number, tileType: string) => {
+        const result = TilemapEditor.editTile(this.terrainLayout, x, y, tileType);
+        if (result.success) {
+          console.log(`✅ Tile at (${x}, ${y}) changed from ${result.oldTileType} to ${tileType}`);
+          this.refreshTerrain();
+        } else {
+          console.error(`❌ Failed to edit tile: ${result.error}`);
+        }
+      };
+      
+      (window as any).createIsland = (x: number, y: number, radius: number = 2) => {
+        const result = TilemapEditor.createIsland(
+          this.terrainLayout, x, y, radius, 'cliff_corner', 'cliff_grass_transition'
+        );
+        if (result.success) {
+          console.log(`🏝️ Created island at (${x}, ${y}) with radius ${radius}, changed ${result.tilesChanged} tiles`);
+          this.refreshTerrain();
+        } else {
+          console.error(`❌ Failed to create island: ${result.error}`);
+        }
+      };
+      
+      (window as any).validateTerrain = () => {
+        const validation = TilemapEditor.validateTerrain(this.terrainLayout);
+        console.log('🔍 Terrain Validation:');
+        console.log(`Valid: ${validation.isValid}`);
+        if (validation.errors.length > 0) {
+          console.error('Errors:', validation.errors);
+        }
+        if (validation.warnings.length > 0) {
+          console.warn('Warnings:', validation.warnings);
+        }
+      };
+      
+      (window as any).exportTerrain = () => {
+        const exported = TilemapEditor.exportTerrain(this.terrainLayout);
+        console.log('📤 Exported terrain:');
+        console.log(exported);
+        // Copy to clipboard if available
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(exported);
+          console.log('✅ Copied to clipboard!');
+        }
+      };
+      
+      console.log('🛠️ Dev tools available:');
+      console.log('  - resetMyCharacter(): Reset character selection');
+      console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
+      console.log('  - printTerrainLayout(): Print terrain layout to console');
+      console.log('  - editTile(x, y, tileType): Edit a single tile');
+      console.log('  - createIsland(x, y, radius): Create cliff island');
+      console.log('  - validateTerrain(): Check terrain for issues');
+      console.log('  - exportTerrain(): Export terrain to JSON');
     }
+  }
+  
+  renderDebugOverlay() {
+    // Remove existing debug graphics
+    const existingDebug = this.children.getByName('debug-overlay');
+    if (existingDebug) {
+      existingDebug.destroy();
+    }
+    
+    if (!this.debugMode) return;
+    
+    // Create debug graphics
+    const debugGraphics = this.add.graphics();
+    debugGraphics.setName('debug-overlay');
+    debugGraphics.setDepth(1000); // Render on top
+    
+    const tileSize = TilesetConfig.image.tileSize;
+    
+    // Draw grid and tile information
+    for (let y = 0; y < this.terrainLayout.length; y++) {
+      for (let x = 0; x < this.terrainLayout[y].length; x++) {
+        const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+        const tileType = this.terrainLayout[y][x];
+        const hasCollision = TilemapUtils.hasCollision(tileType);
+        
+        // Draw tile border
+        debugGraphics.lineStyle(1, hasCollision ? 0xff0000 : 0x00ff00, 0.5);
+        debugGraphics.strokeRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+        
+        // Color code tiles
+        if (hasCollision) {
+          debugGraphics.fillStyle(0xff0000, 0.2);
+        } else {
+          debugGraphics.fillStyle(0x00ff00, 0.1);
+        }
+        debugGraphics.fillRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+      }
+    }
+  }
+
+  refreshTerrain() {
+    // Remove existing terrain tiles
+    this.children.each((child) => {
+      if (child.getData('tileType')) {
+        child.destroy();
+      }
+    });
+    
+    // Clear cliff tiles array
+    this.cliffTiles = [];
+    
+    // Recreate terrain from updated layout
+    const tileSize = TilesetConfig.image.tileSize;
+    const mapWidth = this.terrainLayout[0].length;
+    const mapHeight = this.terrainLayout.length;
+    
+    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+    
+    // Update debug overlay if active
+    if (this.debugMode) {
+      this.renderDebugOverlay();
+    }
+    
+    console.log('🔄 Terrain refreshed successfully');
   }
 
   createFarmingWorld() {
     // Create clean, minimal background
     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
-    const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
+    
+    // Create tilemap-based terrain (replaces the simple ground rectangle)
+    this.createTilemapTerrain();
     
     // Add minimal visual structure without clutter
     this.createMinimalStructure();
@@ -145,7 +295,226 @@ class MainScene extends Phaser.Scene {
     gridGraphics.strokePath();
   }
 
-  // Method removed - no decorations needed for clean UI
+  createTilemapTerrain() {
+    // Create a tilemap with natural terrain using the LPC cliffs grass tileset
+    const tileSize = TilesetConfig.image.tileSize;
+    const mapWidth = Math.ceil(800 / tileSize); // 25 tiles
+    const mapHeight = Math.ceil(600 / tileSize); // 19 tiles
+    
+    // Generate natural terrain layout
+    this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
+    
+    // Create tiles based on the terrain layout
+    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    
+    // Add decorative elements
+    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+  }
+
+  createTilesFromLayout(tileSize: number, mapWidth: number, mapHeight: number) {
+    // Create tiles based on the generated terrain layout
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const tileType = this.terrainLayout[y][x];
+        const tileConfig = TilesetConfig.tiles[tileType];
+        
+        if (tileConfig) {
+          const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+          
+          const tile = this.add.image(worldPos.x, worldPos.y, 'cliffs_grass_tileset');
+          tile.setOrigin(0.5, 0.5);
+          tile.setDisplaySize(tileSize, tileSize);
+          
+          // Apply tile-specific styling
+          this.applyTileStyle(tile, tileType);
+          
+          // Store collision tiles
+          if (tileConfig.collision) {
+            this.cliffTiles.push(tile);
+          }
+          
+          // Add tile data for debugging
+          tile.setData('tileType', tileType);
+          tile.setData('tilePos', { x, y });
+        }
+      }
+    }
+  }
+
+  applyTileStyle(tile: Phaser.GameObjects.Image, tileType: string) {
+    // Apply visual styling based on tile type
+    switch (tileType) {
+      case 'cliff_top':
+        tile.setTint(0x8B4513); // Brown for cliff tops
+        tile.setAlpha(0.8);
+        break;
+      case 'cliff_face':
+        tile.setTint(0x654321); // Darker brown for cliff faces
+        tile.setAlpha(0.9);
+        break;
+      case 'cliff_corner':
+        tile.setTint(0x5D4037); // Corner cliff coloring
+        tile.setAlpha(0.85);
+        break;
+      case 'cliff_large':
+        tile.setTint(0x8B4513); // Brown for large cliff formations
+        tile.setAlpha(0.7);
+        break;
+      case 'grass_full':
+        tile.setTint(0x90EE90); // Green for grass
+        tile.setAlpha(0.3);
+        break;
+      case 'grass_sparse':
+        tile.setTint(0x228B22); // Darker green for sparse grass
+        tile.setAlpha(0.4);
+        break;
+      case 'cliff_grass_transition':
+      case 'grass_cliff_transition':
+        tile.setTint(0x6B8E23); // Olive green for transitions
+        tile.setAlpha(0.5);
+        // Add gentle animation to transition tiles
+        this.tweens.add({
+          targets: tile,
+          alpha: 0.3,
+          duration: 3000 + Math.random() * 2000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        break;
+      default:
+        tile.setTint(0xFFFFFF); // Default white tint
+        tile.setAlpha(0.5);
+    }
+  }
+
+  addTerrainDecorations(tileSize: number, mapWidth: number, mapHeight: number) {
+    // Add decorative elements based on terrain layout
+    const decorationPositions = [];
+    
+    // Find suitable positions for decorations
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const tileType = this.terrainLayout[y][x];
+        
+        // Add ladders near cliffs
+        if (tileType.includes('cliff') && Math.random() > 0.95) {
+          decorationPositions.push({
+            x: x * tileSize + tileSize/2,
+            y: y * tileSize + tileSize/2,
+            type: 'ladder'
+          });
+        }
+        
+        // Add rocks on grass areas
+        if (tileType.includes('grass') && Math.random() > 0.98) {
+          decorationPositions.push({
+            x: x * tileSize + tileSize/2,
+            y: y * tileSize + tileSize/2,
+            type: 'rock'
+          });
+        }
+      }
+    }
+    
+    // Create decoration sprites
+    decorationPositions.forEach(({x, y, type}) => {
+      if (type === 'ladder') {
+        const ladder = this.add.rectangle(x, y, 8, 24, 0x8B4513, 0.8);
+        ladder.setStrokeStyle(1, 0x654321, 1);
+      } else if (type === 'rock') {
+        const rock = this.add.circle(x, y, 4, 0x696969, 0.8);
+        rock.setStrokeStyle(1, 0x2F2F2F, 0.6);
+      }
+    });
+  }
+
+  addDecorations() {
+    // Add trees around the border, avoiding cliff areas
+    const treePositions = [
+      [100, 300], [200, 280], [300, 320], [500, 290],
+      [600, 310], [700, 285], [150, 450], [650, 460],
+      [250, 420], [550, 440], [120, 380], [680, 400]
+    ];
+    
+    treePositions.forEach(([x, y]) => {
+      // Check if position conflicts with cliff tiles
+      const tileX = Math.floor(x / 32);
+      const tileY = Math.floor(y / 32);
+      
+      // Only place trees in safe grass areas
+      if (tileY > 7 && tileX > 2 && tileX < 22) {
+        const trunk = this.add.rectangle(x, y + 15, 8, 30, 0x8B4513);
+        const leaves = this.add.circle(x, y, 20, 0x228B22, 0.8);
+        
+        this.tweens.add({
+          targets: [trunk, leaves],
+          rotation: 0.05,
+          duration: 3000 + Math.random() * 2000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+    });
+
+    // Add natural pathways between grass areas
+    const pathGraphics = this.add.graphics();
+    pathGraphics.fillStyle(0xDEB887, 0.4);
+    
+    // Main horizontal path
+    pathGraphics.fillRect(64, 380, 672, 16);
+    
+    // Vertical connecting paths
+    pathGraphics.fillRect(200, 260, 16, 140);
+    pathGraphics.fillRect(400, 260, 16, 140);
+    pathGraphics.fillRect(600, 260, 16, 140);
+    
+    // Small decorative elements are now added by addTerrainDecorations()
+  }
+
+
+  // Enhanced collision detection using terrain layout
+  checkCliffCollision(x: number, y: number): boolean {
+    const playerRadius = 16; // Approximate player collision radius
+    const tileSize = TilesetConfig.image.tileSize;
+    
+    // Convert world coordinates to tile coordinates
+    const tilePos = TilemapUtils.worldToTile(x, y, tileSize);
+    
+    // Check collision in a 3x3 area around the player
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const checkX = tilePos.x + dx;
+        const checkY = tilePos.y + dy;
+        
+        // Check bounds
+        if (checkX >= 0 && checkX < this.terrainLayout[0].length && 
+            checkY >= 0 && checkY < this.terrainLayout.length) {
+          
+          const tileType = this.terrainLayout[checkY][checkX];
+          
+          // Check if tile has collision
+          if (TilemapUtils.hasCollision(tileType)) {
+            const tileWorldPos = TilemapUtils.tileToWorld(checkX, checkY, tileSize);
+            const tileRadius = tileSize / 2;
+            
+            // Calculate distance between player and tile center
+            const distance = Math.sqrt(
+              Math.pow(x - tileWorldPos.x, 2) + Math.pow(y - tileWorldPos.y, 2)
+            );
+            
+            // Check if player would collide with tile
+            if (distance < (playerRadius + tileRadius)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
 
   createUI() {
     // Create minimal UI with only essential elements
@@ -399,25 +768,41 @@ class MainScene extends Phaser.Scene {
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
 
-    // Handle input with directional sprite changes
+    // Handle input with directional sprite changes and collision detection
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      newX = Math.max(20, newX - speed);
-      moved = true;
-      this.lastDirection = 'left';
+      const potentialX = Math.max(20, newX - speed);
+      // Check collision before moving
+      if (!this.checkCliffCollision(potentialX, newY)) {
+        newX = potentialX;
+        moved = true;
+        this.lastDirection = 'left';
+      }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      newX = Math.min(780, newX + speed);
-      moved = true;
-      this.lastDirection = 'right';
+      const potentialX = Math.min(780, newX + speed);
+      // Check collision before moving
+      if (!this.checkCliffCollision(potentialX, newY)) {
+        newX = potentialX;
+        moved = true;
+        this.lastDirection = 'right';
+      }
     }
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
-      newY = Math.max(20, newY - speed);
-      moved = true;
-      this.lastDirection = 'up';
+      const potentialY = Math.max(20, newY - speed);
+      // Check collision before moving
+      if (!this.checkCliffCollision(newX, potentialY)) {
+        newY = potentialY;
+        moved = true;
+        this.lastDirection = 'up';
+      }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      newY = Math.min(580, newY + speed);
-      moved = true;
-      this.lastDirection = 'down';
+      const potentialY = Math.min(580, newY + speed);
+      // Check collision before moving
+      if (!this.checkCliffCollision(newX, potentialY)) {
+        newY = potentialY;
+        moved = true;
+        this.lastDirection = 'down';
+      }
     }
     
     // Update sprite direction if moved
