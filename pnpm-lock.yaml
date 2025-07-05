@@ -38,6 +38,9 @@ importers:
       express:
         specifier: ^4.18.2
         version: 4.21.2
+      express-rate-limit:
+        specifier: ^7.5.1
+        version: 7.5.1(express@4.21.2)
       nodemon:
         specifier: ^3.1.10
         version: 3.1.10
@@ -2888,6 +2891,12 @@ packages:
   express-jwt@8.5.1:
     resolution: {integrity: sha512-Dv6QjDLpR2jmdb8M6XQXiCcpEom7mK8TOqnr0/TngDKsG2DHVkO8+XnVxkJVN7BuS1I3OrGw6N8j5DaaGgkDRQ==}
     engines: {node: '>= 8.0.0'}
+
+  express-rate-limit@7.5.1:
+    resolution: {integrity: sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
 
   express-session@1.18.1:
     resolution: {integrity: sha512-a5mtTqEaZvBCL9A9aqkrtfz+3SMDhOVUnjafjo+s7A9Txkq+SVX2DLvSp1Zrv4uCXa3lMSK3viWnh9Gg07PBUA==}
@@ -9300,6 +9309,10 @@ snapshots:
       '@types/jsonwebtoken': 9.0.10
       express-unless: 2.1.3
       jsonwebtoken: 9.0.2
+
+  express-rate-limit@7.5.1(express@4.21.2):
+    dependencies:
+      express: 4.21.2
 
   express-session@1.18.1:
     dependencies:

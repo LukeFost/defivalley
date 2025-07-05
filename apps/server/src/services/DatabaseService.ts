@@ -82,10 +82,14 @@ export class DatabaseService {
     `);
 
     // Create indexes for better performance
+    // Create performance indexes
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_crops_player_id ON crops (player_id);
       CREATE INDEX IF NOT EXISTS idx_crops_harvested ON crops (harvested);
       CREATE INDEX IF NOT EXISTS idx_crops_position ON crops (x, y);
+      -- Additional optimized indexes for world queries
+      CREATE INDEX IF NOT EXISTS idx_crops_player_harvested ON crops(player_id, harvested) WHERE harvested = FALSE;
+      CREATE INDEX IF NOT EXISTS idx_players_updated_at ON players(updated_at DESC);
     `);
 
     // Run any pending migrations
@@ -225,29 +229,38 @@ export class DatabaseService {
   }
 
   /**
-   * Get complete world data for a player (player info + all crops)
+   * Get complete world data for a player (player info + all crops) - Optimized
    */
   getWorldData(worldOwnerId: string): { player: Player | null; crops: Crop[] } {
+    const transaction = this.db.transaction(() => {
+      try {
+        // Get player data (will create if doesn't exist)
+        const player = this.getPlayer(worldOwnerId, `Player_${worldOwnerId.slice(0, 8)}`);
+        
+        // Get all unharvested crops for this player in same transaction
+        const crops = this.getUnharvestedCrops(worldOwnerId);
+        
+        return { player, crops };
+      } catch (error) {
+        console.error(`❌ Error loading world data for ${worldOwnerId}:`, error);
+        throw error; // Propagate error instead of swallowing
+      }
+    });
+    
     try {
-      // Get player data (will create if doesn't exist)
-      const player = this.getPlayer(worldOwnerId, `Player_${worldOwnerId.slice(0, 8)}`);
-      
-      // Get all unharvested crops for this player
-      const crops = this.getUnharvestedCrops(worldOwnerId);
-      
-      return { player, crops };
+      return transaction();
     } catch (error) {
-      console.error(`❌ Error loading world data for ${worldOwnerId}:`, error);
+      // Return safe defaults if transaction fails
       return { player: null, crops: [] };
     }
   }
 
   /**
-   * Get list of active worlds (players with unharvested crops or recent activity)
+   * Get list of active worlds with pagination and search
    */
-  getActiveWorlds(): Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }> {
+  getActiveWorlds(limit: number = 20, offset: number = 0, search?: string): Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }> {
     try {
-      const stmt = this.db.prepare(`
+      let query = `
         SELECT 
           p.id as playerId,
           p.name as playerName,
@@ -255,15 +268,52 @@ export class DatabaseService {
           COUNT(c.id) as cropCount
         FROM players p
         LEFT JOIN crops c ON p.id = c.player_id AND c.harvested = FALSE
+      `;
+      
+      const params: any[] = [];
+      
+      if (search) {
+        query += ` WHERE p.id LIKE ? OR p.name LIKE ?`;
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern);
+      }
+      
+      query += `
         GROUP BY p.id, p.name, p.updated_at
         ORDER BY p.updated_at DESC
-        LIMIT 20
-      `);
+        LIMIT ? OFFSET ?
+      `;
       
-      return stmt.all() as Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }>;
+      params.push(limit, offset);
+      
+      const stmt = this.db.prepare(query);
+      return stmt.all(...params) as Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }>;
     } catch (error) {
       console.error('❌ Error getting active worlds:', error);
-      return [];
+      throw error; // Propagate error for proper handling
+    }
+  }
+  
+  /**
+   * Get total count of worlds for pagination
+   */
+  getTotalWorldsCount(search?: string): number {
+    try {
+      let query = 'SELECT COUNT(DISTINCT id) as count FROM players';
+      const params: any[] = [];
+      
+      if (search) {
+        query += ' WHERE id LIKE ? OR name LIKE ?';
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern);
+      }
+      
+      const stmt = this.db.prepare(query);
+      const result = stmt.get(...params) as { count: number };
+      return result.count;
+    } catch (error) {
+      console.error('❌ Error getting total worlds count:', error);
+      throw error;
     }
   }
 

@@ -11,6 +11,9 @@ import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { CropStats } from './CropStats';
+import { RoomOptions } from '../types/colyseus.types';
+import { usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
 
 interface GameState {
   players: Map<string, {
@@ -47,6 +50,8 @@ class MainScene extends Phaser.Scene {
   private cropSystem!: CropSystem;
   private worldId?: string;
   private isOwnWorld?: boolean;
+  private address?: string;
+  private user?: any;
   
   // Camera system properties
   private worldWidth: number = 1600; // Will be updated based on map size
@@ -1062,6 +1067,11 @@ class MainScene extends Phaser.Scene {
     this.worldId = worldId;
     this.isOwnWorld = isOwnWorld;
   }
+  
+  setAuthInfo(address?: string, user?: any) {
+    this.address = address;
+    this.user = user;
+  }
 
   async connectToServer() {
     try {
@@ -1077,19 +1087,20 @@ class MainScene extends Phaser.Scene {
       const endpoint = `ws://${serverHost}:${port}`;
       console.log('Connecting to:', endpoint);
       
+      // Get player ID from wallet address or user ID
+      const playerId = this.address || this.user?.id || `guest_${Math.random().toString(36).substr(2, 9)}`;
+      
       // Determine room type and options based on world configuration
       let roomType = 'game'; // fallback to generic room
-      let roomOptions: any = {
-        name: `Player${Math.floor(Math.random() * 1000)}`
+      const roomOptions: RoomOptions = {
+        name: this.user?.google?.name || this.user?.email?.address?.split('@')[0] || `Player${Math.floor(Math.random() * 1000)}`,
+        playerId: playerId
       };
 
       if (this.worldId) {
         roomType = 'world';
-        roomOptions = {
-          name: `Player${Math.floor(Math.random() * 1000)}`,
-          worldOwnerId: this.worldId
-        };
-        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'})`);
+        roomOptions.worldOwnerId = this.worldId;
+        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'}) with playerId: ${playerId}`);
       }
       
       try {
@@ -1424,6 +1435,10 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
+  
+  // Get user authentication info
+  const { user } = usePrivy();
+  const { address } = useAccount();
 
   useEffect(() => {
     const config: Phaser.Types.Core.GameConfig = {
@@ -1450,8 +1465,9 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       if (scene) {
         sceneRef.current = scene;
         
-        // Configure world settings
+        // Configure world settings and auth info
         scene.setWorldConfiguration(worldId, isOwnWorld);
+        scene.setAuthInfo(address, user);
         
         scene.init({
           chatCallback: (message: ChatMessage) => {
