@@ -89,3 +89,4 @@ repomix-output.xml
 repomix-output.txt
 *.repomix.xml
 *.repomix.txt
+worktrees/
