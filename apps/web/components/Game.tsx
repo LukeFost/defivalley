@@ -120,98 +120,40 @@ class MainScene extends Phaser.Scene {
   }
 
   createFarmingWorld() {
-    // Create layered background for depth
+    // Create clean, minimal background
     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
-    const ground = this.add.rectangle(400, 500, 800, 200, 0x8B4513, 0.8);
-    const grass = this.add.rectangle(400, 450, 800, 100, 0x90EE90, 0.7);
+    const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
     
-    this.createFarmPlots();
-    this.addDecorations();
+    // Add minimal visual structure without clutter
+    this.createMinimalStructure();
   }
 
-  createFarmPlots() {
-    // Create a grid of farming plots
-    const plotSize = 64;
-    const spacing = 80;
-    const startX = 120;
-    const startY = 200;
+  createMinimalStructure() {
+    // Create a simple grid pattern for visual structure without clutter
+    const gridGraphics = this.add.graphics();
+    gridGraphics.lineStyle(1, 0x90EE90, 0.2);
     
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 8; col++) {
-        const x = startX + (col * spacing);
-        const y = startY + (row * spacing);
-        
-        // Create plot background
-        const plot = this.add.rectangle(x, y, plotSize, plotSize, 0x8B4513, 0.3);
-        plot.setStrokeStyle(2, 0x654321, 0.8);
-        
-        // Add some visual variety to plots
-        if (Math.random() > 0.7) {
-          // Some plots have seeds/plants with gentle animation
-          const plant = this.add.circle(x, y, 8, 0x228B22, 0.8);
-          
-          // Add gentle swaying animation
-          this.tweens.add({
-            targets: plant,
-            scaleX: 1.1,
-            scaleY: 0.9,
-            duration: 2000 + Math.random() * 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-          });
-        }
-      }
+    // Add subtle grid lines for spatial reference
+    for (let i = 0; i < 800; i += 100) {
+      gridGraphics.moveTo(i, 0);
+      gridGraphics.lineTo(i, 600);
     }
+    for (let j = 0; j < 600; j += 100) {
+      gridGraphics.moveTo(0, j);
+      gridGraphics.lineTo(800, j);
+    }
+    gridGraphics.strokePath();
   }
 
-  addDecorations() {
-    // Add trees around the border
-    const treePositions = [
-      [50, 100], [750, 120], [80, 500], [720, 480],
-      [150, 80], [650, 90], [100, 520], [700, 540]
-    ];
-    
-    treePositions.forEach(([x, y]) => {
-      const trunk = this.add.rectangle(x, y + 15, 8, 30, 0x8B4513);
-      const leaves = this.add.circle(x, y, 20, 0x228B22, 0.8);
-      
-      this.tweens.add({
-        targets: [trunk, leaves],
-        rotation: 0.05,
-        duration: 3000 + Math.random() * 2000,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut'
-      });
-    });
-
-    // Add path/walkways
-    const pathGraphics = this.add.graphics();
-    pathGraphics.fillStyle(0xDEB887, 0.6);
-    pathGraphics.fillRect(0, 380, 800, 20);
-    pathGraphics.fillRect(390, 0, 20, 600);
-  }
+  // Method removed - no decorations needed for clean UI
 
   createUI() {
-    // Create elegant UI container
+    // Create minimal UI with only essential elements
     const uiContainer = this.add.container(0, 0);
     
-    // Header with farming theme
-    const headerBg = this.add.rectangle(400, 30, 500, 50, 0x8B4513, 0.9);
-    headerBg.setStrokeStyle(2, 0x654321, 1);
-    
-    const title = this.add.text(400, 30, '🌱 DeFi Valley - Cozy Farming', {
-      fontSize: '18px',
-      color: '#FFFFFF',
-      fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold'
-    });
-    title.setOrigin(0.5);
-    
-    // Elegant controls info
-    const controlsBg = this.add.rectangle(120, 580, 220, 40, 0x000000, 0.7);
-    controlsBg.setStrokeStyle(1, 0x8B4513, 0.8);
+    // Simple controls info at bottom
+    const controlsBg = this.add.rectangle(120, 580, 220, 30, 0x000000, 0.6);
+    controlsBg.setStrokeStyle(1, 0x90EE90, 0.3);
     
     const controls = this.add.text(120, 580, '🎮 WASD: Move  💬 Enter: Chat', {
       fontSize: '12px',
@@ -219,14 +161,6 @@ class MainScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif'
     });
     controls.setOrigin(0.5);
-    
-    // Add farming-themed UI elements
-    this.add.text(680, 580, '🌾 Plant & Harvest', {
-      fontSize: '12px',
-      color: '#228B22',
-      fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold'
-    }).setOrigin(0.5);
   }
 
   async connectToServer() {
@@ -634,10 +568,18 @@ function Game() {
       <style jsx>{`
         .game-wrapper {
           position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 20px;
+          display: inline-block;
+          width: 800px;
+          height: 600px;
+          background: transparent;
+        }
+
+        #game-container {
+          width: 100%;
+          height: 100%;
+          border-radius: 8px;
+          overflow: hidden;
+          position: relative;
         }
 
         .chat-container {
@@ -647,26 +589,31 @@ function Game() {
           width: 300px;
           max-height: 200px;
           pointer-events: none;
+          z-index: 10;
         }
 
         .chat-messages {
-          background: rgba(0, 0, 0, 0.7);
+          background: rgba(0, 0, 0, 0.8);
           border-radius: 8px;
           padding: 10px;
           margin-bottom: 10px;
           max-height: 150px;
           overflow-y: auto;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         .chat-message {
           color: white;
           font-size: 14px;
           margin-bottom: 5px;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .chat-name {
           font-weight: bold;
           margin-right: 5px;
+          color: #87CEEB;
         }
 
         .chat-text {
@@ -679,16 +626,20 @@ function Game() {
 
         .chat-input {
           width: 100%;
-          padding: 8px;
+          padding: 8px 12px;
           border: none;
-          border-radius: 4px;
-          background: rgba(255, 255, 255, 0.9);
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.95);
           font-size: 14px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(135, 206, 235, 0.3);
         }
 
         .chat-input:focus {
           outline: none;
           background: white;
+          border-color: #87CEEB;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(135, 206, 235, 0.2);
         }
       `}</style>
     </div>
