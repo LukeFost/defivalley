@@ -5,6 +5,7 @@ import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 
 interface GameState {
   players: Map<string, {
@@ -36,6 +37,8 @@ class MainScene extends Phaser.Scene {
   private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down'; // Track player direction for sprite animation
   private cliffTiles: Phaser.GameObjects.Image[] = []; // Store cliff tiles for collision detection
+  private terrainLayout: string[][] = []; // Store terrain layout for collision detection
+  private debugMode: boolean = false; // Toggle for debug visualization
 
   constructor() {
     super({ key: 'MainScene' });
@@ -120,6 +123,70 @@ class MainScene extends Phaser.Scene {
           console.log('🎮 Character reset! Reload the page to get a new character.');
         }
       };
+      
+      (window as any).toggleDebugMode = () => {
+        this.debugMode = !this.debugMode;
+        console.log(`🔧 Debug mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+        this.renderDebugOverlay();
+      };
+      
+      (window as any).printTerrainLayout = () => {
+        console.log('🗺️ Terrain Layout:');
+        console.table(this.terrainLayout);
+      };
+      
+      console.log('🛠️ Dev tools available:');
+      console.log('  - resetMyCharacter(): Reset character selection');
+      console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
+      console.log('  - printTerrainLayout(): Print terrain layout to console');
+    }
+  }
+  
+  renderDebugOverlay() {
+    // Remove existing debug graphics
+    const existingDebug = this.children.getByName('debug-overlay');
+    if (existingDebug) {
+      existingDebug.destroy();
+    }
+    
+    if (!this.debugMode) return;
+    
+    // Create debug graphics
+    const debugGraphics = this.add.graphics();
+    debugGraphics.setName('debug-overlay');
+    debugGraphics.setDepth(1000); // Render on top
+    
+    const tileSize = TilesetConfig.image.tileSize;
+    
+    // Draw grid and tile information
+    for (let y = 0; y < this.terrainLayout.length; y++) {
+      for (let x = 0; x < this.terrainLayout[y].length; x++) {
+        const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+        const tileType = this.terrainLayout[y][x];
+        const hasCollision = TilemapUtils.hasCollision(tileType);
+        
+        // Draw tile border
+        debugGraphics.lineStyle(1, hasCollision ? 0xff0000 : 0x00ff00, 0.5);
+        debugGraphics.strokeRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+        
+        // Color code tiles
+        if (hasCollision) {
+          debugGraphics.fillStyle(0xff0000, 0.2);
+        } else {
+          debugGraphics.fillStyle(0x00ff00, 0.1);
+        }
+        debugGraphics.fillRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+      }
     }
   }
 
@@ -172,159 +239,134 @@ class MainScene extends Phaser.Scene {
 
   createTilemapTerrain() {
     // Create a tilemap with natural terrain using the LPC cliffs grass tileset
-    // The tileset contains 32x32 tiles arranged in a grid
-    const tileSize = 32;
+    const tileSize = TilesetConfig.image.tileSize;
     const mapWidth = Math.ceil(800 / tileSize); // 25 tiles
     const mapHeight = Math.ceil(600 / tileSize); // 19 tiles
     
-    // Create base grass terrain
-    this.createGrassLayer(tileSize, mapWidth, mapHeight);
+    // Generate natural terrain layout
+    this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
     
-    // Add cliff formations for elevated areas
-    this.createCliffFormations(tileSize, mapWidth, mapHeight);
+    // Create tiles based on the terrain layout
+    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
     
-    // Add transition tiles for seamless blending
-    this.createTransitionTiles(tileSize, mapWidth, mapHeight);
+    // Add decorative elements
+    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
   }
 
-  createGrassLayer(tileSize: number, mapWidth: number, mapHeight: number) {
-    // Create a base layer of grass tiles
-    const grassTileWidth = 64; // Estimated from tileset
-    const grassTileHeight = 64;
-    
-    // Create grass ground covering the lower half of the screen
-    for (let y = 8; y < mapHeight; y++) {
+  createTilesFromLayout(tileSize: number, mapWidth: number, mapHeight: number) {
+    // Create tiles based on the generated terrain layout
+    for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
-        const tileX = x * tileSize;
-        const tileY = y * tileSize;
+        const tileType = this.terrainLayout[y][x];
+        const tileConfig = TilesetConfig.tiles[tileType];
         
-        // Create grass texture using tileset
-        const grassTile = this.add.image(tileX + tileSize/2, tileY + tileSize/2, 'cliffs_grass_tileset');
-        grassTile.setOrigin(0.5, 0.5);
-        grassTile.setDisplaySize(tileSize, tileSize);
-        grassTile.setTint(0x90EE90); // Green tint for grass
-        grassTile.setAlpha(0.3); // Semi-transparent for subtle effect
-        
-        // Add slight variation in grass tiles
-        if (Math.random() > 0.8) {
-          grassTile.setTint(0x228B22); // Darker green for variation
-          grassTile.setAlpha(0.4);
+        if (tileConfig) {
+          const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+          
+          const tile = this.add.image(worldPos.x, worldPos.y, 'cliffs_grass_tileset');
+          tile.setOrigin(0.5, 0.5);
+          tile.setDisplaySize(tileSize, tileSize);
+          
+          // Apply tile-specific styling
+          this.applyTileStyle(tile, tileType);
+          
+          // Store collision tiles
+          if (tileConfig.collision) {
+            this.cliffTiles.push(tile);
+          }
+          
+          // Add tile data for debugging
+          tile.setData('tileType', tileType);
+          tile.setData('tilePos', { x, y });
         }
       }
     }
   }
 
-  createCliffFormations(tileSize: number, mapWidth: number, mapHeight: number) {
-    // Create cliff formations around the borders and some interior areas
-    const cliffPositions = [
-      // Top border cliffs
-      ...Array.from({length: mapWidth}, (_, i) => ({x: i, y: 0, type: 'cliff_top'})),
-      ...Array.from({length: mapWidth}, (_, i) => ({x: i, y: 1, type: 'cliff_face'})),
-      
-      // Left border cliffs
-      ...Array.from({length: 6}, (_, i) => ({x: 0, y: i + 2, type: 'cliff_left'})),
-      ...Array.from({length: 6}, (_, i) => ({x: 1, y: i + 2, type: 'cliff_face'})),
-      
-      // Right border cliffs
-      ...Array.from({length: 6}, (_, i) => ({x: mapWidth - 1, y: i + 2, type: 'cliff_right'})),
-      ...Array.from({length: 6}, (_, i) => ({x: mapWidth - 2, y: i + 2, type: 'cliff_face'})),
-      
-      // Interior cliff formations for visual interest
-      {x: 5, y: 5, type: 'cliff_island'},
-      {x: 6, y: 5, type: 'cliff_island'},
-      {x: 5, y: 6, type: 'cliff_island'},
-      {x: 6, y: 6, type: 'cliff_island'},
-      
-      {x: 18, y: 4, type: 'cliff_island'},
-      {x: 19, y: 4, type: 'cliff_island'},
-      {x: 18, y: 5, type: 'cliff_island'},
-      {x: 19, y: 5, type: 'cliff_island'},
-    ];
-    
-    cliffPositions.forEach(({x, y, type}) => {
-      if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
-        const tileX = x * tileSize;
-        const tileY = y * tileSize;
-        
-        const cliffTile = this.add.image(tileX + tileSize/2, tileY + tileSize/2, 'cliffs_grass_tileset');
-        cliffTile.setOrigin(0.5, 0.5);
-        cliffTile.setDisplaySize(tileSize, tileSize);
-        
-        // Set cliff-specific tints and properties
-        switch (type) {
-          case 'cliff_top':
-            cliffTile.setTint(0x8B4513); // Brown for cliff tops
-            cliffTile.setAlpha(0.8);
-            break;
-          case 'cliff_face':
-            cliffTile.setTint(0x654321); // Darker brown for cliff faces
-            cliffTile.setAlpha(0.9);
-            break;
-          case 'cliff_left':
-          case 'cliff_right':
-            cliffTile.setTint(0x5D4037); // Side cliff coloring
-            cliffTile.setAlpha(0.85);
-            break;
-          case 'cliff_island':
-            cliffTile.setTint(0x8B4513); // Brown for island cliffs
-            cliffTile.setAlpha(0.7);
-            break;
-        }
-        
-        // Add collision properties to cliff tiles
-        cliffTile.setData('isCliff', true);
-        cliffTile.setData('collision', true);
-        
-        // Store cliff tiles for collision detection
-        this.cliffTiles.push(cliffTile);
-      }
-    });
-  }
-
-  createTransitionTiles(tileSize: number, mapWidth: number, mapHeight: number) {
-    // Create transition tiles between cliffs and grass for seamless blending
-    const transitionPositions = [
-      // Transitions below top cliffs
-      ...Array.from({length: mapWidth}, (_, i) => ({x: i, y: 2, type: 'grass_cliff_transition'})),
-      
-      // Transitions next to side cliffs
-      ...Array.from({length: 6}, (_, i) => ({x: 2, y: i + 2, type: 'grass_cliff_transition'})),
-      ...Array.from({length: 6}, (_, i) => ({x: mapWidth - 3, y: i + 2, type: 'grass_cliff_transition'})),
-      
-      // Transitions around interior cliff islands
-      {x: 4, y: 5, type: 'grass_cliff_transition'},
-      {x: 7, y: 5, type: 'grass_cliff_transition'},
-      {x: 5, y: 4, type: 'grass_cliff_transition'},
-      {x: 5, y: 7, type: 'grass_cliff_transition'},
-      
-      {x: 17, y: 4, type: 'grass_cliff_transition'},
-      {x: 20, y: 4, type: 'grass_cliff_transition'},
-      {x: 18, y: 3, type: 'grass_cliff_transition'},
-      {x: 18, y: 6, type: 'grass_cliff_transition'},
-    ];
-    
-    transitionPositions.forEach(({x, y, type}) => {
-      if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
-        const tileX = x * tileSize;
-        const tileY = y * tileSize;
-        
-        const transitionTile = this.add.image(tileX + tileSize/2, tileY + tileSize/2, 'cliffs_grass_tileset');
-        transitionTile.setOrigin(0.5, 0.5);
-        transitionTile.setDisplaySize(tileSize, tileSize);
-        
-        // Blend between cliff and grass colors
-        transitionTile.setTint(0x6B8E23); // Olive green for transition
-        transitionTile.setAlpha(0.5);
-        
+  applyTileStyle(tile: Phaser.GameObjects.Image, tileType: string) {
+    // Apply visual styling based on tile type
+    switch (tileType) {
+      case 'cliff_top':
+        tile.setTint(0x8B4513); // Brown for cliff tops
+        tile.setAlpha(0.8);
+        break;
+      case 'cliff_face':
+        tile.setTint(0x654321); // Darker brown for cliff faces
+        tile.setAlpha(0.9);
+        break;
+      case 'cliff_corner':
+        tile.setTint(0x5D4037); // Corner cliff coloring
+        tile.setAlpha(0.85);
+        break;
+      case 'cliff_large':
+        tile.setTint(0x8B4513); // Brown for large cliff formations
+        tile.setAlpha(0.7);
+        break;
+      case 'grass_full':
+        tile.setTint(0x90EE90); // Green for grass
+        tile.setAlpha(0.3);
+        break;
+      case 'grass_sparse':
+        tile.setTint(0x228B22); // Darker green for sparse grass
+        tile.setAlpha(0.4);
+        break;
+      case 'cliff_grass_transition':
+      case 'grass_cliff_transition':
+        tile.setTint(0x6B8E23); // Olive green for transitions
+        tile.setAlpha(0.5);
         // Add gentle animation to transition tiles
         this.tweens.add({
-          targets: transitionTile,
+          targets: tile,
           alpha: 0.3,
           duration: 3000 + Math.random() * 2000,
           yoyo: true,
           repeat: -1,
           ease: 'Sine.easeInOut'
         });
+        break;
+      default:
+        tile.setTint(0xFFFFFF); // Default white tint
+        tile.setAlpha(0.5);
+    }
+  }
+
+  addTerrainDecorations(tileSize: number, mapWidth: number, mapHeight: number) {
+    // Add decorative elements based on terrain layout
+    const decorationPositions = [];
+    
+    // Find suitable positions for decorations
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const tileType = this.terrainLayout[y][x];
+        
+        // Add ladders near cliffs
+        if (tileType.includes('cliff') && Math.random() > 0.95) {
+          decorationPositions.push({
+            x: x * tileSize + tileSize/2,
+            y: y * tileSize + tileSize/2,
+            type: 'ladder'
+          });
+        }
+        
+        // Add rocks on grass areas
+        if (tileType.includes('grass') && Math.random() > 0.98) {
+          decorationPositions.push({
+            x: x * tileSize + tileSize/2,
+            y: y * tileSize + tileSize/2,
+            type: 'rock'
+          });
+        }
+      }
+    }
+    
+    // Create decoration sprites
+    decorationPositions.forEach(({x, y, type}) => {
+      if (type === 'ladder') {
+        const ladder = this.add.rectangle(x, y, 8, 24, 0x8B4513, 0.8);
+        ladder.setStrokeStyle(1, 0x654321, 1);
+      } else if (type === 'rock') {
+        const rock = this.add.circle(x, y, 4, 0x696969, 0.8);
+        rock.setStrokeStyle(1, 0x2F2F2F, 0.6);
       }
     });
   }
@@ -370,59 +412,46 @@ class MainScene extends Phaser.Scene {
     pathGraphics.fillRect(400, 260, 16, 140);
     pathGraphics.fillRect(600, 260, 16, 140);
     
-    // Add some small decorative elements
-    this.addSmallDecorations();
+    // Small decorative elements are now added by addTerrainDecorations()
   }
 
-  addSmallDecorations() {
-    // Add small rocks and bushes for extra detail
-    const decorationPositions = [
-      {x: 180, y: 350, type: 'rock'},
-      {x: 420, y: 330, type: 'bush'},
-      {x: 580, y: 370, type: 'rock'},
-      {x: 320, y: 400, type: 'bush'},
-      {x: 680, y: 350, type: 'rock'},
-      {x: 140, y: 420, type: 'bush'},
-    ];
-    
-    decorationPositions.forEach(({x, y, type}) => {
-      if (type === 'rock') {
-        const rock = this.add.circle(x, y, 6, 0x696969, 0.8);
-        rock.setStrokeStyle(1, 0x2F2F2F, 0.6);
-      } else if (type === 'bush') {
-        const bush = this.add.circle(x, y, 12, 0x228B22, 0.6);
-        
-        // Add gentle swaying animation
-        this.tweens.add({
-          targets: bush,
-          scaleX: 1.1,
-          scaleY: 0.9,
-          duration: 4000 + Math.random() * 2000,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-      }
-    });
-  }
 
-  // Collision detection for cliff tiles
+  // Enhanced collision detection using terrain layout
   checkCliffCollision(x: number, y: number): boolean {
     const playerRadius = 16; // Approximate player collision radius
+    const tileSize = TilesetConfig.image.tileSize;
     
-    for (const cliffTile of this.cliffTiles) {
-      const tileX = cliffTile.x;
-      const tileY = cliffTile.y;
-      const tileRadius = 16; // Half of tile size (32px)
-      
-      // Calculate distance between player and cliff tile
-      const distance = Math.sqrt(
-        Math.pow(x - tileX, 2) + Math.pow(y - tileY, 2)
-      );
-      
-      // Check if player would collide with cliff tile
-      if (distance < (playerRadius + tileRadius)) {
-        return true;
+    // Convert world coordinates to tile coordinates
+    const tilePos = TilemapUtils.worldToTile(x, y, tileSize);
+    
+    // Check collision in a 3x3 area around the player
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const checkX = tilePos.x + dx;
+        const checkY = tilePos.y + dy;
+        
+        // Check bounds
+        if (checkX >= 0 && checkX < this.terrainLayout[0].length && 
+            checkY >= 0 && checkY < this.terrainLayout.length) {
+          
+          const tileType = this.terrainLayout[checkY][checkX];
+          
+          // Check if tile has collision
+          if (TilemapUtils.hasCollision(tileType)) {
+            const tileWorldPos = TilemapUtils.tileToWorld(checkX, checkY, tileSize);
+            const tileRadius = tileSize / 2;
+            
+            // Calculate distance between player and tile center
+            const distance = Math.sqrt(
+              Math.pow(x - tileWorldPos.x, 2) + Math.pow(y - tileWorldPos.y, 2)
+            );
+            
+            // Check if player would collide with tile
+            if (distance < (playerRadius + tileRadius)) {
+              return true;
+            }
+          }
+        }
       }
     }
     
