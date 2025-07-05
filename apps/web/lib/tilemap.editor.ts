@@ -299,7 +299,7 @@ export class TilemapEditor {
       layout: terrainLayout,
       metadata: {
         exported: new Date().toISOString(),
-        tileTypes: [...new Set(terrainLayout.flat())],
+        tileTypes: Array.from(new Set(terrainLayout.flat())),
         validation: this.validateTerrain(terrainLayout)
       }
     }, null, 2);

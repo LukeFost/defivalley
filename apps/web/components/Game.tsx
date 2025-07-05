@@ -7,6 +7,10 @@ import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
+import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+import { CropContextMenu } from './CropContextMenu';
+import { CropInfo } from './CropInfo';
+import { CropStats } from './CropStats';
 
 interface GameState {
   players: Map<string, {
@@ -40,6 +44,7 @@ class MainScene extends Phaser.Scene {
   private cliffTiles: Phaser.GameObjects.Image[] = []; // Store cliff tiles for collision detection
   private terrainLayout: string[][] = []; // Store terrain layout for collision detection
   private debugMode: boolean = false; // Toggle for debug visualization
+  private cropSystem!: CropSystem; // Crop management system
 
   constructor() {
     super({ key: 'MainScene' });
@@ -69,6 +74,10 @@ class MainScene extends Phaser.Scene {
     
     // Load the tileset for world decoration
     this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
+    
+    // Initialize and preload crop system
+    this.cropSystem = new CropSystem(this);
+    this.cropSystem.preload();
   }
 
   async create() {
@@ -83,6 +92,9 @@ class MainScene extends Phaser.Scene {
 
     // Setup development tools
     this.setupDevTools();
+
+    // Initialize crop system
+    this.cropSystem.create();
 
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -768,6 +780,11 @@ class MainScene extends Phaser.Scene {
   update() {
     if (!this.room || !this.currentPlayer) return;
 
+    // Update crop system
+    if (this.cropSystem) {
+      this.cropSystem.update();
+    }
+
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
@@ -847,6 +864,57 @@ class MainScene extends Phaser.Scene {
     }
     this.scene.stop();
   }
+
+  // Crop system methods for external access
+  getCropSystem(): CropSystem | null {
+    return this.cropSystem || null;
+  }
+
+  canPlantAt(x: number, y: number): boolean {
+    return this.cropSystem ? this.cropSystem.canPlantAt(x, y) : false;
+  }
+
+  getCropAt(x: number, y: number): { id: string; type: CropType; stage: string } | null {
+    if (!this.cropSystem) return null;
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    return crop ? { id: crop.id, type: crop.type, stage: crop.stage } : null;
+  }
+
+  plantCrop(cropType: CropType, x: number, y: number): void {
+    if (this.cropSystem) {
+      this.cropSystem.plantCrop(x, y, cropType);
+    }
+  }
+
+  removeCropAtPosition(x: number, y: number): void {
+    if (!this.cropSystem) return;
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    if (crop) {
+      this.cropSystem.removeCrop(crop.id);
+    }
+  }
+
+  harvestCropAtPosition(x: number, y: number): void {
+    if (!this.cropSystem) return;
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    if (crop) {
+      this.cropSystem.harvestCrop(crop.id);
+    }
+  }
+
+  getTotalCrops(): number {
+    return this.cropSystem ? this.cropSystem.getAllCrops().length : 0;
+  }
+
+  getReadyCrops(): number {
+    if (!this.cropSystem) return 0;
+    return this.cropSystem.getAllCrops().filter(crop => crop.stage === 'ready').length;
+  }
+
+  getGrowingCrops(): number {
+    if (!this.cropSystem) return 0;
+    return this.cropSystem.getAllCrops().filter(crop => crop.stage !== 'ready').length;
+  }
 }
 
 function Game() {
@@ -855,6 +923,7 @@ function Game() {
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
+  const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
 
   useEffect(() => {
     const config: Phaser.Types.Core.GameConfig = {
@@ -883,6 +952,11 @@ function Game() {
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
           }
+        });
+
+        // Set up crop click event listener
+        scene.events.on('cropClicked', (crop: CropData) => {
+          setSelectedCrop(crop);
         });
       }
     }, 500);
@@ -922,9 +996,56 @@ function Game() {
     }
   };
 
+  // Crop system handlers
+  const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.plantCrop(cropType, x, y);
+    }
+  };
+
+  const handleRemoveCrop = (x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.removeCropAtPosition(x, y);
+    }
+  };
+
+  const handleHarvestCrop = (x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.harvestCropAtPosition(x, y);
+    }
+  };
+
+  const canPlantAt = (x: number, y: number): boolean => {
+    return sceneRef.current ? sceneRef.current.canPlantAt(x, y) : false;
+  };
+
+  const getCropAt = (x: number, y: number) => {
+    return sceneRef.current ? sceneRef.current.getCropAt(x, y) : null;
+  };
+
+  const getTotalCrops = (): number => {
+    return sceneRef.current ? sceneRef.current.getTotalCrops() : 0;
+  };
+
+  const getReadyCrops = (): number => {
+    return sceneRef.current ? sceneRef.current.getReadyCrops() : 0;
+  };
+
+  const getGrowingCrops = (): number => {
+    return sceneRef.current ? sceneRef.current.getGrowingCrops() : 0;
+  };
+
   return (
     <div className="game-wrapper">
-      <div id="game-container" />
+      <CropContextMenu
+        onPlantCrop={handlePlantCrop}
+        onRemoveCrop={handleRemoveCrop}
+        onHarvestCrop={handleHarvestCrop}
+        canPlantAt={canPlantAt}
+        getCropAt={getCropAt}
+      >
+        <div id="game-container" />
+      </CropContextMenu>
       
       {/* Chat UI */}
       <div className="chat-container">
@@ -960,6 +1081,19 @@ function Game() {
           </form>
         )}
       </div>
+
+      {/* Crop Info Panel */}
+      <CropInfo 
+        crop={selectedCrop} 
+        onClose={() => setSelectedCrop(null)} 
+      />
+
+      {/* Crop Statistics Panel */}
+      <CropStats 
+        getTotalCrops={getTotalCrops}
+        getReadyCrops={getReadyCrops}
+        getGrowingCrops={getGrowingCrops}
+      />
 
       <style jsx>{`
         .game-wrapper {

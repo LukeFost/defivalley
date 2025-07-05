@@ -14,6 +14,7 @@
     "@0xsquid/squid-types": "^0.1.168",
     "@axelar-network/axelarjs-sdk": "^0.17.4",
     "@privy-io/react-auth": "^2.17.3",
+    "@radix-ui/react-context-menu": "^2.2.15",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-query": "^5.81.5",

@@ -315,7 +315,7 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
       )}
       
       {/* Transaction Hashes */}
-      {(transaction.sagaTxHash || transaction.arbitrumTxHash || transaction.axelarTxHash) && (
+      {(transaction.sagaTxHash || transaction.arbitrumTxHash || transaction.axelarTxId) && (
         <div className="mt-4 pt-3 border-t border-gray-200">
           <p className="text-xs text-gray-500 mb-2">Transaction Hashes:</p>
           <div className="space-y-1">
@@ -347,17 +347,17 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
                 </a>
               </div>
             )}
-            {transaction.axelarTxHash && (
+            {transaction.axelarTxId && (
               <div className="flex items-center space-x-2 text-xs">
                 <span className="text-gray-500">Axelar:</span>
                 <a
-                  href={getExplorerUrl(transaction.axelarTxHash, 'axelar')}
+                  href={getExplorerUrl(transaction.axelarTxId, 'axelar')}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-gray-100 px-2 py-1 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors"
                   title={`View on ${getChainName('axelar')} Explorer`}
                 >
-                  {transaction.axelarTxHash.slice(0, 10)}...{transaction.axelarTxHash.slice(-8)}
+                  {transaction.axelarTxId.slice(0, 10)}...{transaction.axelarTxId.slice(-8)}
                 </a>
               </div>
             )}

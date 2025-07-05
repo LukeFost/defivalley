@@ -57,6 +57,9 @@ const config: HardhatUserConfig = {
        */
       default: {
         version: "0.8.28",
+        settings: {
+          evmVersion: "istanbul"
+        }
       },
       /*
        * The production profile is meant to be used for deployments, providing
@@ -66,6 +69,7 @@ const config: HardhatUserConfig = {
       production: {
         version: "0.8.28",
         settings: {
+          evmVersion: "istanbul",
           optimizer: {
             enabled: true,
             runs: 200,
