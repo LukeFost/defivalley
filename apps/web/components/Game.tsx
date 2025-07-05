@@ -6,6 +6,7 @@ import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
+import { TilemapEditor } from '../lib/tilemap.editor';
 
 interface GameState {
   players: Map<string, {
@@ -135,10 +136,59 @@ class MainScene extends Phaser.Scene {
         console.table(this.terrainLayout);
       };
       
+      (window as any).editTile = (x: number, y: number, tileType: string) => {
+        const result = TilemapEditor.editTile(this.terrainLayout, x, y, tileType);
+        if (result.success) {
+          console.log(`✅ Tile at (${x}, ${y}) changed from ${result.oldTileType} to ${tileType}`);
+          this.refreshTerrain();
+        } else {
+          console.error(`❌ Failed to edit tile: ${result.error}`);
+        }
+      };
+      
+      (window as any).createIsland = (x: number, y: number, radius: number = 2) => {
+        const result = TilemapEditor.createIsland(
+          this.terrainLayout, x, y, radius, 'cliff_corner', 'cliff_grass_transition'
+        );
+        if (result.success) {
+          console.log(`🏝️ Created island at (${x}, ${y}) with radius ${radius}, changed ${result.tilesChanged} tiles`);
+          this.refreshTerrain();
+        } else {
+          console.error(`❌ Failed to create island: ${result.error}`);
+        }
+      };
+      
+      (window as any).validateTerrain = () => {
+        const validation = TilemapEditor.validateTerrain(this.terrainLayout);
+        console.log('🔍 Terrain Validation:');
+        console.log(`Valid: ${validation.isValid}`);
+        if (validation.errors.length > 0) {
+          console.error('Errors:', validation.errors);
+        }
+        if (validation.warnings.length > 0) {
+          console.warn('Warnings:', validation.warnings);
+        }
+      };
+      
+      (window as any).exportTerrain = () => {
+        const exported = TilemapEditor.exportTerrain(this.terrainLayout);
+        console.log('📤 Exported terrain:');
+        console.log(exported);
+        // Copy to clipboard if available
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(exported);
+          console.log('✅ Copied to clipboard!');
+        }
+      };
+      
       console.log('🛠️ Dev tools available:');
       console.log('  - resetMyCharacter(): Reset character selection');
       console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
       console.log('  - printTerrainLayout(): Print terrain layout to console');
+      console.log('  - editTile(x, y, tileType): Edit a single tile');
+      console.log('  - createIsland(x, y, radius): Create cliff island');
+      console.log('  - validateTerrain(): Check terrain for issues');
+      console.log('  - exportTerrain(): Export terrain to JSON');
     }
   }
   
@@ -188,6 +238,33 @@ class MainScene extends Phaser.Scene {
         );
       }
     }
+  }
+
+  refreshTerrain() {
+    // Remove existing terrain tiles
+    this.children.each((child) => {
+      if (child.getData('tileType')) {
+        child.destroy();
+      }
+    });
+    
+    // Clear cliff tiles array
+    this.cliffTiles = [];
+    
+    // Recreate terrain from updated layout
+    const tileSize = TilesetConfig.image.tileSize;
+    const mapWidth = this.terrainLayout[0].length;
+    const mapHeight = this.terrainLayout.length;
+    
+    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+    
+    // Update debug overlay if active
+    if (this.debugMode) {
+      this.renderDebugOverlay();
+    }
+    
+    console.log('🔄 Terrain refreshed successfully');
   }
 
   createFarmingWorld() {
