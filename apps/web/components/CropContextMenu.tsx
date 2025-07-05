@@ -17,6 +17,7 @@ interface CropContextMenuProps {
   children: React.ReactNode;
   onPlantCrop: (cropType: CropType, x: number, y: number) => void;
   onRemoveCrop: (x: number, y: number) => void;
+  onHarvestCrop: (x: number, y: number) => void;
   canPlantAt: (x: number, y: number) => boolean;
   getCropAt: (x: number, y: number) => { id: string; type: CropType; stage: string } | null;
 }
@@ -25,6 +26,7 @@ export function CropContextMenu({
   children,
   onPlantCrop,
   onRemoveCrop,
+  onHarvestCrop,
   canPlantAt,
   getCropAt,
 }: CropContextMenuProps) {
@@ -76,6 +78,15 @@ export function CropContextMenu({
     setContextMenuPosition(null);
   };
 
+  const handleHarvestCrop = () => {
+    if (!contextMenuPosition) return;
+    
+    const { x, y } = contextMenuPosition;
+    onHarvestCrop(x, y);
+    console.log(`🚜 Harvesting crop at (${x}, ${y})`);
+    setContextMenuPosition(null);
+  };
+
   // Group crops by category for better UX
   const cropCategories = {
     'Root Vegetables': ['potato', 'carrot'] as CropType[],
@@ -104,6 +115,16 @@ export function CropContextMenu({
               Stage: {currentCrop.stage}
             </ContextMenuItem>
             <ContextMenuSeparator />
+            
+            {currentCrop.stage === 'ready' && (
+              <ContextMenuItem 
+                onClick={handleHarvestCrop}
+                className="text-blue-600 focus:text-blue-600"
+              >
+                🚜 Harvest Crop
+              </ContextMenuItem>
+            )}
+            
             <ContextMenuItem 
               onClick={handleRemoveCrop}
               className="text-red-600 focus:text-red-600"

@@ -5,8 +5,9 @@ import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType } from '../lib/character.config';
-import { CropSystem, CropType } from '../lib/CropSystem';
+import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
+import { CropInfo } from './CropInfo';
 
 interface GameState {
   players: Map<string, {
@@ -574,6 +575,16 @@ class MainScene extends Phaser.Scene {
     if (!this.cropSystem) return false;
     return this.cropSystem.canPlantAt(x, y);
   }
+  
+  harvestCropAt(x: number, y: number): boolean {
+    if (!this.cropSystem) return false;
+    
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    if (!crop) return false;
+    
+    const result = this.cropSystem.harvestCrop(crop.id);
+    return result.success;
+  }
 }
 
 function Game() {
@@ -581,6 +592,7 @@ function Game() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
+  const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
   const sceneRef = useRef<MainScene | null>(null);
 
   useEffect(() => {
@@ -610,6 +622,11 @@ function Game() {
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
           }
+        });
+        
+        // Listen for crop click events
+        scene.events.on('cropClicked', (crop: CropData) => {
+          setSelectedCrop(crop);
         });
       }
     }, 500);
@@ -676,11 +693,18 @@ function Game() {
     return null;
   };
 
+  const handleHarvestCrop = (x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.harvestCropAt(x, y);
+    }
+  };
+
   return (
     <div className="game-wrapper">
       <CropContextMenu
         onPlantCrop={handlePlantCrop}
         onRemoveCrop={handleRemoveCrop}
+        onHarvestCrop={handleHarvestCrop}
         canPlantAt={handleCanPlantAt}
         getCropAt={handleGetCropAt}
       >
@@ -721,6 +745,12 @@ function Game() {
           </form>
         )}
       </div>
+
+      {/* Crop Information Display */}
+      <CropInfo 
+        crop={selectedCrop} 
+        onClose={() => setSelectedCrop(null)} 
+      />
 
       <style jsx>{`
         .game-wrapper {

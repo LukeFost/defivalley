@@ -182,6 +182,33 @@ export class CropSystem {
   }
 
   /**
+   * Harvest a crop (only if ready)
+   */
+  harvestCrop(cropId: string): { success: boolean; reward?: string } {
+    const crop = this.crops.get(cropId);
+    if (!crop) return { success: false };
+    
+    if (crop.stage !== 'ready') {
+      console.log(`🚫 Cannot harvest ${crop.type} - not ready yet (${crop.stage})`);
+      return { success: false };
+    }
+
+    // Remove the crop
+    this.removeCrop(cropId);
+    
+    // Calculate harvest reward
+    const config = CROP_CONFIGS[crop.type];
+    const reward = `Harvested ${config.name}!`;
+    
+    console.log(`🚜 Harvested ${crop.type}: ${reward}`);
+    
+    // Show harvest animation at crop location
+    this.showHarvestEffect(crop.x, crop.y);
+    
+    return { success: true, reward };
+  }
+
+  /**
    * Get crop at specific position (for context menu detection)
    */
   getCropAtPosition(x: number, y: number, tolerance: number = 16): CropData | null {
@@ -243,6 +270,25 @@ export class CropSystem {
     const sprite = this.scene.add.sprite(crop.x, crop.y, this.cropSpritesheet, stageIndex);
     sprite.setOrigin(0.5, 0.5);
     sprite.setScale(1.5); // Make crops slightly bigger
+    
+    // Make sprite interactive for clicks
+    sprite.setInteractive();
+    
+    // Add hover effects
+    sprite.on('pointerover', () => {
+      sprite.setTint(0xdddddd);
+    });
+    
+    sprite.on('pointerout', () => {
+      sprite.clearTint();
+    });
+    
+    // Add click handler for crop information
+    sprite.on('pointerdown', () => {
+      console.log(`🌱 Clicked crop: ${crop.type} (${crop.stage})`);
+      // Emit event for crop info display
+      this.scene.events.emit('cropClicked', crop);
+    });
     
     // Add subtle animations
     this.scene.tweens.add({
@@ -345,6 +391,54 @@ export class CropSystem {
       } catch (error) {
         console.error('Error loading crops from storage:', error);
       }
+    }
+  }
+
+  /**
+   * Show harvest effect animation
+   */
+  private showHarvestEffect(x: number, y: number) {
+    // Create floating text effect
+    const harvestText = this.scene.add.text(x, y, '🎉 Harvested!', {
+      fontSize: '16px',
+      color: '#FFD700',
+      fontStyle: 'bold'
+    });
+    harvestText.setOrigin(0.5);
+    
+    // Animate the text
+    this.scene.tweens.add({
+      targets: harvestText,
+      y: y - 40,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        harvestText.destroy();
+      }
+    });
+    
+    // Create sparkle effect
+    for (let i = 0; i < 6; i++) {
+      const sparkle = this.scene.add.circle(
+        x + (Math.random() - 0.5) * 40,
+        y + (Math.random() - 0.5) * 40,
+        3,
+        0xFFD700
+      );
+      
+      this.scene.tweens.add({
+        targets: sparkle,
+        alpha: 0,
+        scaleX: 2,
+        scaleY: 2,
+        duration: 500 + Math.random() * 500,
+        delay: Math.random() * 200,
+        ease: 'Power2',
+        onComplete: () => {
+          sparkle.destroy();
+        }
+      });
     }
   }
 
