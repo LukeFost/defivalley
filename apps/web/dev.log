@@ -1,0 +1,142 @@
+
+> web@0.1.0 dev /Users/lukefoster/Documents/Development/defivalley/apps/web
+> next dev --port 3000 "--port" "3333"
+
+   ▲ Next.js 15.3.0
+   - Local:        http://localhost:3333
+   - Network:      http://172.31.50.134:3333
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1896ms
+ ○ Compiling / ...
+ ✓ Compiled / in 8.7s (11754 modules)
+[DEPRECATED] `getStorage`, `serialize` and `deserialize` options are deprecated. Use `storage` option instead.
+[ReferenceError: indexedDB is not defined]
+ ⨯ unhandledRejection: [ReferenceError: indexedDB is not defined]
+ ⨯ unhandledRejection:  [ReferenceError: indexedDB is not defined]
+ GET / 200 in 9386ms
+ ✓ Compiled in 1164ms (5665 modules)
+ ✓ Compiled in 382ms (5679 modules)
+ ✓ Compiled in 428ms (5679 modules)
+ ⨯ ./components/Game.tsx
+Error:   [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:273:1]
+ [2m270[0m |   createFarmingWorld() {
+ [2m271[0m |     // Create clean, minimal background
+ [2m272[0m |     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+ [2m273[0m | <<<<<<< HEAD
+     : [35;1m^^^^^^^[0m
+ [2m274[0m |     const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
+ [2m275[0m | =======
+ [2m276[0m |     
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:275:1]
+ [2m272[0m |     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+ [2m273[0m | <<<<<<< HEAD
+ [2m274[0m |     const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
+ [2m275[0m | =======
+     : [35;1m^^^^^^^[0m
+ [2m276[0m |     
+ [2m277[0m |     // Create tilemap-based terrain
+ [2m278[0m |     this.createTilemapTerrain();
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:279:1]
+ [2m276[0m |     
+ [2m277[0m |     // Create tilemap-based terrain
+ [2m278[0m |     this.createTilemapTerrain();
+ [2m279[0m | >>>>>>> feature/world-decoration-cliffs
+     : [35;1m^^^^^^^[0m
+ [2m280[0m |     
+ [2m281[0m |     // Add minimal visual structure without clutter
+ [2m282[0m |     this.createMinimalStructure();
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:302:1]
+ [2m299[0m |     gridGraphics.strokePath();
+ [2m300[0m |   }
+ [2m301[0m | 
+ [2m302[0m | <<<<<<< HEAD
+     : [35;1m^^^^^^^[0m
+ [2m303[0m |   // Method removed - no decorations needed for clean UI
+ [2m304[0m | =======
+ [2m305[0m |   createTilemapTerrain() {
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:304:1]
+ [2m301[0m | 
+ [2m302[0m | <<<<<<< HEAD
+ [2m303[0m |   // Method removed - no decorations needed for clean UI
+ [2m304[0m | =======
+     : [35;1m^^^^^^^[0m
+ [2m305[0m |   createTilemapTerrain() {
+ [2m306[0m |     // Create a tilemap with natural terrain using the LPC cliffs grass tileset
+ [2m307[0m |     const tileSize = TilesetConfig.image.tileSize;
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:525:1]
+ [2m522[0m |     
+ [2m523[0m |     return false;
+ [2m524[0m |   }
+ [2m525[0m | >>>>>>> feature/world-decoration-cliffs
+     : [35;1m^^^^^^^[0m
+ [2m526[0m | 
+ [2m527[0m |   createUI() {
+ [2m528[0m |     // Create minimal UI with only essential elements
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
+ ✓ Compiled in 395ms (5679 modules)
+ ✓ Compiled in 1169ms (5686 modules)
+ ✓ Compiled in 1080ms (5665 modules)
+ ⨯ ./components/Game.tsx:11:1
+Module not found: Can't resolve './CropContextMenu'
+   9 | import { TilemapEditor } from '../lib/tilemap.editor';
+  10 | import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+> 11 | import { CropContextMenu } from './CropContextMenu';
+     | ^
+  12 | import { CropInfo } from './CropInfo';
+  13 | import { CropStats } from './CropStats';
+  14 |
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/GameWrapper.tsx
+ ⨯ ./components/CropContextMenu.tsx:4:1
+Module not found: Can't resolve '@/components/ui/context-menu'
+  2 |
+  3 | import { useState, useEffect, useCallback } from 'react';
+> 4 | import {
+    | ^
+  5 |   ContextMenu,
+  6 |   ContextMenuContent,
+  7 |   ContextMenuItem,
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
+ ⨯ ./components/CropContextMenu.tsx:4:1
+Module not found: Can't resolve '@/components/ui/context-menu'
+  2 |
+  3 | import { useState, useEffect, useCallback } from 'react';
+> 4 | import {
+    | ^
+  5 |   ContextMenu,
+  6 |   ContextMenuContent,
+  7 |   ContextMenuItem,
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
