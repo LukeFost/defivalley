@@ -25,10 +25,22 @@ export interface CharacterConfiguration {
       repeat: boolean;
     }>;
   };
+  // For characters with directional rotation frames
+  rotationFrames?: Record<Direction, number>;
+}
+
+// Animation preset type with optional rotation frames
+interface AnimationPreset {
+  frameWidth: number;
+  frameHeight: number;
+  scale: number;
+  basePath: string;
+  animations: Record<string, { frames: number; frameRate: number; file: string }>;
+  rotationFrames?: Record<Direction, number>;
 }
 
 // Animation preset configurations for DRY principle
-const ANIMATION_PRESETS = {
+const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
   knight: {
     frameWidth: 120,
     frameHeight: 80,
@@ -41,14 +53,23 @@ const ANIMATION_PRESETS = {
     },
   },
   cowboy: {
-    frameWidth: 53,
-    frameHeight: 115,
+    frameWidth: 80,
+    frameHeight: 102,
     scale: 0.5,
     basePath: '/sprites/Cowboy',
     animations: {
-      idle: { frames: 6, frameRate: 4, file: 'Rotation_Cycle_Cowboy.png' },
-      walk: { frames: 12, frameRate: 8, file: 'Walk_Cycle_Cowboy.png' },
-      run: { frames: 12, frameRate: 12, file: 'Walk_Cycle_Cowboy.png' },
+      idle: { frames: 1, frameRate: 1, file: 'Walk_Cycle_Cowboy.png' }, // Frame 0 only - idle pose
+      walk: { frames: 11, frameRate: 12, file: 'Walk_Cycle_Cowboy.png' }, // All 11 frames - complete walk cycle
+      run: { frames: 11, frameRate: 16, file: 'Walk_Cycle_Cowboy.png' }, // All 11 frames - faster walk cycle
+      // Rotation sprite sheet for directional facing (5 frames: left, left-front, front, right-front, right)
+      rotate: { frames: 5, frameRate: 1, file: 'Rotation_Cycle_Cowboy.png' }, // Static directional frames
+    },
+    // Add directional frame mapping for rotation sprite
+    rotationFrames: {
+      left: 0,      // Frame 0: facing left
+      down: 2,      // Frame 2: facing forward/down
+      right: 4,     // Frame 4: facing right
+      up: 2,        // Frame 2: facing forward (no back view, use front)
     },
   },
 } as const;
@@ -70,24 +91,24 @@ function createAnimationConfig(preset: keyof typeof ANIMATION_PRESETS): Characte
   };
 }
 
+// Helper function to create character configuration from presets
+function createCharacterConfig(name: string, preset: keyof typeof ANIMATION_PRESETS): CharacterConfiguration {
+  const config = ANIMATION_PRESETS[preset];
+  return {
+    key: name,
+    frameWidth: config.frameWidth,
+    frameHeight: config.frameHeight,
+    scale: config.scale,
+    type: 'animation_sheets',
+    animationConfig: createAnimationConfig(preset),
+    rotationFrames: config.rotationFrames,
+  };
+}
+
 // Character definitions using the new configuration system
 export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
-  knight: {
-    key: 'knight',
-    frameWidth: ANIMATION_PRESETS.knight.frameWidth,
-    frameHeight: ANIMATION_PRESETS.knight.frameHeight,
-    scale: ANIMATION_PRESETS.knight.scale,
-    type: 'animation_sheets',
-    animationConfig: createAnimationConfig('knight'),
-  },
-  cowboy: {
-    key: 'cowboy',
-    frameWidth: ANIMATION_PRESETS.cowboy.frameWidth,
-    frameHeight: ANIMATION_PRESETS.cowboy.frameHeight,
-    scale: ANIMATION_PRESETS.cowboy.scale,
-    type: 'animation_sheets',
-    animationConfig: createAnimationConfig('cowboy'),
-  },
+  knight: createCharacterConfig('knight', 'knight'),
+  cowboy: createCharacterConfig('cowboy', 'cowboy'),
 };
 
 // Legacy config for backward compatibility
@@ -171,18 +192,30 @@ export function getAnimationKey(character: CharacterType, state: AnimationState)
   return `${character}_idle`;
 }
 
+// Helper function to get directional frame for characters with rotation sprites
+export function getDirectionalFrame(character: CharacterType, direction: Direction): number | null {
+  const config = getCharacterConfig(character);
+  if (config.rotationFrames) {
+    return config.rotationFrames[direction] ?? null;
+  }
+  return null;
+}
+
+// Helper function to check if character has directional rotation frames
+export function hasRotationFrames(character: CharacterType): boolean {
+  const config = getCharacterConfig(character);
+  return config.rotationFrames !== undefined;
+}
+
+// Helper function to get rotation animation key for character
+export function getRotationAnimationKey(character: CharacterType): string {
+  return `${character}_rotate`;
+}
+
 // Helper function to add new character easily
 export function addCharacter(
   name: string,
   preset: keyof typeof ANIMATION_PRESETS
 ): CharacterConfiguration {
-  const presetConfig = ANIMATION_PRESETS[preset];
-  return {
-    key: name,
-    frameWidth: presetConfig.frameWidth,
-    frameHeight: presetConfig.frameHeight,
-    scale: presetConfig.scale,
-    type: 'animation_sheets',
-    animationConfig: createAnimationConfig(preset),
-  };
+  return createCharacterConfig(name, preset);
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../app/store';
-import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CharacterDefinitions, CharacterType, CharacterConfig } from '../lib/character.config';
 import {
   Dialog,
   DialogContent,
@@ -18,20 +18,18 @@ interface CharacterPreviewProps {
 }
 
 function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewProps) {
-  const characterIndex = CharacterConfig.player.characters[character];
-  const spriteSheetPath = CharacterConfig.player.path;
+  const characterDef = CharacterDefinitions[character];
+  if (!characterDef) return null;
   
-  // Calculate sprite position
-  const frameWidth = CharacterConfig.player.frameWidth;
-  const frameHeight = CharacterConfig.player.frameHeight;
-  const framesPerRow = 8; // Assuming 8 characters per row based on sprite sheet
-  const row = Math.floor(characterIndex / framesPerRow);
-  const col = characterIndex % framesPerRow;
-  
-  // Use down-facing sprite (direction 0)
-  const downDirection = CharacterConfig.player.directions.down;
-  const spriteX = col * frameWidth * CharacterConfig.player.framesPerCharacter + downDirection * frameWidth;
-  const spriteY = row * frameHeight;
+  // Get the appropriate image source based on character type
+  let imageSrc = '';
+  if (characterDef.type === 'animation_sheets' && characterDef.animationConfig) {
+    // Use idle animation image for preview
+    imageSrc = characterDef.animationConfig.animations.idle?.path || '';
+  } else if (characterDef.spritesheetConfig) {
+    // Use spritesheet image
+    imageSrc = characterDef.spritesheetConfig.path;
+  }
   
   return (
     <div
@@ -46,16 +44,24 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
         {/* Character Sprite Preview */}
         <div className="relative">
           <div
-            className="w-16 h-16 border-2 border-gray-300 rounded-lg overflow-hidden"
-            style={{
-              backgroundImage: `url(${spriteSheetPath})`,
-              backgroundPosition: `-${spriteX}px -${spriteY}px`,
-              backgroundSize: `${frameWidth * 8 * CharacterConfig.player.framesPerCharacter}px auto`,
-              imageRendering: 'pixelated',
-              transform: 'scale(2)',
-              transformOrigin: 'top left',
-            }}
-          />
+            className="w-16 h-16 border-2 border-gray-300 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50"
+          >
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt={character}
+                className="max-w-full max-h-full object-contain"
+                style={{
+                  imageRendering: 'pixelated',
+                  width: `${characterDef.frameWidth}px`,
+                  height: `${characterDef.frameHeight}px`,
+                  transform: `scale(${Math.min(64 / characterDef.frameWidth, 64 / characterDef.frameHeight)})`,
+                }}
+              />
+            ) : (
+              <div className="text-gray-400 text-xs">No Preview</div>
+            )}
+          </div>
           {isSelected && (
             <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -89,7 +95,7 @@ export default function SettingsDialog() {
   useEffect(() => {
     setIsMounted(true);
     const savedCharacter = localStorage.getItem('character-selection') as CharacterType;
-    if (savedCharacter && CharacterConfig.player.characters[savedCharacter] !== undefined) {
+    if (savedCharacter && CharacterDefinitions[savedCharacter] !== undefined) {
       setCurrentCharacter(savedCharacter);
       setSelectedCharacter(savedCharacter);
       console.log('⚙️ [SETTINGS] Loaded saved character:', savedCharacter);

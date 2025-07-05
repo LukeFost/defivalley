@@ -5,6 +5,9 @@ import {
   AnimationState,
   getCharacterConfig,
   hasAnimations,
+  hasRotationFrames,
+  getDirectionalFrame,
+  getRotationAnimationKey,
   CharacterConfiguration
 } from './character.config';
 
@@ -148,6 +151,12 @@ export class Player extends Phaser.GameObjects.Container {
     const animConfig = this.characterConfig.animationConfig;
     if (!animConfig) return;
 
+    // Check if character has rotation frames for directional facing
+    if (hasRotationFrames(this.playerInfo.character)) {
+      this.updateRotationSprite();
+      return;
+    }
+
     const animationState = this.playerInfo.animationState || 'idle';
     const animation = animConfig.animations[animationState];
     
@@ -156,11 +165,28 @@ export class Player extends Phaser.GameObjects.Container {
       
       // Check if animation exists, if not create it
       if (!this.scene.anims.exists(animKey)) {
+        // Handle custom frame ranges for different characters
+        let startFrame = 0;
+        let endFrame = animation.frames - 1;
+        
+        // Special handling for cowboy walk cycle
+        if (this.playerInfo.character === 'cowboy') {
+          if (animationState === 'idle') {
+            // Idle uses only frame 0
+            startFrame = 0;
+            endFrame = 0;
+          } else if (animationState === 'walk' || animationState === 'run') {
+            // Walk/run uses frames 1-7 (avoiding problematic frames and non-existent frames)
+            startFrame = 1;
+            endFrame = 7;
+          }
+        }
+        
         this.scene.anims.create({
           key: animKey,
           frames: this.scene.anims.generateFrameNumbers(animation.key, { 
-            start: 0, 
-            end: animation.frames - 1 
+            start: startFrame, 
+            end: endFrame 
           }),
           frameRate: animation.frameRate,
           repeat: animation.repeat ? -1 : 0,
@@ -172,7 +198,97 @@ export class Player extends Phaser.GameObjects.Container {
         this.sprite.play(animKey);
         this.currentAnimation = animKey;
       }
+      
+      // Handle directional flipping for left/right movement
+      this.updateSpriteFlipping();
     }
+  }
+
+  /**
+   * Updates rotation sprites for directional facing (like cowboy rotation)
+   */
+  private updateRotationSprite(): void {
+    const animConfig = this.characterConfig.animationConfig;
+    if (!animConfig) return;
+
+    const animationState = this.playerInfo.animationState || 'idle';
+    
+    // For idle state, use rotation frames for directional facing
+    if (animationState === 'idle' || !this.playerInfo.isMoving) {
+      const rotationAnimKey = getRotationAnimationKey(this.playerInfo.character);
+      
+      // Create rotation animation if it doesn't exist
+      if (!this.scene.anims.exists(rotationAnimKey)) {
+        const rotateAnimation = animConfig.animations['rotate'];
+        if (rotateAnimation) {
+          this.scene.anims.create({
+            key: rotationAnimKey,
+            frames: this.scene.anims.generateFrameNumbers(rotateAnimation.key, { 
+              start: 0, 
+              end: rotateAnimation.frames - 1 
+            }),
+            frameRate: 1, // Static frames, no animation
+            repeat: 0,
+          });
+        }
+      }
+      
+      // Set to the appropriate directional frame
+      const directionalFrame = getDirectionalFrame(this.playerInfo.character, this.playerInfo.direction);
+      if (directionalFrame !== null) {
+        // Stop any current animation and set static frame
+        this.sprite.stop();
+        this.sprite.setTexture(getRotationAnimationKey(this.playerInfo.character), directionalFrame);
+      }
+    } else {
+      // For walking/running, use the regular walk animation
+      const walkAnimation = animConfig.animations[animationState];
+      if (walkAnimation) {
+        const animKey = `${this.playerInfo.character}_${animationState}`;
+        
+        // Create walk animation if it doesn't exist
+        if (!this.scene.anims.exists(animKey)) {
+          let startFrame = 0;
+          let endFrame = walkAnimation.frames - 1;
+          
+          // Special handling for cowboy walk cycle
+          if (this.playerInfo.character === 'cowboy') {
+            if (animationState === 'walk' || animationState === 'run') {
+              startFrame = 1;
+              endFrame = 7;
+            }
+          }
+          
+          this.scene.anims.create({
+            key: animKey,
+            frames: this.scene.anims.generateFrameNumbers(walkAnimation.key, { 
+              start: startFrame, 
+              end: endFrame 
+            }),
+            frameRate: walkAnimation.frameRate,
+            repeat: -1,
+          });
+        }
+        
+        // Play walk animation if different from current
+        if (this.currentAnimation !== animKey) {
+          this.sprite.play(animKey);
+          this.currentAnimation = animKey;
+        }
+      }
+    }
+  }
+
+  /**
+   * Updates sprite flipping based on movement direction
+   */
+  private updateSpriteFlipping(): void {
+    if (this.playerInfo.direction === 'left') {
+      this.sprite.setFlipX(true); // Flip horizontally for left movement
+    } else if (this.playerInfo.direction === 'right') {
+      this.sprite.setFlipX(false); // Normal orientation for right movement
+    }
+    // For up/down, keep the current flip state (don't change)
   }
 
   /**
@@ -186,6 +302,9 @@ export class Player extends Phaser.GameObjects.Container {
     const frameIndex = spritesheetConfig.characterIndex * spritesheetConfig.framesPerCharacter + directionIndex;
     
     this.sprite.setFrame(frameIndex);
+    
+    // Handle directional flipping for static sprites too
+    this.updateSpriteFlipping();
   }
 
   public updatePosition(x: number, y: number): void {
@@ -227,6 +346,7 @@ export class Player extends Phaser.GameObjects.Container {
       // Update animation state based on movement
       if (hasAnimations(this.playerInfo.character)) {
         const newAnimationState = isMoving ? 'walk' : 'idle';
+        console.log(`🎭 ${this.playerInfo.character} animation state: ${this.playerInfo.animationState} → ${newAnimationState}`);
         this.updateAnimationState(newAnimationState);
       }
     }
