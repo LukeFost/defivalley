@@ -469,19 +469,3 @@ export function useCrossChainTx() {
   };
 }
 
-// Placeholder for missing useSquidRouter hook needed by auto-bridge components
-export function useSquidRouter() {
-  return {
-    // TODO: Implement Squid Router integration for auto-bridge
-    // This is a placeholder to fix TypeScript compilation errors
-    isLoading: false,
-    error: null,
-    route: null,
-    getRoute: () => Promise.resolve(null),
-    executeRoute: () => Promise.resolve(null),
-    // Missing properties required by Auto-Bridge components
-    supportedChains: [] as any[],
-    getTokensForChain: (chainId: any) => [] as any[],
-    getQuote: (params: any) => Promise.resolve(null),
-  };
-}
