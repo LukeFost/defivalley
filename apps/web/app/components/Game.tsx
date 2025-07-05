@@ -81,10 +81,26 @@ class MainScene extends Phaser.Scene {
   }
 
 
+  // Safe localStorage access for SSR
+  private static safeLocalStorage = {
+    getItem: (key: string): string | null => {
+      if (typeof window === 'undefined') return null;
+      return localStorage.getItem(key);
+    },
+    setItem: (key: string, value: string): void => {
+      if (typeof window === 'undefined') return;
+      localStorage.setItem(key, value);
+    },
+    removeItem: (key: string): void => {
+      if (typeof window === 'undefined') return;
+      localStorage.removeItem(key);
+    }
+  };
+
   // Utility function to reset a player's character selection
   static resetPlayerCharacter(playerAddress: string) {
     const storageKey = `defi-valley-character-${playerAddress}`;
-    localStorage.removeItem(storageKey);
+    MainScene.safeLocalStorage.removeItem(storageKey);
     console.log(`🔄 Reset character selection for player ${playerAddress}`);
   }
 
@@ -326,7 +342,7 @@ class MainScene extends Phaser.Scene {
       
       if (isCurrentPlayer) {
         // For current player, check global settings first
-        const globalCharacterSelection = localStorage.getItem('character-selection') as CharacterType;
+        const globalCharacterSelection = MainScene.safeLocalStorage.getItem('character-selection') as CharacterType;
         
         if (globalCharacterSelection && CharacterConfig.player.characters[globalCharacterSelection] !== undefined) {
           characterType = globalCharacterSelection;
@@ -335,7 +351,7 @@ class MainScene extends Phaser.Scene {
           // Fall back to player-specific or generate new
           const playerAddress = player.address || sessionId;
           const storageKey = `defi-valley-character-${playerAddress}`;
-          const savedCharacter = localStorage.getItem(storageKey);
+          const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
           
           if (savedCharacter) {
             characterType = savedCharacter as CharacterType;
@@ -345,7 +361,7 @@ class MainScene extends Phaser.Scene {
             const characterTypes = Object.keys(CharacterConfig.player.characters) as CharacterType[];
             const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
             characterType = characterTypes[characterIndex];
-            localStorage.setItem(storageKey, characterType);
+            MainScene.safeLocalStorage.setItem(storageKey, characterType);
             console.log(`🎭 Current player assigned new character ${characterType}`);
           }
         }
@@ -353,7 +369,7 @@ class MainScene extends Phaser.Scene {
         // For other players, use player-specific storage
         const playerAddress = player.address || sessionId;
         const storageKey = `defi-valley-character-${playerAddress}`;
-        const savedCharacter = localStorage.getItem(storageKey);
+        const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
         
         if (savedCharacter) {
           characterType = savedCharacter as CharacterType;
@@ -363,7 +379,7 @@ class MainScene extends Phaser.Scene {
           const characterTypes = Object.keys(CharacterConfig.player.characters) as CharacterType[];
           const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
           characterType = characterTypes[characterIndex];
-          localStorage.setItem(storageKey, characterType);
+          MainScene.safeLocalStorage.setItem(storageKey, characterType);
           console.log(`🎭 Player ${player.name} assigned new character ${characterType}`);
         }
       }

@@ -102,7 +102,8 @@ This starts:
 - **Chat**: Press Enter to open elegant chat interface
 - **Farming**: Click plots to plant USDC seeds (connects to real DeFi)
 - **Visual Elements**: Animated trees, swaying plants, farming paths, and cozy atmosphere
-- **Multiplayer**: Real-time player synchronization with unique character selection
+- **Multiplayer**: Real-time player synchronization with deterministic character selection
+- **Character System**: 8 unique character types with persistent identity (see [Character System Docs](docs/CHARACTER_SYSTEM.md))
 
 #### Network Multiplayer
 1. **Local farming**: Multiple browser tabs for testing
@@ -118,9 +119,13 @@ This starts:
 defivalley/
 ├── apps/
 │   ├── web/           # Next.js frontend + Phaser game
+│   │   ├── app/       # Next.js app router
+│   │   ├── lib/       # Game architecture (Player class, character config)
+│   │   └── components/# React components and Phaser scenes
 │   └── server/        # Colyseus multiplayer server
 ├── packages/
-│   └── (contracts)/   # Hardhat 3 Alpha smart contracts
+│   └── contracts/     # Hardhat 3 Alpha smart contracts
+├── docs/              # Technical documentation
 ├── turbo.json         # Turborepo configuration
 └── pnpm-workspace.yaml
 ```
@@ -143,6 +148,16 @@ npx hardhat run scripts/deploy.ts --network sagaTestnet
 # Deploy to Arbitrum testnet  
 npx hardhat run scripts/deploy.ts --network arbitrumSepolia
 ```
+
+### Game Architecture
+
+#### Character System
+- **Configuration-driven**: Centralized sprite metadata in `lib/character.config.ts`
+- **Object-oriented**: Player class encapsulates visual elements and behavior
+- **Type-safe**: Full TypeScript coverage for character types and directions
+- **Performance optimized**: Eliminated runtime image processing for faster loading
+
+See [Character System Documentation](docs/CHARACTER_SYSTEM.md) for detailed architecture.
 
 ### Build Commands
 

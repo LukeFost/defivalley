@@ -82,7 +82,6 @@ function SeedCard({ seed, isSelected, onSelect }: SeedCardProps) {
 }
 
 export default function PlantSeedDialog() {
-  const [isMounted, setIsMounted] = useState(false);
   const { address } = useAccount();
   const config = useConfig();
   
@@ -117,10 +116,6 @@ export default function PlantSeedDialog() {
   
   const selectedSeed = seedTypes.find(s => s.id === selectedSeedType);
 
-  // Set mounted state after hydration
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
   
   // Debounced validation function
   const validateAmount = useCallback(async (amount: string, seed: SeedType | undefined) => {
@@ -213,10 +208,6 @@ export default function PlantSeedDialog() {
   console.log('🌱 [DIALOG] About to render Dialog with open =', isPlantModalOpen);
   console.log('🌱 [DIALOG] hidePlantModal function available:', typeof hidePlantModal === 'function');
   
-  // Prevent rendering until client-side hydration is complete
-  if (!isMounted) {
-    return null;
-  }
   
   return (
     <Dialog 

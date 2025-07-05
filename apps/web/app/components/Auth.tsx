@@ -180,7 +180,12 @@ export function Auth() {
                 <h4>🌱 Your Farm</h4>
                 <div className="header-buttons">
                   <button 
-                    onClick={showSettingsModal}
+                    onClick={() => {
+                      console.log('⚙️ [AUTH] Settings button clicked!');
+                      console.log('⚙️ [AUTH] showSettingsModal function:', typeof showSettingsModal);
+                      showSettingsModal();
+                      console.log('⚙️ [AUTH] showSettingsModal called');
+                    }}
                     className="settings-btn"
                     title="Settings"
                   >

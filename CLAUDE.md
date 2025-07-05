@@ -148,9 +148,11 @@ pnpm exec hardhat run scripts/test-end-to-end.ts --network sagaTestnet
 
 ### Monorepo Structure
 - `apps/web/` - Next.js frontend application
+  - `app/` - Next.js app router and React components
+  - `lib/` - Game architecture (Player class, character configuration)
 - `apps/server/` - Colyseus game server
 - `packages/contracts/` - Smart contracts (Hardhat 3) and deployment scripts
-- `packages/` - Shared utilities and other packages
+- `docs/` - Technical documentation and architectural guides
 
 ### Key Technologies
 - **Frontend**: Next.js 15 + React 19 + Phaser 3 + TypeScript
@@ -205,10 +207,35 @@ Saga Chainlet (Gasless Gaming)     Arbitrum (DeFi Yield)
 - **Network Detection**: Auto-detects server URL for local/network connections
 
 #### Game Features
-- **Player Movement**: WASD/Arrow key controls with real-time synchronization
+- **Player Movement**: WASD/Arrow key controls with real-time synchronization and directional sprites
 - **Chat System**: Press Enter to open chat, real-time messaging between players
-- **Visual Players**: Green circle for current player, red for others with name tags
+- **Character System**: 8 unique character types with deterministic selection and persistent identity
+- **Visual Players**: Character sprites with nameplates, level badges, and current player highlighting
 - **Connection Management**: Auto-reconnection, fallback URLs, error handling
+
+#### Character System Architecture (DRY + KISS Principles)
+
+**Configuration-Driven Design (`/lib/character.config.ts`)**:
+- Centralized sprite sheet metadata (no hardcoded magic numbers)
+- Type-safe character types: warrior, mage, archer, rogue, paladin, priest, necromancer, berserker
+- Easy to add new characters without code changes
+
+**Object-Oriented Player Class (`/lib/Player.ts`)**:
+- Extends `Phaser.GameObjects.Container` for clean encapsulation
+- Self-contained sprite, nameplate, and level badge management
+- Simple API: `updatePosition()`, `updateDirection()`, `changeCharacter()`
+
+**Deterministic Character Selection**:
+- Persistent identity based on wallet address/session ID hash
+- Global character selection for current player (localStorage)
+- Fallback to player-specific storage for consistency
+
+**Performance Optimizations**:
+- ❌ Eliminated runtime image processing (95 lines removed)
+- ✅ Direct spritesheet loading with transparency
+- ✅ Container-based object management for better performance
+
+See [Character System Documentation](docs/CHARACTER_SYSTEM.md) for complete architecture details.
 
 #### Network Configuration
 ```bash

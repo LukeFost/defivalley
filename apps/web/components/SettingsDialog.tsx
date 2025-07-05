@@ -77,6 +77,7 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
 }
 
 export default function SettingsDialog() {
+  const [isMounted, setIsMounted] = useState(false);
   const isSettingsModalOpen = useAppStore((state) => state.ui.showSettingsModal ?? false);
   const hideSettingsModal = useAppStore((state) => state.hideSettingsModal);
   const addNotification = useAppStore((state) => state.addNotification);
@@ -84,14 +85,20 @@ export default function SettingsDialog() {
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterType>('warrior');
   const [currentCharacter, setCurrentCharacter] = useState<CharacterType>('warrior');
   
-  // Load current character selection from localStorage on mount
+  // Set mounted state and load current character selection from localStorage on mount
   useEffect(() => {
+    setIsMounted(true);
     const savedCharacter = localStorage.getItem('character-selection') as CharacterType;
     if (savedCharacter && CharacterConfig.player.characters[savedCharacter] !== undefined) {
       setCurrentCharacter(savedCharacter);
       setSelectedCharacter(savedCharacter);
+      console.log('⚙️ [SETTINGS] Loaded saved character:', savedCharacter);
+    } else {
+      console.log('⚙️ [SETTINGS] No saved character found, using default warrior');
     }
   }, []);
+  
+  console.log('⚙️ [SETTINGS] Rendering SettingsDialog, isOpen:', isSettingsModalOpen, 'isMounted:', isMounted);
   
   const handleCharacterSelect = (character: CharacterType) => {
     setSelectedCharacter(character);
@@ -121,6 +128,11 @@ export default function SettingsDialog() {
   
   const availableCharacters = Object.keys(CharacterConfig.player.characters) as CharacterType[];
   const hasChanges = selectedCharacter !== currentCharacter;
+  
+  // Prevent rendering until client-side hydration is complete
+  if (!isMounted) {
+    return null;
+  }
   
   return (
     <Dialog 
