@@ -1,6 +1,15 @@
 import { Room, Client } from "colyseus";
 import { GameState, Player, Crop } from "../schema/GameState";
 import { databaseService } from "../services/DatabaseService";
+import { 
+  SeedType, 
+  SEED_CONFIGS, 
+  PlantSeedMessage, 
+  HarvestCropMessage,
+  GameError,
+  ERROR_CODES,
+  CROP_COLLISION_RADIUS 
+} from "../types/game.types";
 
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
@@ -35,8 +44,12 @@ export class GameRoom extends Room<GameState> {
       });
     });
     
-    this.onMessage("plant_seed", (client, message) => {
+    this.onMessage("plant_seed", (client, message: PlantSeedMessage) => {
       this.handlePlantSeed(client, message);
+    });
+    
+    this.onMessage("harvest_crop", (client, message: HarvestCropMessage) => {
+      this.handleHarvestCrop(client, message);
     });
     
     this.onMessage("ping", (client, message) => {
@@ -118,7 +131,7 @@ export class GameRoom extends Room<GameState> {
   private loadCropsFromDatabase() {
     try {
       // Load all unharvested crops from database
-      const allCrops = databaseService.db.prepare('SELECT * FROM crops WHERE harvested = FALSE').all();
+      const allCrops = databaseService.db.prepare('SELECT * FROM crops WHERE harvested = FALSE').all() as any[];
       
       for (const dbCrop of allCrops) {
         const crop = new Crop();
@@ -141,10 +154,17 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  private handlePlantSeed(client: Client, message: any) {
+  private sendError(client: Client, error: GameError) {
+    client.send('game_error', error);
+  }
+
+  private handlePlantSeed(client: Client, message: PlantSeedMessage) {
     const player = this.state.players.get(client.sessionId);
     if (!player) {
-      client.send('error', { message: 'Player not found' });
+      this.sendError(client, {
+        code: ERROR_CODES.PLAYER_NOT_FOUND,
+        message: 'Player not found'
+      });
       return;
     }
 
@@ -152,83 +172,223 @@ export class GameRoom extends Room<GameState> {
     const { seedType, x, y, investmentAmount } = message;
     
     if (!seedType || typeof x !== 'number' || typeof y !== 'number' || !investmentAmount) {
-      client.send('error', { message: 'Invalid plant seed request' });
+      this.sendError(client, {
+        code: ERROR_CODES.INVALID_REQUEST,
+        message: 'Invalid plant seed request',
+        details: { seedType, x, y, investmentAmount }
+      });
       return;
     }
 
-    // Check if position is already occupied
-    if (databaseService.isPositionOccupied(x, y)) {
-      client.send('error', { message: 'Position already occupied' });
+    // Check if position is already occupied (with radius checking)
+    if (databaseService.isPositionOccupied(x, y, CROP_COLLISION_RADIUS)) {
+      this.sendError(client, {
+        code: ERROR_CODES.POSITION_OCCUPIED,
+        message: 'Position already occupied or too close to another crop',
+        details: { x, y, radius: CROP_COLLISION_RADIUS }
+      });
       return;
     }
 
-    // Define seed types and their properties
-    const seedTypes = {
-      'usdc_sprout': { minInvestment: 10, growthTime: 24 * 60 * 60 * 1000, xpGain: 1 }, // 24 hours
-      'premium_tree': { minInvestment: 100, growthTime: 48 * 60 * 60 * 1000, xpGain: 10 }, // 48 hours
-      'whale_forest': { minInvestment: 1000, growthTime: 72 * 60 * 60 * 1000, xpGain: 100 } // 72 hours
-    };
-
-    const seedConfig = seedTypes[seedType as keyof typeof seedTypes];
+    // Validate seed type
+    const seedConfig = SEED_CONFIGS[seedType];
     if (!seedConfig) {
-      client.send('error', { message: 'Invalid seed type' });
+      this.sendError(client, {
+        code: ERROR_CODES.INVALID_SEED_TYPE,
+        message: 'Invalid seed type',
+        details: { seedType, validTypes: Object.keys(SEED_CONFIGS) }
+      });
       return;
     }
 
     if (investmentAmount < seedConfig.minInvestment) {
-      client.send('error', { message: `Minimum investment for ${seedType} is ${seedConfig.minInvestment} USDC` });
+      this.sendError(client, {
+        code: ERROR_CODES.INSUFFICIENT_INVESTMENT,
+        message: `Minimum investment for ${seedType} is ${seedConfig.minInvestment} USDC`,
+        details: { seedType, minInvestment: seedConfig.minInvestment, provided: investmentAmount }
+      });
       return;
     }
 
-    // Create crop in database
-    const now = new Date().toISOString();
-    const cropId = databaseService.saveCrop({
-      player_id: client.sessionId,
-      seed_type: seedType,
-      x: x,
-      y: y,
-      planted_at: now,
-      growth_time: seedConfig.growthTime,
-      investment_amount: investmentAmount,
-      harvested: false
-    });
+    // Use transaction to ensure atomicity
+    try {
+      const result = databaseService.transaction(() => {
+        // Create crop in database
+        const now = new Date().toISOString();
+        const cropId = databaseService.saveCrop({
+          player_id: client.sessionId,
+          seed_type: seedType,
+          x: x,
+          y: y,
+          planted_at: now,
+          growth_time: seedConfig.growthTime,
+          investment_amount: investmentAmount,
+          harvested: false
+        });
 
-    // Create crop in game state
-    const crop = new Crop();
-    crop.id = cropId;
-    crop.playerId = client.sessionId;
-    crop.seedType = seedType;
-    crop.x = x;
-    crop.y = y;
-    crop.plantedAt = now;
-    crop.growthTime = seedConfig.growthTime;
-    crop.investmentAmount = investmentAmount;
-    crop.harvested = false;
+        // Update player XP
+        const newXP = player.xp + seedConfig.xpGain;
+        databaseService.updatePlayerXP(client.sessionId, newXP);
 
-    this.state.crops.set(cropId, crop);
+        return { cropId, now, newXP };
+      });
 
-    // Update player XP
-    player.xp += seedConfig.xpGain;
-    databaseService.updatePlayerXP(client.sessionId, player.xp);
+      // Create crop in game state
+      const crop = new Crop();
+      crop.id = result.cropId;
+      crop.playerId = client.sessionId;
+      crop.seedType = seedType;
+      crop.x = x;
+      crop.y = y;
+      crop.plantedAt = result.now;
+      crop.growthTime = seedConfig.growthTime;
+      crop.investmentAmount = investmentAmount;
+      crop.harvested = false;
 
-    // Send success response
-    client.send('seed_planted', {
-      cropId: cropId,
-      seedType: seedType,
-      x: x,
-      y: y,
-      xpGained: seedConfig.xpGain,
-      newXP: player.xp
-    });
+      this.state.crops.set(result.cropId, crop);
+      player.xp = result.newXP;
 
-    // Broadcast to all players
-    this.broadcast('crop_planted', {
-      cropId: cropId,
-      playerId: client.sessionId,
-      playerName: player.name,
-      seedType: seedType,
-      x: x,
-      y: y
-    });
+      // Send success response
+      client.send('seed_planted', {
+        cropId: result.cropId,
+        seedType: seedType,
+        x: x,
+        y: y,
+        xpGained: seedConfig.xpGain,
+        newXP: result.newXP
+      });
+
+      // Broadcast to all players
+      this.broadcast('crop_planted', {
+        cropId: result.cropId,
+        playerId: client.sessionId,
+        playerName: player.name,
+        seedType: seedType,
+        x: x,
+        y: y
+      });
+    } catch (error) {
+      console.error('❌ Error planting seed:', error);
+      this.sendError(client, {
+        code: ERROR_CODES.DATABASE_ERROR,
+        message: 'Failed to plant seed',
+        details: error
+      });
+    }
+
+  }
+
+  private handleHarvestCrop(client: Client, message: HarvestCropMessage) {
+    const player = this.state.players.get(client.sessionId);
+    if (!player) {
+      this.sendError(client, {
+        code: ERROR_CODES.PLAYER_NOT_FOUND,
+        message: 'Player not found'
+      });
+      return;
+    }
+
+    const { cropId } = message;
+    const crop = this.state.crops.get(cropId);
+    
+    if (!crop) {
+      this.sendError(client, {
+        code: ERROR_CODES.CROP_NOT_FOUND,
+        message: 'Crop not found',
+        details: { cropId }
+      });
+      return;
+    }
+
+    // Verify ownership
+    if (crop.playerId !== client.sessionId) {
+      this.sendError(client, {
+        code: ERROR_CODES.INVALID_REQUEST,
+        message: 'You can only harvest your own crops',
+        details: { cropId }
+      });
+      return;
+    }
+
+    // Check if already harvested
+    if (crop.harvested) {
+      this.sendError(client, {
+        code: ERROR_CODES.CROP_ALREADY_HARVESTED,
+        message: 'Crop has already been harvested',
+        details: { cropId }
+      });
+      return;
+    }
+
+    // Check if crop is ready
+    const plantedTime = new Date(crop.plantedAt).getTime();
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - plantedTime;
+
+    if (timeElapsed < crop.growthTime) {
+      const timeRemaining = crop.growthTime - timeElapsed;
+      this.sendError(client, {
+        code: ERROR_CODES.CROP_NOT_READY,
+        message: 'Crop is not ready for harvest',
+        details: { 
+          cropId, 
+          timeRemaining,
+          readyAt: new Date(plantedTime + crop.growthTime).toISOString()
+        }
+      });
+      return;
+    }
+
+    // Calculate yield
+    const seedConfig = SEED_CONFIGS[crop.seedType as SeedType];
+    const yieldAmount = databaseService.calculateYield(
+      crop.investmentAmount,
+      crop.plantedAt,
+      seedConfig.baseYieldRate
+    );
+
+    try {
+      // Update database
+      databaseService.transaction(() => {
+        databaseService.harvestCrop(cropId);
+        // In a real implementation, we would also:
+        // - Update player's wallet balance
+        // - Record the yield transaction
+        // - Update any DeFi protocol state
+      });
+
+      // Update game state
+      crop.harvested = true;
+
+      // Send success response
+      client.send('crop_harvested', {
+        cropId: cropId,
+        investmentAmount: crop.investmentAmount,
+        yieldAmount: yieldAmount,
+        totalReturn: crop.investmentAmount + yieldAmount
+      });
+
+      // Broadcast harvest event
+      this.broadcast('harvest_event', {
+        playerId: client.sessionId,
+        playerName: player.name,
+        cropId: cropId,
+        seedType: crop.seedType,
+        totalReturn: crop.investmentAmount + yieldAmount
+      });
+
+      // Remove crop from active state after a delay
+      setTimeout(() => {
+        this.state.crops.delete(cropId);
+      }, 5000);
+
+    } catch (error) {
+      console.error('❌ Error harvesting crop:', error);
+      this.sendError(client, {
+        code: ERROR_CODES.DATABASE_ERROR,
+        message: 'Failed to harvest crop',
+        details: error
+      });
+    }
   }
 }
