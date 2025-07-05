@@ -75,6 +75,7 @@ apps/web/.env.local
 # Claude AI and development tools
 .claude/
 claude/
+CLAUDE.md
 .mcp.json
 .npmrc
 temp_package.json

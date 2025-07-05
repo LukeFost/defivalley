@@ -225,7 +225,13 @@ export function Auth() {
 
               <div className="farm-actions">
                 <button 
-                  onClick={() => useUI.getState().showPlantModal()}
+                  onClick={() => {
+                    console.log('Plant Seeds button clicked!');
+                    console.log('Chain ID:', chainId, 'Expected:', config.sagaChainId, 'Match:', chainId === config.sagaChainId);
+                    console.log('showPlantModal function:', showPlantModal);
+                    showPlantModal();
+                    console.log('showPlantModal called');
+                  }}
                   className="action-btn plant"
                   disabled={chainId !== config.sagaChainId}
                 >
@@ -233,7 +239,13 @@ export function Auth() {
                 </button>
                 
                 <button 
-                  onClick={toggleTransactionTracker}
+                  onClick={() => {
+                    console.log('Transactions button clicked!');
+                    console.log('toggleTransactionTracker function:', toggleTransactionTracker);
+                    console.log('showTransactionTracker state:', showTransactionTracker);
+                    toggleTransactionTracker();
+                    console.log('toggleTransactionTracker called');
+                  }}
                   className="action-btn transactions"
                 >
                   📊 Transactions

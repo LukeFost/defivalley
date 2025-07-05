@@ -6,6 +6,31 @@ A cozy farming game where your crops are powered by real DeFi protocols. Plant s
 
 DeFi Valley is a multiplayer farming game that transforms complex DeFi yield farming into an intuitive, delightful gaming experience. Built for the hackathon with a focus on cross-chain interoperability and user experience.
 
+## 🏆 Hackathon Features
+
+### What Makes This Special
+- **🎮 Gaming + DeFi**: First farming game with real yield farming integration
+- **⚡ Gasless Gaming**: Zero transaction costs on Saga Chainlets
+- **🔗 Cross-Chain Innovation**: Seamless Saga ↔ Arbitrum communication via Axelar
+- **🛡️ Production Security**: Enterprise-grade smart contracts with circuit breakers
+- **👥 Real-Time Multiplayer**: Live player interaction with Colyseus + Phaser
+- **🎯 UX First**: Complex DeFi made simple through gaming metaphors
+
+### Technical Innovation Stack
+- **Frontend**: Next.js 15 + Phaser 3 + TypeScript
+- **Game Server**: Colyseus multiplayer framework
+- **Auth**: Privy Web3 authentication with embedded wallets
+- **Smart Contracts**: Hardhat 3 Alpha + Solidity 0.8.28
+- **Cross-Chain**: Axelar General Message Passing (GMP)
+- **DeFi Integration**: EulerSwap yield farming on Arbitrum
+- **Security**: OpenZeppelin + custom circuit breakers
+
+### Live Demo
+🚀 **Try it now**: [Insert your deployed URL here]
+- Connect with email, social login, or crypto wallet
+- Plant seeds, earn real yield, chat with other players
+- Experience the first gamified cross-chain DeFi protocol
+
 ### Key Features
 
 - **🌱 Seed Planting = DeFi Deposits**: Plant USDC seeds that automatically deposit into EulerSwap vaults
@@ -36,18 +61,25 @@ DeFi Valley is a multiplayer farming game that transforms complex DeFi yield far
 - **Node.js v22+** (Required for Hardhat 3 Alpha)
 - **pnpm** (Package manager)
 - **Metamask** or compatible wallet
+- **Testnet tokens** (Optional - for full DeFi testing)
 
 ### Installation
 
 ```bash
 # Clone and install
-git clone <your-repo>
+git clone https://github.com/LukeFost/defivalley.git
 cd defivalley
 pnpm install
+
+# Set up environment (create your own .env files)
+cp packages/contracts/.env.example packages/contracts/.env
+cp apps/web/.env.local.example apps/web/.env.local
 
 # Start development environment
 pnpm dev
 ```
+
+> **⚠️ Security Note**: You'll need to add your own private keys to the `.env` files for full functionality. Never commit these files to git.
 
 This starts:
 - **Frontend**: http://localhost:3000 (Next.js with Turbopack + Phaser)
@@ -193,13 +225,40 @@ yarn exec turbo link
 pnpm exec turbo link
 ```
 
-## Useful Links
+## 🔒 Security & Public Repository
 
-Learn more about the power of Turborepo:
+### Repository Security Status
+- ✅ **No sensitive data committed** - All private keys and API keys are excluded
+- ✅ **Clean git history** - No secrets have ever been committed
+- ✅ **Proper .gitignore** - All sensitive files are properly excluded
+- ✅ **Safe for public viewing** - Ready for hackathon judges and community
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+### For Developers
+To get full functionality:
+1. Copy `.env.example` files to `.env` in respective directories
+2. Add your own private keys and API credentials
+3. Never commit `.env` files to version control
+4. Use `npx hardhat keystore set` for secure key management
+
+### Smart Contract Addresses (Testnet)
+- **GameController (Saga)**: `0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673`
+- **DeFiVault (Arbitrum)**: `0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673`
+
+## 🚀 Deployment & Links
+
+### Networks
+- **Saga Chainlet**: Gasless gaming layer
+- **Arbitrum Sepolia**: DeFi yield farming layer
+- **Axelar**: Cross-chain message passing
+
+### Useful Links
+
+Learn more about the technologies used:
+
+- [Turborepo](https://turborepo.com/docs) - Monorepo build system
+- [Colyseus](https://colyseus.io/) - Multiplayer game server
+- [Phaser](https://phaser.io/) - 2D game engine
+- [Privy](https://privy.io/) - Web3 authentication
+- [Axelar](https://axelar.network/) - Cross-chain infrastructure
+- [Saga](https://saga.xyz/) - Gaming-focused blockchain
+- [Arbitrum](https://arbitrum.io/) - Ethereum L2 scaling

@@ -187,7 +187,14 @@ export default function PlantSeed() {
     setPlantAmount(formatUnits(finalAmount, 6));
   };
   
-  if (!showPlantModal) return null;
+  console.log('PlantSeed render - showPlantModal:', showPlantModal);
+  
+  if (!showPlantModal) {
+    console.log('PlantSeed modal is hidden');
+    return null;
+  }
+  
+  console.log('PlantSeed modal should be visible!');
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -254,7 +261,7 @@ export default function PlantSeed() {
                   <div className="relative">
                     <input
                       type="number"
-                      value={plantAmount}
+                      value={plantAmount || ''}
                       onChange={(e) => setPlantAmount(e.target.value)}
                       placeholder={`Min ${Number(formatUnits(selectedSeed.minAmount, 6))}`}
                       className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${

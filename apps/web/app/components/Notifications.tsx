@@ -183,17 +183,17 @@ function NotificationItem({ notification, onRemove }: NotificationItemProps) {
 export default function Notifications() {
   const { notifications, removeNotification } = useUI();
 
-  if (notifications.length === 0) return null;
+  if (!notifications || notifications.length === 0) return null;
 
   return (
     <div className="notifications-container">
-      {notifications.map((notification) => (
+      {notifications?.map((notification) => (
         <NotificationItem
           key={notification.id}
           notification={notification}
           onRemove={removeNotification}
         />
-      ))}
+      )) || null}
 
       <style jsx>{`
         .notifications-container {

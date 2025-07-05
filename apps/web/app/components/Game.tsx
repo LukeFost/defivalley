@@ -26,8 +26,8 @@ interface ChatMessage {
 class MainScene extends Phaser.Scene {
   private client!: Client;
   private room!: Room<GameState>;
-  private players: Map<string, Phaser.GameObjects.Graphics> = new Map();
-  private currentPlayer!: Phaser.GameObjects.Graphics;
+  private players: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private currentPlayer!: Phaser.GameObjects.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
   private sessionId!: string;
@@ -41,9 +41,15 @@ class MainScene extends Phaser.Scene {
     this.chatCallback = data.chatCallback;
   }
 
+  preload() {
+    // Load the character sprite sheets
+    this.load.image('characters', '/sprites/RPGCharacterSprites32x32.png');
+    this.load.image('soldier', '/sprites/RPGSoldier32x32.png');
+  }
+
   async create() {
-    // Create world bounds
-    this.add.rectangle(400, 300, 800, 600, 0x87CEEB, 0.3);
+    // Create world bounds with grass-like background
+    this.add.rectangle(400, 300, 800, 600, 0x228B22, 0.3);
     
     // Add some visual elements
     this.add.text(10, 10, 'DeFi Valley - Multiplayer Game', {
@@ -61,6 +67,9 @@ class MainScene extends Phaser.Scene {
       color: '#666666'
     });
 
+    // Create animations for different characters
+    this.createCharacterAnimations();
+
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
@@ -69,6 +78,24 @@ class MainScene extends Phaser.Scene {
     this.time.delayedCall(100, () => {
       this.connectToServer();
     });
+  }
+
+  createCharacterAnimations() {
+    // Create sprite sheet configurations for the characters
+    // The RPGCharacterSprites32x32.png has 20 characters in a 4x5 grid
+    const characterFrames: Phaser.Types.Animations.GenerateFrameNumbers = {
+      start: 0,
+      end: 19
+    };
+
+    // For now, we'll use static frames. Later we can add walking animations
+    // Each character is 32x32 pixels
+    if (!this.textures.exists('characterFrames')) {
+      this.textures.addSpriteSheet('characterFrames', this.textures.get('characters').getSourceImage(), {
+        frameWidth: 32,
+        frameHeight: 32
+      });
+    }
   }
 
   async connectToServer() {
@@ -179,11 +206,16 @@ class MainScene extends Phaser.Scene {
         return;
       }
       
-      // Create player visual
-      const playerSprite = this.add.graphics();
-      playerSprite.fillStyle(isCurrentPlayer ? 0x00ff00 : 0xff0000);
-      playerSprite.fillCircle(0, 0, 20);
-      playerSprite.setPosition(player.x, player.y);
+      // Create player sprite using character frames
+      // Use different character frames for different players
+      const characterIndex = Math.abs(sessionId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % 20;
+      const playerSprite = this.add.sprite(player.x, player.y, 'characterFrames', characterIndex);
+      playerSprite.setScale(1.5); // Scale up the 32x32 sprite slightly
+      
+      // Add a subtle tint for current player
+      if (isCurrentPlayer) {
+        playerSprite.setTint(0xaaffaa); // Light green tint
+      }
       
       // Add player name
       const nameText = this.add.text(player.x, player.y - 35, player.name, {
@@ -201,7 +233,7 @@ class MainScene extends Phaser.Scene {
         this.currentPlayer = playerSprite;
       }
       
-      console.log('Added player:', sessionId, player.name);
+      console.log('Added player:', sessionId, player.name, 'with character frame:', characterIndex);
     } catch (error) {
       console.error('Error adding player:', error);
     }

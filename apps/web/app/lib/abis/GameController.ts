@@ -22,6 +22,11 @@ export const GameControllerABI = [
   },
   {
     "inputs": [],
+    "name": "InvalidCommand",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidGasPayment",
     "type": "error"
   },
@@ -69,6 +74,11 @@ export const GameControllerABI = [
   },
   {
     "inputs": [],
+    "name": "SeedAlreadyHarvested",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "SeedNotReady",
     "type": "error"
   },
@@ -101,6 +111,37 @@ export const GameControllerABI = [
       }
     ],
     "name": "CrossChainDepositInitiated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "txId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "destinationChain",
+        "type": "string"
+      }
+    ],
+    "name": "CrossChainHarvestInitiated",
     "type": "event"
   },
   {
@@ -219,6 +260,24 @@ export const GameControllerABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256[]",
+        "name": "seedIds",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "address",
+        "name": "gasToken",
+        "type": "address"
+      }
+    ],
+    "name": "batchHarvestSeeds",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "seedType",
         "type": "uint256"
@@ -270,6 +329,19 @@ export const GameControllerABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "seedId",
+        "type": "uint256"
+      }
+    ],
+    "name": "emergencyHarvestSeed",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "gasService",
     "outputs": [
@@ -290,6 +362,35 @@ export const GameControllerABI = [
         "internalType": "contract IAxelarGateway",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      }
+    ],
+    "name": "getHarvestableSeeds",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "harvestableSeeds",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalHarvestableAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalEstimatedYield",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -391,11 +492,16 @@ export const GameControllerABI = [
         "internalType": "uint256",
         "name": "seedId",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "gasToken",
+        "type": "address"
       }
     ],
     "name": "harvestSeed",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {

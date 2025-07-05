@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3000",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint --max-warnings 0",
@@ -14,14 +14,14 @@
     "@privy-io/react-auth": "^2.17.3",
     "@tanstack/react-query": "^5.81.5",
     "colyseus.js": "^0.16.4",
+    "immer": "^10.0.3",
     "next": "^15.3.0",
     "phaser": "^3.90.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "viem": "^2.31.7",
     "wagmi": "^2.15.6",
-    "zustand": "^4.5.0",
-    "immer": "^10.0.3"
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
