@@ -26,6 +26,7 @@ coverage
 out/
 build
 dist
+apps/server/dist/
 
 # Smart Contract Build Artifacts
 packages/contracts/artifacts/
@@ -39,15 +40,27 @@ packages/contracts/.openzeppelin/
 
 # Web3 & Wallet
 .secret
+packages/deployer-wallet.md
+packages/contracts/deployer-wallet.md
+**/deployer-wallet.md
+*.private.key
+*.wallet.json
 
 # Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Misc
 .DS_Store
 *.pem
+
+# Temporary files
+temp_*.json
+temp_*
+*.tmp
+*.temp
 
 # IDE
 .vscode/
@@ -57,3 +70,4 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+apps/web/.env.local

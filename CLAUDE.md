@@ -107,24 +107,41 @@ pnpm format
 ```
 
 ### Smart Contract Development
+
+**IMPORTANT VERSION REQUIREMENTS:**
+- Node.js v22+ required for Hardhat 3 Alpha
+- Use `nvm use v22` before any Hardhat commands
+- Alternative: Consider Node 20 LTS + Hardhat 2.x for stability (per O3 expert review)
+
+**Simplified Deployment Commands (from project root):**
 ```bash
-# Navigate to packages directory first
-cd packages
+# Set correct Node version
+nvm use v22
+
+# Deploy everything with fixed Axelar addresses
+pnpm run deploy:all
+
+# Individual deployment steps
+pnpm run deploy:arbitrum    # DeFiVault to Arbitrum Sepolia
+pnpm run deploy:saga        # GameController to Saga Chainlet  
+pnpm run deploy:configure   # Configure cross-chain communication
+pnpm run deploy:test        # Test end-to-end flow
+```
+
+**Manual deployment (from packages/contracts):**
+```bash
+cd packages/contracts
 
 # Compile contracts
-npx hardhat compile
+pnpm exec hardhat compile
 
-# Deploy DeFiVault to Arbitrum Sepolia
-npx hardhat run scripts/deploy-defivault.ts --network arbitrumSepolia
-
-# Deploy GameController to Saga Chainlet
-npx hardhat run scripts/deploy-gamecontroller.ts --network sagaTestnet
-
-# Configure cross-chain communication
-npx hardhat run scripts/configure-contracts.ts --network sagaTestnet
+# Deploy with REAL Axelar addresses (Fixed modules)
+echo "y" | pnpm exec hardhat ignition deploy ignition/modules/DeFiVaultFixed.ts --network arbitrumSepolia
+echo "y" | pnpm exec hardhat ignition deploy ignition/modules/GameControllerFixed.ts --network sagaTestnet
+echo "y" | pnpm exec hardhat ignition deploy ignition/modules/ConfigureFixed.ts --network sagaTestnet
 
 # Test complete cross-chain flow
-npx hardhat run scripts/test-cross-chain.ts --network sagaTestnet
+pnpm exec hardhat run scripts/test-end-to-end.ts --network sagaTestnet
 ```
 
 ## Project Architecture
@@ -132,11 +149,13 @@ npx hardhat run scripts/test-cross-chain.ts --network sagaTestnet
 ### Monorepo Structure
 - `apps/web/` - Next.js frontend application
 - `apps/server/` - Colyseus game server
-- `packages/` - Smart contracts (Hardhat 3) and shared utilities
+- `packages/contracts/` - Smart contracts (Hardhat 3) and deployment scripts
+- `packages/` - Shared utilities and other packages
 
 ### Key Technologies
 - **Frontend**: Next.js 15 + React 19 + Phaser 3 + TypeScript
 - **Game Server**: Colyseus 0.16 for real-time multiplayer
+- **Web3 Auth**: Privy 2.17.3 + wagmi 2.15.6 for wallet integration
 - **Blockchain**: Hardhat 3 (alpha) with Solidity 0.8.28
 - **Cross-chain**: Axelar GMP for secure message passing
 - **DeFi Integration**: EulerSwap vaults for yield generation
@@ -156,11 +175,20 @@ Saga Chainlet (Gasless Gaming)     Arbitrum (DeFi Yield)
 ```
 
 ### Network Configuration
+
+**Deployment Status**: ✅ **FULLY OPERATIONAL** with real Axelar addresses
+
 - `arbitrumSepolia` - Arbitrum testnet for DeFi vault
 - `sagaTestnet` - Saga chainlet for game controller
-- **Axelar Addresses**:
-  - Arbitrum Gateway: `0xe1cE95479C84e9809269227C7F8524aE051Ae77a`
-  - Arbitrum GasService: `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6`
+
+**Current Contract Addresses**:
+- **GameController (Saga)**: `0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673`
+- **DeFiVault (Arbitrum)**: `0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673`
+
+**Axelar Integration** (FIXED with real addresses):
+- **Arbitrum Gateway**: `0xe432150cce91c13a887f7D836923d5597adD8E31`
+- **Arbitrum GasService**: `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6`
+- **Cross-chain Status**: Operational for testnet development
 
 ### Multiplayer Game Implementation
 
@@ -201,52 +229,227 @@ Test Client: http://172.31.50.134:2567/test.html
 - **SSR Issues**: Game component uses dynamic loading with `ssr: false`
 - **Network Access**: Test with `/test.html` client for connection debugging
 
+## Web3 Authentication System
+
+DeFi Valley uses **Privy** for seamless Web3 authentication with **wagmi** for blockchain interactions.
+
+### Authentication Features
+- **🔐 Multiple Login Methods**: Email, Google, Twitter, external wallets
+- **👛 Embedded Wallets**: Auto-created for users without existing wallets
+- **🔗 External Wallet Support**: MetaMask, WalletConnect, Coinbase Wallet
+- **⚡ Multi-chain**: Saga Chainlet (gasless gaming) + Arbitrum (DeFi)
+- **🔄 Chain Switching**: Easy network switching between gaming/DeFi layers
+- **💰 Real-time Balances**: Live wallet balance display
+- **🎮 Game Integration**: Authentication tied to multiplayer identity
+
+### Web3 Stack Configuration
+```typescript
+// Configured Networks
+- Saga Chainlet: Chain ID 2751669528484000 (Gaming - Gasless)
+- Arbitrum Sepolia: Chain ID 421614 (DeFi - Yield Farming)
+
+// Provider Setup
+- PrivyProvider: Web3 authentication + embedded wallets
+- WagmiProvider: Blockchain interactions + multi-chain
+- QueryClient: Optimized caching for blockchain data
+```
+
+### Authentication Flow
+1. **Connect**: User clicks "Connect & Play"
+2. **Choose Method**: Email, social login, or external wallet
+3. **Auto-wallet**: Embedded wallet created for new users
+4. **Multi-chain**: Switch between Saga (gaming) and Arbitrum (DeFi)
+5. **Play**: Authenticated identity integrated with game
+
+### Frontend Integration
+```typescript
+// Key Components
+- apps/web/app/components/Auth.tsx: Complete auth UI
+- apps/web/app/components/Providers.tsx: Web3 provider setup
+- apps/web/app/wagmi.ts: Multi-chain configuration
+- apps/web/app/layout.tsx: Provider wrapper integration
+```
+
+### Environment Variables
+```bash
+# Required for Web3 functionality
+NEXT_PUBLIC_PRIVY_APP_ID=cmcph1jpi002hjw0nk76yfxu8
+NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=bdd94739681190d1274efc1059cbf744
+
+# Optional RPC overrides
+NEXT_PUBLIC_SAGA_RPC_URL=https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io
+NEXT_PUBLIC_ARBITRUM_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
+```
+
+### Smart Contract Integration with Security Features
+```typescript
+// Contract Addresses (Production-Ready with Security)
+GameController (Saga): 0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673
+  // ✅ One-click harvest, batch harvest, emergency functions
+DeFiVault (Arbitrum): 0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673
+  // ✅ Circuit breaker, deposit caps, command routing
+
+// Enhanced Hooks Available (Security-Enabled)
+- usePlayerInfo(): Read player data from GameController
+- useRegisterPlayer(): Register new player on Saga
+- usePlantSeed(): Plant seeds with cross-chain DeFi (cap-protected)
+- 🆕 useHarvestSeed(): One-click harvest with cross-chain yield claim
+- 🆕 useBatchHarvest(): Harvest multiple seeds in one transaction
+- useVaultBalance(): Check DeFi vault balance and security status
+- useVaultDeposit(): Deposit into yield farming (pause-protected)
+- 🆕 useEmergencyPause(): Emergency pause controls (authorized operators)
+- 🆕 useDepositCap(): Check and update deposit cap limits
+- 🆕 useSecurityStatus(): Monitor circuit breaker and pause state
+```
+
+### Web3 Development Setup
+```bash
+# Install dependencies (already configured)
+pnpm install
+
+# Start development with Web3 auth
+pnpm dev --filter=web
+
+# Access authenticated app
+http://localhost:3000
+```
+
+### User Experience
+- **New Users**: Sign up with email/social → Auto-wallet created → Start playing
+- **Crypto Users**: Connect existing wallet → Verify identity → Start playing  
+- **Cross-chain**: Seamless switching between gaming (Saga) and DeFi (Arbitrum)
+- **Mobile**: Full WalletConnect support for mobile wallet apps
+
 ## Configuration Variables
-For cross-chain deployment, configure these variables in `packages/.env`:
+For cross-chain deployment, configure these variables in `packages/contracts/.env`:
 
 ### Required Environment Variables
 ```bash
-# Arbitrum Sepolia (DeFi Vault)
+# Root .env file contains deployer keys
+/Users/lukefoster/Documents/Development/defivalley/.env:
+DEPLOYER_PRIVATE_KEY=your_private_key_here
+DEPLOYER_PUBLIC_KEY=your_public_key_here
+SAGA_RPC_URL=https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io
+SAGA_CHAIN_ID=2751669528484000
+
+# Contracts package .env file
+packages/contracts/.env:
 ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
 ARBITRUM_SEPOLIA_PRIVATE_KEY=your_private_key_here
-
-# Saga Chainlet (Game Controller)  
-SAGA_TESTNET_RPC_URL=https://chainlet.saga.xyz/
+SAGA_TESTNET_RPC_URL=https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io
 SAGA_TESTNET_PRIVATE_KEY=your_private_key_here
 
-# Contract addresses (filled after deployment)
-DEFI_VAULT_ADDRESS=
-GAME_CONTROLLER_ADDRESS=
+# Contract addresses (DEPLOYED)
+DEFI_VAULT_ADDRESS=0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673
+GAME_CONTROLLER_ADDRESS=0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673
 ```
 
-### Pre-configured Addresses
+### Key Network Addresses (✅ UPDATED with real Axelar addresses)
 - **USDC Arbitrum Sepolia**: `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`
-- **Axelar Gateway (Arbitrum)**: `0xe1cE95479C84e9809269227C7F8524aE051Ae77a`
+- **Axelar Gateway (Arbitrum)**: `0xe432150cce91c13a887f7D836923d5597adD8E31` ⚠️ FIXED
 - **Axelar GasService (Arbitrum)**: `0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6`
+
+**🚨 SECURITY UPDATE**: Latest deployment includes production-ready security features:
+- ✅ Circuit breaker with emergency pause capabilities
+- ✅ Deposit cap protection (1M USDC default, configurable)
+- ✅ One-click harvest with cross-chain yield claiming
+- ✅ Command routing for secure message dispatch
+- ✅ Multi-operator pause system for emergency response
+- ✅ All functions protected with whenNotPaused modifiers
 
 ### Security Notes
 - Use `npx hardhat keystore set PRIVATE_KEY` for secure key storage
 - Never commit private keys to git
 - Use different keys for testnet vs mainnet deployment
 
-## Game Mechanics
+## Hardhat 3 Alpha Deployment Guide
+
+### Prerequisites
+- **Node.js 22.10.0 or later** (CRITICAL - Hardhat 3 Alpha requirement)
+- **pnpm** package manager
+- **dotenv** for environment variable loading
+
+### Common Issues and Solutions
+
+#### 1. Node.js Version Issues
+```bash
+# Error: "You are using Node.js 18.x which is not supported by Hardhat"
+# Solution: Upgrade to Node.js 22+
+nvm install 22
+nvm use 22
+
+# For persistent sessions, ensure NVM is properly sourced:
+export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+```
+
+#### 2. Keystore Password Issues
+```bash
+# Error: "[hardhat-keystore] Enter the password:"
+# Solution: Delete keystore and use direct env vars
+rm -rf .hardhat/keystore .hardhat-keystore
+
+# Update hardhat.config.ts to use process.env instead of configVariable():
+accounts: [process.env.ARBITRUM_SEPOLIA_PRIVATE_KEY ?? ""]
+```
+
+#### 3. Import/Export Issues with Hardhat 3
+```bash
+# Error: "The requested module 'hardhat' does not provide an export named 'viem'"
+# Solution: Use Hardhat Ignition for deployments instead of scripts
+# Ignition modules work better with Hardhat 3 Alpha
+
+# Good: Use Ignition modules
+pnpm exec hardhat ignition deploy ignition/modules/DeFiVault.ts --network arbitrumSepolia
+
+# Problematic: Direct script execution with viem imports
+pnpm exec hardhat run scripts/deploy-defivault.ts --network arbitrumSepolia
+```
+
+#### 4. Contract Sources Configuration
+```bash
+# Add to hardhat.config.ts if contracts are in root directory:
+paths: {
+  sources: "./", // Contracts are in the root directory
+},
+```
+
+### Hardhat 3 Alpha Deployment Workflow
+1. **Environment Setup**: Ensure Node.js 22+, create .env files
+2. **Compilation**: `pnpm exec hardhat compile`
+3. **Deployment**: Use Ignition modules instead of scripts
+4. **Configuration**: Use Ignition for contract interactions
+5. **Verification**: Run status scripts for confirmation
+
+## Game Mechanics with Enhanced Security 🛡️
 
 ### Seed Types & Investment Tiers
-| Seed Type | Min Investment | Growth Time | APY Target |
-|-----------|---------------|-------------|------------|
-| USDC Sprout | 10 USDC | 24 hours | ~5% |
-| Premium Tree | 100 USDC | 48 hours | ~5% |
-| Whale Forest | 1000 USDC | 72 hours | ~5% |
+| Seed Type | Min Investment | Growth Time | APY Target | Security Features |
+|-----------|---------------|-------------|------------|------------------|
+| USDC Sprout | 10 USDC | 24 hours | ~5% | Deposit cap protected |
+| Premium Tree | 100 USDC | 48 hours | ~5% | Circuit breaker enabled |
+| Whale Forest | 1000 USDC | 72 hours | ~5% | Emergency pause support |
 
-### Player Progression
+### Player Progression & Security
 - **XP System**: 1 XP per 10 USDC invested
 - **Real Yield**: Actual DeFi returns from EulerSwap
 - **Multiplayer**: Real-time farming with friends via Colyseus
+- **🛡️ Security**: Circuit breaker protection for all DeFi operations
+- **⚡ One-Click Harvest**: Automated cross-chain yield claiming
+- **📊 Deposit Caps**: Maximum 1M USDC total protocol deposits
 
-### Cross-Chain Flow
-1. Register player on Saga (gasless)
-2. Plant seed with USDC amount 
-3. Axelar sends message to Arbitrum
-4. DeFi vault deposits USDC into EulerSwap
-5. Yield accumulates over growth period
-6. Harvest triggers yield claim on Arbitrum
+### Enhanced Cross-Chain Flow with Security
+1. **Register player** on Saga (gasless)
+2. **Plant seed** with USDC amount (validated against deposit caps)
+3. **Axelar sends DEPOSIT command** to Arbitrum with security validation
+4. **DeFi vault deposits USDC** into EulerSwap (if not paused)
+5. **Yield accumulates** over growth period with real-time monitoring
+6. **🆕 ONE-CLICK HARVEST**: Player clicks harvest → triggers cross-chain HARVEST command
+7. **Auto yield claim**: DeFiVault calculates yield, withdraws from EulerSwap, transfers to player
+
+### 🛡️ Security Controls
+- **Emergency Pause**: Pause operators can halt all deposits/harvests instantly
+- **Deposit Caps**: Configurable maximum total deposits (default: 1M USDC)
+- **Command Validation**: All cross-chain messages validated and routed securely
+- **Emergency Functions**: Players can withdraw principal during protocol emergencies
+- **Multi-Operator**: Multiple authorized addresses can trigger emergency pauses
+- **Circuit Breaker**: Automatic pause triggers for suspicious activity patterns
