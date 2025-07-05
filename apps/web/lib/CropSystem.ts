@@ -366,6 +366,25 @@ export class CropSystem {
   }
 
   /**
+   * Get crop statistics
+   */
+  getCropStats() {
+    const crops = Array.from(this.crops.values());
+    return {
+      total: crops.length,
+      ready: crops.filter(crop => crop.stage === 'ready').length,
+      growing: crops.filter(crop => crop.stage !== 'ready').length,
+      byStage: {
+        seed: crops.filter(crop => crop.stage === 'seed').length,
+        sprout: crops.filter(crop => crop.stage === 'sprout').length,
+        growing: crops.filter(crop => crop.stage === 'growing').length,
+        mature: crops.filter(crop => crop.stage === 'mature').length,
+        ready: crops.filter(crop => crop.stage === 'ready').length,
+      }
+    };
+  }
+
+  /**
    * Save crops to localStorage
    */
   private saveCropsToStorage() {

@@ -8,6 +8,7 @@ import { CharacterConfig, CharacterType } from '../lib/character.config';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
+import { CropStats } from './CropStats';
 
 interface GameState {
   players: Map<string, {
@@ -149,36 +150,53 @@ class MainScene extends Phaser.Scene {
   }
 
   createFarmPlots() {
-    // Create a grid of farming plots
+    // Create a grid of farming plots with enhanced visuals
     const plotSize = 64;
     const spacing = 80;
     const startX = 120;
     const startY = 200;
+    
+    // Create farming area background
+    const farmingAreaBg = this.add.rectangle(400, 340, 560, 320, 0x8B4513, 0.1);
+    farmingAreaBg.setStrokeStyle(2, 0x654321, 0.4);
+    
+    // Add farming area label
+    const farmingLabel = this.add.text(400, 180, '🚜 Farming Area - Right-click to plant crops', {
+      fontSize: '14px',
+      color: '#654321',
+      fontFamily: 'Arial, sans-serif',
+      fontStyle: 'bold'
+    });
+    farmingLabel.setOrigin(0.5);
     
     for (let row = 0; row < 4; row++) {
       for (let col = 0; col < 8; col++) {
         const x = startX + (col * spacing);
         const y = startY + (row * spacing);
         
-        // Create plot background
-        const plot = this.add.rectangle(x, y, plotSize, plotSize, 0x8B4513, 0.3);
-        plot.setStrokeStyle(2, 0x654321, 0.8);
+        // Create plot background with better styling
+        const plot = this.add.rectangle(x, y, plotSize, plotSize, 0x8B4513, 0.2);
+        plot.setStrokeStyle(1, 0x654321, 0.6);
         
-        // Add some visual variety to plots
-        if (Math.random() > 0.7) {
-          // Some plots have seeds/plants with gentle animation
-          const plant = this.add.circle(x, y, 8, 0x228B22, 0.8);
-          
-          // Add gentle swaying animation
-          this.tweens.add({
-            targets: plant,
-            scaleX: 1.1,
-            scaleY: 0.9,
-            duration: 2000 + Math.random() * 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-          });
+        // Make plots interactive for visual feedback
+        plot.setInteractive();
+        plot.on('pointerover', () => {
+          plot.setFillStyle(0x8B4513, 0.3);
+        });
+        plot.on('pointerout', () => {
+          plot.setFillStyle(0x8B4513, 0.2);
+        });
+        
+        // Add some visual variety to empty plots
+        if (Math.random() > 0.8) {
+          // Some plots have small rocks or debris
+          const debris = this.add.circle(
+            x + (Math.random() - 0.5) * 20, 
+            y + (Math.random() - 0.5) * 20, 
+            2, 
+            0x696969, 
+            0.6
+          );
         }
       }
     }
@@ -585,6 +603,11 @@ class MainScene extends Phaser.Scene {
     const result = this.cropSystem.harvestCrop(crop.id);
     return result.success;
   }
+  
+  getCropStats() {
+    if (!this.cropSystem) return { total: 0, ready: 0, growing: 0 };
+    return this.cropSystem.getCropStats();
+  }
 }
 
 function Game() {
@@ -699,6 +722,28 @@ function Game() {
     }
   };
 
+  // Stats handlers
+  const getTotalCrops = () => {
+    if (sceneRef.current) {
+      return sceneRef.current.getCropStats().total;
+    }
+    return 0;
+  };
+
+  const getReadyCrops = () => {
+    if (sceneRef.current) {
+      return sceneRef.current.getCropStats().ready;
+    }
+    return 0;
+  };
+
+  const getGrowingCrops = () => {
+    if (sceneRef.current) {
+      return sceneRef.current.getCropStats().growing;
+    }
+    return 0;
+  };
+
   return (
     <div className="game-wrapper">
       <CropContextMenu
@@ -750,6 +795,13 @@ function Game() {
       <CropInfo 
         crop={selectedCrop} 
         onClose={() => setSelectedCrop(null)} 
+      />
+
+      {/* Crop Statistics */}
+      <CropStats 
+        getTotalCrops={getTotalCrops}
+        getReadyCrops={getReadyCrops}
+        getGrowingCrops={getGrowingCrops}
       />
 
       <style jsx>{`
