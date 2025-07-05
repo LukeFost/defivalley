@@ -69,7 +69,7 @@ export default function AutoBridgeSelector({
   const availableTokens = selectedChain ? getTokensForChain(selectedChain) : [];
   
   // Filter tokens based on search
-  const filteredTokens = availableTokens.filter(token =>
+  const filteredTokens = availableTokens.filter((token: any) =>
     token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     token.address.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -86,7 +86,7 @@ export default function AutoBridgeSelector({
 
     setIsGettingQuote(true);
     try {
-      const token = availableTokens.find(t => t.address === selectedToken);
+      const token = availableTokens.find((t: any) => t.address === selectedToken);
       if (!token) return;
 
       const amount = parseUnits(bridgeAmount, token.decimals);
@@ -122,7 +122,7 @@ export default function AutoBridgeSelector({
   };
 
   const getChainName = (chainId: number) => {
-    const chain = supportedChains.find(c => c.chainId === chainId);
+    const chain = supportedChains.find((c: any) => c.chainId === chainId);
     return chain?.chainName || `Chain ${chainId}`;
   };
 
@@ -195,7 +195,7 @@ export default function AutoBridgeSelector({
 
               {/* Token List */}
               <div className="max-h-60 overflow-y-auto space-y-2">
-                {filteredTokens.map((token) => (
+                {filteredTokens.map((token: any) => (
                   <button
                     key={token.address}
                     onClick={() => {
@@ -288,7 +288,7 @@ export default function AutoBridgeSelector({
                 <div className="flex justify-between">
                   <span className="text-green-600">From:</span>
                   <span className="font-medium text-green-800">
-                    {bridgeAmount} {availableTokens.find(t => t.address === selectedToken)?.symbol}
+                    {bridgeAmount} {availableTokens.find((t: any) => t.address === selectedToken)?.symbol}
                   </span>
                 </div>
                 <div className="flex justify-between">

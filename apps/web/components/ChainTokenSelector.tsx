@@ -35,21 +35,21 @@ export default function ChainTokenSelector({ onSelectionChange, className = '' }
 
   const availableChains = showAllChains 
     ? supportedChains 
-    : supportedChains.filter(chain => 
+    : supportedChains.filter((chain: any) => 
         POPULAR_CHAINS.some(popular => popular.id === chain.chainId)
       );
 
   const availableTokens = selectedChain ? getTokensForChain(selectedChain) : [];
   
-  const filteredTokens = availableTokens.filter(token => {
+  const filteredTokens = availableTokens.filter((token: any) => {
     const matchesSearch = token.symbol.toLowerCase().includes(tokenSearchTerm.toLowerCase());
     const isPopular = POPULAR_TOKENS.includes(token.symbol);
     return tokenSearchTerm ? matchesSearch : isPopular;
   });
 
   useEffect(() => {
-    const chain = supportedChains.find(c => c.chainId === selectedChain);
-    const token = availableTokens.find(t => t.address === selectedToken);
+    const chain = supportedChains.find((c: any) => c.chainId === selectedChain);
+    const token = availableTokens.find((t: any) => t.address === selectedToken);
     
     onSelectionChange({
       chainId: selectedChain,
@@ -87,7 +87,7 @@ export default function ChainTokenSelector({ onSelectionChange, className = '' }
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {availableChains.map((chain) => (
+          {availableChains.map((chain: any) => (
             <button
               key={chain.chainId}
               onClick={() => {
@@ -130,7 +130,7 @@ export default function ChainTokenSelector({ onSelectionChange, className = '' }
 
           {/* Token Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
-            {filteredTokens.map((token) => (
+            {filteredTokens.map((token: any) => (
               <button
                 key={token.address}
                 onClick={() => setSelectedToken(token.address)}
@@ -166,7 +166,7 @@ export default function ChainTokenSelector({ onSelectionChange, className = '' }
           {/* Quick Selection Buttons */}
           <div className="mt-4 flex flex-wrap gap-2">
             {POPULAR_TOKENS.map((symbol) => {
-              const token = availableTokens.find(t => t.symbol === symbol);
+              const token = availableTokens.find((t: any) => t.symbol === symbol);
               if (!token) return null;
               
               return (
@@ -193,10 +193,10 @@ export default function ChainTokenSelector({ onSelectionChange, className = '' }
           <h4 className="font-medium text-gray-900 mb-2">Selection Summary</h4>
           <div className="text-sm text-gray-600 space-y-1">
             <div>
-              <span className="font-medium">Chain:</span> {supportedChains.find(c => c.chainId === selectedChain)?.chainName}
+              <span className="font-medium">Chain:</span> {supportedChains.find((c: any) => c.chainId === selectedChain)?.chainName}
             </div>
             <div>
-              <span className="font-medium">Token:</span> {availableTokens.find(t => t.address === selectedToken)?.symbol}
+              <span className="font-medium">Token:</span> {availableTokens.find((t: any) => t.address === selectedToken)?.symbol}
             </div>
             <div>
               <span className="font-medium">Address:</span> 

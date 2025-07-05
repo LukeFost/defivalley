@@ -479,5 +479,9 @@ export function useSquidRouter() {
     route: null,
     getRoute: () => Promise.resolve(null),
     executeRoute: () => Promise.resolve(null),
+    // Missing properties required by Auto-Bridge components
+    supportedChains: [] as any[],
+    getTokensForChain: (chainId: any) => [] as any[],
+    getQuote: (params: any) => Promise.resolve(null),
   };
 }
