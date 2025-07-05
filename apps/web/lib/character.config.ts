@@ -42,8 +42,8 @@ interface AnimationPreset {
 // Animation preset configurations for DRY principle
 const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
   cowboy: {
-    frameWidth: 80,
-    frameHeight: 102,
+    frameWidth: 58,
+    frameHeight: 115,
     scale: 0.5,
     basePath: '/sprites/Cowboy',
     animations: {
@@ -99,38 +99,6 @@ export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
   cowboy: createCharacterConfig('cowboy', 'cowboy'),
 };
 
-// Legacy config for backward compatibility
-export const CharacterConfig = {
-  player: {
-    key: 'player_characters',
-    path: '/sprites/Cowboy/Walk_Cycle_Cowboy.png',
-    frameWidth: 80,
-    frameHeight: 102,
-    directions: {
-      down: 0,
-      left: 1,
-      right: 2,
-      up: 3,
-    },
-    framesPerCharacter: 11,
-    characters: {
-      cowboy: 0,
-    },
-  },
-  cowboy: {
-    key: 'cowboy_character',
-    path: '/sprites/Cowboy/Rotation_Cycle_Cowboy.png',
-    frameWidth: 80,
-    frameHeight: 102,
-    directions: {
-      down: 2,  // Use frame 2 (front-facing) for down
-      left: 0,  // Use frame 0 (left-facing) for left
-      right: 4, // Use frame 4 (right-facing) for right
-      up: 2,    // Use frame 2 (front-facing) for up (no back view)
-    },
-    framesPerCharacter: 5,
-  },
-} as const;
 
 export type CharacterType = keyof typeof CharacterDefinitions;
 
