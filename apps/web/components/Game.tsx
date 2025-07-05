@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
-import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 
@@ -54,6 +54,17 @@ class MainScene extends Phaser.Scene {
     this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
+    });
+    
+    // Load knight animation sheets
+    this.load.spritesheet('knight_idle', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png', {
+      frameWidth: 120,
+      frameHeight: 80
+    });
+    
+    this.load.spritesheet('knight_run', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png', {
+      frameWidth: 120,
+      frameHeight: 80
     });
     
     // Load the tileset for world decoration
@@ -647,7 +658,7 @@ class MainScene extends Phaser.Scene {
         // For current player, check global settings first
         const globalCharacterSelection = MainScene.safeLocalStorage.getItem('character-selection') as CharacterType;
         
-        if (globalCharacterSelection && CharacterConfig.player.characters[globalCharacterSelection] !== undefined) {
+        if (globalCharacterSelection && CharacterDefinitions[globalCharacterSelection] !== undefined) {
           characterType = globalCharacterSelection;
           console.log(`🎭 Current player using global character selection: ${characterType}`);
         } else {
@@ -661,7 +672,7 @@ class MainScene extends Phaser.Scene {
             console.log(`🎭 Current player using saved character ${characterType}`);
           } else {
             // First time - generate a character based on address and save it
-            const characterTypes = Object.keys(CharacterConfig.player.characters) as CharacterType[];
+            const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
             const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
             characterType = characterTypes[characterIndex];
             MainScene.safeLocalStorage.setItem(storageKey, characterType);
@@ -679,7 +690,7 @@ class MainScene extends Phaser.Scene {
           console.log(`🎭 Player ${player.name} using saved character ${characterType}`);
         } else {
           // Generate a character based on address and save it
-          const characterTypes = Object.keys(CharacterConfig.player.characters) as CharacterType[];
+          const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
           const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
           characterType = characterTypes[characterIndex];
           MainScene.safeLocalStorage.setItem(storageKey, characterType);

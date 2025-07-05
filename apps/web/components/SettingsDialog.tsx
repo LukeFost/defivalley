@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../app/store';
-import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,8 @@ interface CharacterPreviewProps {
 }
 
 function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewProps) {
+  const characterConfig = CharacterDefinitions[character];
+  
   // Handle knight character differently
   if (character === 'knight') {
     return (
@@ -35,7 +37,7 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
             <div
               className="w-16 h-16 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100"
               style={{
-                backgroundImage: `url(${CharacterConfig.knight.path})`,
+                backgroundImage: `url(${characterConfig.animationConfig?.animations.idle.path})`,
                 backgroundPosition: '0px 0px',
                 backgroundSize: 'cover',
                 imageRendering: 'pixelated',
@@ -61,8 +63,12 @@ function CharacterPreview({ character, isSelected, onSelect }: CharacterPreviewP
     );
   }
   
-  // Standard character preview
-  const characterIndex = CharacterConfig.player.characters[character];
+  // Standard character preview for spritesheet-based characters
+  const characterIndex = CharacterConfig.player.characters[character as keyof typeof CharacterConfig.player.characters];
+  if (characterIndex === undefined) {
+    console.warn(`Character ${character} not found in legacy character config`);
+    return null;
+  }
   const spriteSheetPath = CharacterConfig.player.path;
   
   // Calculate sprite position
@@ -131,7 +137,7 @@ export default function SettingsDialog() {
   // Load current character selection from localStorage on mount
   useEffect(() => {
     const savedCharacter = localStorage.getItem('character-selection') as CharacterType;
-    if (savedCharacter && CharacterConfig.player.characters[savedCharacter] !== undefined) {
+    if (savedCharacter && CharacterDefinitions[savedCharacter] !== undefined) {
       setCurrentCharacter(savedCharacter);
       setSelectedCharacter(savedCharacter);
       console.log(`🎭 Loaded saved character: ${savedCharacter}`);
@@ -166,7 +172,7 @@ export default function SettingsDialog() {
     hideSettingsModal();
   };
   
-  const availableCharacters = Object.keys(CharacterConfig.player.characters) as CharacterType[];
+  const availableCharacters = Object.keys(CharacterDefinitions) as CharacterType[];
   const hasChanges = selectedCharacter !== currentCharacter;
   
   return (
