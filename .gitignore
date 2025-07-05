@@ -71,3 +71,13 @@ temp_*
 # OS
 Thumbs.db
 apps/web/.env.local
+
+# Claude AI and development tools
+.claude/
+.mcp.json
+.npmrc
+temp_package.json
+
+# IDE (additional patterns)
+.vscode/
+.idea/
