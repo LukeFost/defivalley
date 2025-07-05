@@ -66,7 +66,6 @@ class MainScene extends Phaser.Scene {
   private initializeCollisionMap() {
     // Initialize collision map based on dynamically generated tile types
     if (this.mapLayout.length === 0) {
-      console.log('🗺️ Map layout not generated yet, skipping collision initialization');
       return;
     }
     
@@ -84,7 +83,6 @@ class MainScene extends Phaser.Scene {
     this.worldWidth = this.mapLayout[0].length * tileSize;
     this.worldHeight = this.mapLayout.length * tileSize;
     
-    console.log(`🗺️ Collision map initialized: ${this.mapLayout[0].length}x${this.mapLayout.length} tiles, World: ${this.worldWidth}x${this.worldHeight}`);
   }
   
   private isTileSolid(tileType: string): boolean {
@@ -103,7 +101,6 @@ class MainScene extends Phaser.Scene {
   preload() {
     // Add load event listeners for debugging
     this.load.on('filecomplete', (key: string, type: string, data: any) => {
-      console.log(`✅ Loaded ${type}: ${key}`);
     });
     
     this.load.on('loaderror', (file: any) => {
@@ -111,19 +108,15 @@ class MainScene extends Phaser.Scene {
     });
     
     // Load the legacy character sprite sheet for backward compatibility
-    console.log(`🔄 Loading legacy character sprite: ${CharacterConfig.player.key} from ${CharacterConfig.player.path}`);
     this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
     });
     
     // Load all character animation sheets dynamically from CharacterDefinitions
-    console.log(`🔄 Loading character definitions...`);
     Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {
       if (character.type === 'animation_sheets' && character.animationConfig) {
-        console.log(`🔄 Loading animations for ${characterName}:`);
         Object.entries(character.animationConfig.animations).forEach(([animName, animation]) => {
-          console.log(`  - ${animName}: ${animation.key} from ${animation.path}`);
           this.load.spritesheet(animation.key, animation.path, {
             frameWidth: character.frameWidth,
             frameHeight: character.frameHeight
@@ -142,7 +135,6 @@ class MainScene extends Phaser.Scene {
 
   async create() {
     // Log all loaded textures for debugging
-    console.log('🎮 Scene created! Available textures:', Object.keys(this.textures.list));
     
     // Setup camera system first
     this.setupCameraSystem();
@@ -179,7 +171,6 @@ class MainScene extends Phaser.Scene {
     // Enable smooth camera following
     this.cameras.main.setLerp(this.cameraLerpFactor);
     
-    console.log(`📷 Camera system initialized - World: ${this.worldWidth}x${this.worldHeight}, Lerp: ${this.cameraLerpFactor}`);
   }
 
   updateCameraFollow() {
@@ -191,7 +182,6 @@ class MainScene extends Phaser.Scene {
 
   createCharacterAnimations() {
     // Character sprite sheet is now loaded directly as a spritesheet
-    console.log('Character sprite sheet loaded with transparent background');
   }
 
 
@@ -215,7 +205,6 @@ class MainScene extends Phaser.Scene {
   static resetPlayerCharacter(playerAddress: string) {
     const storageKey = `defi-valley-character-${playerAddress}`;
     MainScene.safeLocalStorage.removeItem(storageKey);
-    console.log(`🔄 Reset character selection for player ${playerAddress}`);
   }
 
   // Add this to window for easy console access during development
@@ -561,7 +550,6 @@ class MainScene extends Phaser.Scene {
       this.renderDebugOverlay();
     }
     
-    console.log('🔄 Terrain refreshed successfully');
   }
 
   createFarmingWorld() {
@@ -589,7 +577,6 @@ class MainScene extends Phaser.Scene {
   }
 
   createSimpleFarmBackground() {
-    console.log(`🚜 Creating simple farm background with invisible walls (fast hackathon approach)`);
     
     // Set world dimensions for a farm area
     this.worldWidth = 1600;
@@ -601,7 +588,6 @@ class MainScene extends Phaser.Scene {
     // Create invisible collision walls for farm boundaries and obstacles
     this.createInvisibleWalls();
     
-    console.log(`✅ Simple farm world created: ${this.worldWidth}x${this.worldHeight} with invisible walls`);
   }
   
   createFarmBackgroundGraphics() {
@@ -622,11 +608,9 @@ class MainScene extends Phaser.Scene {
       grassBackground.fillCircle(x, y, size);
     }
     
-    console.log(`✅ Simple grass background created`);
   }
   
   createInvisibleWalls() {
-    console.log(`🚧 Creating simple border walls`);
     
     // Create static physics group for invisible walls
     const walls = this.physics.add.staticGroup();
@@ -657,7 +641,6 @@ class MainScene extends Phaser.Scene {
     // Store wall group for player collision detection
     this.invisibleWalls = walls;
     
-    console.log(`✅ Created ${walls.children.size} simple border walls`);
   }
   
   private setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
@@ -673,14 +656,12 @@ class MainScene extends Phaser.Scene {
     
     if (solidTileIndices.length > 0) {
       layer.setCollision(solidTileIndices);
-      console.log(`🛡️ Set collision for ${solidTileIndices.length} solid tile types:`, solidTileIndices);
     }
   }
 
   // Painter Functions for Procedural World Generation
 
   private createBaseLayer(baseTile: string, width: number, height: number): string[][] {
-    console.log(`🎨 Creating ${width}x${height} base layer with natural variation`);
     
     const layout: string[][] = [];
     
@@ -699,15 +680,12 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Base layer created with 80/20 grass variation`);
     return layout;
   }
 
   private paintBorders(layout: string[][]) {
     const height = layout.length;
     const width = layout[0].length;
-    
-    console.log(`🎨 Painting cliff borders`);
     
     // Paint top and bottom borders with cliffs
     for (let x = 0; x < width; x++) {
@@ -731,8 +709,6 @@ class MainScene extends Phaser.Scene {
   private paintRectangularPlateau(layout: string[][], x: number, y: number, width: number, height: number) {
     const mapHeight = layout.length;
     const mapWidth = layout[0].length;
-    
-    console.log(`🎨 Painting intelligent ${width}x${height} plateau at (${x}, ${y}) with proper borders`);
     
     // Ensure plateau fits within map bounds
     const endX = Math.min(x + width, mapWidth);
@@ -774,14 +750,11 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Plateau painted with intelligent borders and interior fill`);
   }
 
   private paintCircularLake(layout: string[][], centerX: number, centerY: number, radius: number) {
     const mapHeight = layout.length;
     const mapWidth = layout[0].length;
-    
-    console.log(`🎨 Painting natural circular lake at (${centerX}, ${centerY}) with radius ${radius} and proper transitions`);
     
     // STEP 1: Fill the inside of the circle with water tiles
     // STEP 2: Trace the edge with grass-to-water transition tiles
@@ -819,7 +792,6 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Natural lake painted with water fill and directional shore transitions`);
   }
 
   private paintPath(layout: string[][], points: Array<{x: number, y: number}>) {
