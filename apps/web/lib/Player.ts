@@ -84,18 +84,45 @@ export class Player extends Phaser.GameObjects.Container {
       // For animation-based characters (like knight), create with idle animation
       const idleAnim = this.characterConfig.animationConfig?.animations.idle;
       if (idleAnim) {
-        return scene.add.sprite(0, 0, idleAnim.key);
+        console.log(`🎭 Creating sprite for ${this.playerInfo.character} with texture key: ${idleAnim.key}`);
+        
+        // Check if texture exists before creating sprite
+        if (scene.textures.exists(idleAnim.key)) {
+          return scene.add.sprite(0, 0, idleAnim.key);
+        } else {
+          console.warn(`⚠️ Texture ${idleAnim.key} not found! Falling back to legacy character sprite.`);
+          console.log('Available textures:', scene.textures.list);
+          // Fall through to legacy fallback
+        }
       }
     }
     
     // For spritesheet-based characters or fallback
     const spritesheetConfig = this.characterConfig.spritesheetConfig;
     if (spritesheetConfig) {
-      return scene.add.sprite(0, 0, 'player_characters');
+      console.log(`🎭 Using spritesheet character with key: player_characters`);
+      if (scene.textures.exists('player_characters')) {
+        return scene.add.sprite(0, 0, 'player_characters');
+      } else {
+        console.warn(`⚠️ Texture player_characters not found!`);
+      }
     }
     
     // Legacy fallback
-    return scene.add.sprite(0, 0, this.characterConfig.key);
+    console.log(`🎭 Using legacy fallback with key: ${this.characterConfig.key}`);
+    if (scene.textures.exists(this.characterConfig.key)) {
+      return scene.add.sprite(0, 0, this.characterConfig.key);
+    } else {
+      console.error(`❌ No valid texture found for character ${this.playerInfo.character}! Creating fallback texture.`);
+      // Create a fallback texture programmatically
+      const graphics = scene.add.graphics();
+      graphics.fillStyle(0x4a90e2, 1); // Blue rectangle instead of green
+      graphics.fillRect(0, 0, 32, 32);
+      graphics.generateTexture('fallback_character', 32, 32);
+      graphics.destroy(); // Clean up the graphics object
+      
+      return scene.add.sprite(0, 0, 'fallback_character');
+    }
   }
 
   /**

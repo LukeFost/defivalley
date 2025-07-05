@@ -125,7 +125,14 @@ export const makeStore = () => {
           
           clearCompletedTransactions: () => {
             set((state) => {
+              // Clear transaction history
               state.transactionHistory = [];
+              
+              // Also clear any active transactions that are completed/failed
+              // This handles transactions that got stuck in active state
+              state.activeTransactions = state.activeTransactions.filter(
+                tx => tx.status !== 'completed' && tx.status !== 'failed'
+              );
             });
           },
           
@@ -357,7 +364,8 @@ export const useTransactions = () => useAppStore(state => ({
   update: state.updateTransaction,
   complete: state.completeTransaction,
   fail: state.failTransaction,
-  retry: state.retryTransaction
+  retry: state.retryTransaction,
+  clearCompleted: state.clearCompletedTransactions
 }));
 
 export const usePlayerData = () => useAppStore(state => ({

@@ -13,8 +13,8 @@ const Game = dynamic(() => import('./Game'), {
       </div>
       <style jsx>{`
         .game-frame {
-          width: 800px;
-          height: 600px;
+          width: 1600px;
+          height: 900px;
           background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
           border-radius: 12px;
           padding: 8px;

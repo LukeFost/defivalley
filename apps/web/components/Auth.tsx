@@ -7,6 +7,14 @@ import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
 import { useAppStore, useTransactions, usePlayerData, useConfig } from '../app/store'
 import { NetworkSelector } from './NetworkSelector'
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
 
 export function Auth() {
   const { ready, authenticated, user, login, logout } = usePrivy()
@@ -15,6 +23,7 @@ export function Auth() {
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
   const [isMounted, setIsMounted] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   
   // DeFi Valley state integration
   const { active: activeTransactions } = useTransactions()
@@ -85,8 +94,30 @@ export function Auth() {
   const isOnArbitrum = chainId === arbitrumSepolia.id
   const embeddedWallet = wallets.find(wallet => wallet.walletClientType === 'privy')
 
-  return (
-    <div className="auth-component">
+  // Render floating trigger button for all users
+  const FloatingTrigger = () => (
+    <div className="floating-trigger">
+      <DrawerTrigger asChild>
+        <button className="wallet-trigger-btn">
+          <div className="wallet-icon">
+            {authenticated && address ? (
+              <span className="wallet-address">{address.slice(0, 6)}...{address.slice(-4)}</span>
+            ) : (
+              <span className="wallet-placeholder">🪙</span>
+            )}
+          </div>
+          {authenticated && seedPositions.filter(s => s.isReady).length > 0 && (
+            <div className="harvest-indicator">
+              {seedPositions.filter(s => s.isReady).length}
+            </div>
+          )}
+        </button>
+      </DrawerTrigger>
+    </div>
+  )
+
+  const AuthContent = () => (
+    <div className="drawer-auth-content">
       {authenticated && user ? (
         <div className="authenticated">
           <div className="user-info">
@@ -296,9 +327,11 @@ export function Auth() {
             </div>
           )}
 
-          <button onClick={logout} className="logout-btn">
-            🚪 Logout
-          </button>
+          <DrawerClose asChild>
+            <button onClick={logout} className="logout-btn">
+              🚪 Logout
+            </button>
+          </DrawerClose>
         </div>
       ) : (
         <div className="not-authenticated">
@@ -307,9 +340,11 @@ export function Auth() {
             <p>Connect your wallet or create a new one to start farming and earning real DeFi yields!</p>
           </div>
           
-          <button onClick={login} className="login-btn">
-            🎮 Connect & Play
-          </button>
+          <DrawerClose asChild>
+            <button onClick={login} className="login-btn">
+              🎮 Connect & Play
+            </button>
+          </DrawerClose>
           
           <div className="features-list">
             <div className="feature">🌾 Plant virtual seeds</div>
@@ -319,16 +354,112 @@ export function Auth() {
           </div>
         </div>
       )}
+    </div>
+  )
 
+  return (
+    <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+      {/* Floating trigger button */}
+      <FloatingTrigger />
+      
+      {/* Drawer content */}
+      <DrawerContent className="drawer-overlay">
+        <DrawerHeader>
+          <DrawerTitle>🌱 DeFi Valley</DrawerTitle>
+        </DrawerHeader>
+        <div className="drawer-body">
+          <AuthContent />
+        </div>
+      </DrawerContent>
+      
       <style jsx>{`
-        .auth-component {
+        .floating-trigger {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 1000;
+        }
+        
+        .wallet-trigger-btn {
+          position: relative;
           background: rgba(255, 255, 255, 0.95);
-          border-radius: 12px;
-          padding: 24px;
-          margin: 20px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          min-width: 320px;
-          max-width: 400px;
+          border: 2px solid #4CAF50;
+          border-radius: 50px;
+          padding: 12px 16px;
+          cursor: pointer;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-weight: 500;
+          backdrop-filter: blur(10px);
+        }
+        
+        .wallet-trigger-btn:hover {
+          background: rgba(255, 255, 255, 1);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .wallet-address {
+          font-size: 14px;
+          color: #333;
+          font-family: monospace;
+        }
+        
+        .wallet-placeholder {
+          font-size: 18px;
+        }
+        
+        .harvest-indicator {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          background: #ff6b35;
+          color: white;
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: bold;
+          animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        
+        .drawer-auth-content {
+          padding: 0;
+          max-height: 70vh;
+          overflow-y: auto;
+        }
+        
+        :global(.drawer-overlay) {
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(10px);
+          border-radius: 20px 20px 0 0;
+          max-width: 500px;
+          margin: 0 auto;
+        }
+        
+        .drawer-body {
+          padding: 0 20px 20px;
+        }
+        .drawer-auth-content {
+          background: transparent;
+          border-radius: 0;
+          padding: 0;
+          margin: 0;
+          box-shadow: none;
+          min-width: auto;
+          max-width: none;
           font-family: var(--font-geist-sans);
         }
         
@@ -724,6 +855,6 @@ export function Auth() {
           color: #856404;
         }
       `}</style>
-    </div>
+    </Drawer>
   )
 }

@@ -26,6 +26,7 @@ export interface CrossChainTx {
   sagaTxHash?: string;
   arbitrumTxHash?: string;
   axelarTxId?: string;
+  axelarTxHash?: string; // Added for TransactionTracker compatibility
   
   // Timing
   startTime: number;

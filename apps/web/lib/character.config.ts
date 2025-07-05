@@ -27,143 +27,66 @@ export interface CharacterConfiguration {
   };
 }
 
-// Character definitions using the new configuration system
-export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
-  warrior: {
-    key: 'warrior',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 0,
-    },
-  },
-  mage: {
-    key: 'mage',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 1,
-    },
-  },
-  archer: {
-    key: 'archer',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 2,
-    },
-  },
-  rogue: {
-    key: 'rogue',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 3,
-    },
-  },
-  paladin: {
-    key: 'paladin',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 4,
-    },
-  },
-  priest: {
-    key: 'priest',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 5,
-    },
-  },
-  necromancer: {
-    key: 'necromancer',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 6,
-    },
-  },
-  berserker: {
-    key: 'berserker',
-    frameWidth: 32,
-    frameHeight: 32,
-    scale: 1,
-    type: 'spritesheet',
-    spritesheetConfig: {
-      path: '/sprites/RPGCharacterSprites32x32.png',
-      directions: { down: 0, left: 1, right: 2, up: 3 },
-      framesPerCharacter: 4,
-      characterIndex: 7,
-    },
-  },
+// Animation preset configurations for DRY principle
+const ANIMATION_PRESETS = {
   knight: {
-    key: 'knight',
     frameWidth: 120,
     frameHeight: 80,
-    scale: 0.4,
-    type: 'animation_sheets',
-    animationConfig: {
-      animations: {
-        idle: {
-          key: 'knight_idle',
-          path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png',
-          frames: 10,
-          frameRate: 8,
-          repeat: true,
-        },
-        walk: {
-          key: 'knight_run',
-          path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png',
-          frames: 10,
-          frameRate: 12,
-          repeat: true,
-        },
-        run: {
-          key: 'knight_run',
-          path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png',
-          frames: 10,
-          frameRate: 16,
-          repeat: true,
-        },
-      },
+    scale: 0.8,
+    basePath: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets',
+    animations: {
+      idle: { frames: 10, frameRate: 8, file: '_Idle.png' },
+      walk: { frames: 10, frameRate: 12, file: '_Run.png' },
+      run: { frames: 10, frameRate: 16, file: '_Run.png' },
     },
+  },
+  cowboy: {
+    frameWidth: 53,
+    frameHeight: 115,
+    scale: 0.5,
+    basePath: '/sprites/Cowboy',
+    animations: {
+      idle: { frames: 6, frameRate: 4, file: 'Rotation_Cycle_Cowboy.png' },
+      walk: { frames: 12, frameRate: 8, file: 'Walk_Cycle_Cowboy.png' },
+      run: { frames: 12, frameRate: 12, file: 'Walk_Cycle_Cowboy.png' },
+    },
+  },
+} as const;
+
+// Helper function to create animation configuration from presets
+function createAnimationConfig(preset: keyof typeof ANIMATION_PRESETS): CharacterConfiguration['animationConfig'] {
+  const config = ANIMATION_PRESETS[preset];
+  return {
+    animations: Object.entries(config.animations).reduce((acc, [state, anim]) => {
+      acc[state] = {
+        key: `${preset}_${state}`,
+        path: `${config.basePath}/${anim.file}`,
+        frames: anim.frames,
+        frameRate: anim.frameRate,
+        repeat: true,
+      };
+      return acc;
+    }, {} as Record<string, any>),
+  };
+}
+
+// Character definitions using the new configuration system
+export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
+  knight: {
+    key: 'knight',
+    frameWidth: ANIMATION_PRESETS.knight.frameWidth,
+    frameHeight: ANIMATION_PRESETS.knight.frameHeight,
+    scale: ANIMATION_PRESETS.knight.scale,
+    type: 'animation_sheets',
+    animationConfig: createAnimationConfig('knight'),
+  },
+  cowboy: {
+    key: 'cowboy',
+    frameWidth: ANIMATION_PRESETS.cowboy.frameWidth,
+    frameHeight: ANIMATION_PRESETS.cowboy.frameHeight,
+    scale: ANIMATION_PRESETS.cowboy.scale,
+    type: 'animation_sheets',
+    animationConfig: createAnimationConfig('cowboy'),
   },
 };
 
@@ -171,26 +94,19 @@ export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
 export const CharacterConfig = {
   player: {
     key: 'player_characters',
-    path: '/sprites/RPGCharacterSprites32x32.png',
-    frameWidth: 32,
-    frameHeight: 32,
+    path: '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png',
+    frameWidth: 120,
+    frameHeight: 80,
     directions: {
       down: 0,
       left: 1,
       right: 2,
       up: 3,
     },
-    framesPerCharacter: 4,
+    framesPerCharacter: 10,
     characters: {
-      warrior: 0,
-      mage: 1,
-      archer: 2,
-      rogue: 3,
-      paladin: 4,
-      priest: 5,
-      necromancer: 6,
-      berserker: 7,
-      knight: 8, // For backward compatibility
+      knight: 0,
+      cowboy: 1,
     },
   },
   knight: {
@@ -205,6 +121,19 @@ export const CharacterConfig = {
       up: 3,
     },
     framesPerCharacter: 10,
+  },
+  cowboy: {
+    key: 'cowboy_character',
+    path: '/sprites/Cowboy/Rotation_Cycle_Cowboy.png',
+    frameWidth: 53,
+    frameHeight: 115,
+    directions: {
+      down: 0,
+      left: 1,
+      right: 2,
+      up: 3,
+    },
+    framesPerCharacter: 6,
   },
 } as const;
 
@@ -221,4 +150,39 @@ export function getCharacterConfig(character: CharacterType): CharacterConfigura
 // Helper function to check if character supports animations
 export function hasAnimations(character: CharacterType): boolean {
   return getCharacterConfig(character).type === 'animation_sheets';
+}
+
+// Helper function to get all animation states for a character
+export function getAnimationStates(character: CharacterType): string[] {
+  const config = getCharacterConfig(character);
+  if (config.type === 'animation_sheets' && config.animationConfig) {
+    return Object.keys(config.animationConfig.animations);
+  }
+  return [];
+}
+
+// Helper function to get animation key for a character and state
+export function getAnimationKey(character: CharacterType, state: AnimationState): string {
+  const config = getCharacterConfig(character);
+  if (config.type === 'animation_sheets' && config.animationConfig) {
+    const animation = config.animationConfig.animations[state];
+    return animation ? animation.key : `${character}_idle`;
+  }
+  return `${character}_idle`;
+}
+
+// Helper function to add new character easily
+export function addCharacter(
+  name: string,
+  preset: keyof typeof ANIMATION_PRESETS
+): CharacterConfiguration {
+  const presetConfig = ANIMATION_PRESETS[preset];
+  return {
+    key: name,
+    frameWidth: presetConfig.frameWidth,
+    frameHeight: presetConfig.frameHeight,
+    scale: presetConfig.scale,
+    type: 'animation_sheets',
+    animationConfig: createAnimationConfig(preset),
+  };
 }

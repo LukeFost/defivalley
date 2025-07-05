@@ -40,14 +40,60 @@ class MainScene extends Phaser.Scene {
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
-  private lastDirection: string = 'down'; // Track player direction for sprite animation
-  private cliffTiles: Phaser.GameObjects.Image[] = []; // Store cliff tiles for collision detection
-  private terrainLayout: string[][] = []; // Store terrain layout for collision detection
-  private debugMode: boolean = false; // Toggle for debug visualization
-  private cropSystem!: CropSystem; // Crop management system
+  private lastDirection: string = 'down';
+  private cliffTiles: Phaser.GameObjects.Image[] = [];
+  private terrainLayout: string[][] = [];
+  private debugMode: boolean = false;
+  private cropSystem!: CropSystem;
+  
+  // Camera system properties
+  private worldWidth: number = 1600; // Will be updated based on map size
+  private worldHeight: number = 1200; // Will be updated based on map size
+  private cameraLerpFactor: number = 0.1; // Smooth camera following
+  
+  // Simple background approach with invisible walls
+  private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
+  
+  // Legacy tilemap properties (kept for backward compatibility)
+  private mapLayout: string[][] = [];
+  private collisionMap: boolean[][] = [];
 
   constructor() {
     super({ key: 'MainScene' });
+    // Collision map will be initialized after terrain generation
+  }
+  
+  private initializeCollisionMap() {
+    // Initialize collision map based on dynamically generated tile types
+    if (this.mapLayout.length === 0) {
+      console.log('🗺️ Map layout not generated yet, skipping collision initialization');
+      return;
+    }
+    
+    for (let y = 0; y < this.mapLayout.length; y++) {
+      this.collisionMap[y] = [];
+      for (let x = 0; x < this.mapLayout[y].length; x++) {
+        const tileType = this.mapLayout[y][x];
+        // Set collision based on tile type
+        this.collisionMap[y][x] = this.isTileSolid(tileType);
+      }
+    }
+    
+    // Update world size based on map dimensions
+    const tileSize = 32; // Standard tile size
+    this.worldWidth = this.mapLayout[0].length * tileSize;
+    this.worldHeight = this.mapLayout.length * tileSize;
+    
+    console.log(`🗺️ Collision map initialized: ${this.mapLayout[0].length}x${this.mapLayout.length} tiles, World: ${this.worldWidth}x${this.worldHeight}`);
+  }
+  
+  private isTileSolid(tileType: string): boolean {
+    // Define which tiles are solid (impassable)
+    const solidTiles = [
+      'cliff_tall_1', 'cliff_tall_2', 'cliff_thin', 'cliff_round', 
+      'cliff_large', 'cliff_small', 'rocks_brown', 'rocks_dark'
+    ];
+    return solidTiles.includes(tileType);
   }
 
   init(data: { chatCallback?: (message: ChatMessage) => void }) {
@@ -55,21 +101,35 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load the character sprite sheet
+    // Add load event listeners for debugging
+    this.load.on('filecomplete', (key: string, type: string, data: any) => {
+      console.log(`✅ Loaded ${type}: ${key}`);
+    });
+    
+    this.load.on('loaderror', (file: any) => {
+      console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
+    });
+    
+    // Load the legacy character sprite sheet for backward compatibility
+    console.log(`🔄 Loading legacy character sprite: ${CharacterConfig.player.key} from ${CharacterConfig.player.path}`);
     this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
     });
     
-    // Load knight animation sheets
-    this.load.spritesheet('knight_idle', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png', {
-      frameWidth: 120,
-      frameHeight: 80
-    });
-    
-    this.load.spritesheet('knight_run', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png', {
-      frameWidth: 120,
-      frameHeight: 80
+    // Load all character animation sheets dynamically from CharacterDefinitions
+    console.log(`🔄 Loading character definitions...`);
+    Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {
+      if (character.type === 'animation_sheets' && character.animationConfig) {
+        console.log(`🔄 Loading animations for ${characterName}:`);
+        Object.entries(character.animationConfig.animations).forEach(([animName, animation]) => {
+          console.log(`  - ${animName}: ${animation.key} from ${animation.path}`);
+          this.load.spritesheet(animation.key, animation.path, {
+            frameWidth: character.frameWidth,
+            frameHeight: character.frameHeight
+          });
+        });
+      }
     });
     
     // Load the tileset for world decoration
@@ -81,6 +141,12 @@ class MainScene extends Phaser.Scene {
   }
 
   async create() {
+    // Log all loaded textures for debugging
+    console.log('🎮 Scene created! Available textures:', Object.keys(this.textures.list));
+    
+    // Setup camera system first
+    this.setupCameraSystem();
+    
     // Create a beautiful farming world background
     this.createFarmingWorld();
     
@@ -104,6 +170,23 @@ class MainScene extends Phaser.Scene {
     this.time.delayedCall(100, () => {
       this.connectToServer();
     });
+  }
+
+  setupCameraSystem() {
+    // Set world bounds for the camera
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    
+    // Enable smooth camera following
+    this.cameras.main.setLerp(this.cameraLerpFactor);
+    
+    console.log(`📷 Camera system initialized - World: ${this.worldWidth}x${this.worldHeight}, Lerp: ${this.cameraLerpFactor}`);
+  }
+
+  updateCameraFollow() {
+    // Follow the current player smoothly
+    if (this.currentPlayer) {
+      this.cameras.main.startFollow(this.currentPlayer, true, this.cameraLerpFactor, this.cameraLerpFactor);
+    }
   }
 
   createCharacterAnimations() {
@@ -204,6 +287,192 @@ class MainScene extends Phaser.Scene {
         }
       };
       
+      (window as any).togglePhysicsDebug = () => {
+        const currentDebug = this.physics.world.debugGraphic;
+        if (currentDebug) {
+          this.physics.world.debugGraphic.clear();
+          this.physics.world.debugGraphic = null;
+          console.log('🔧 Physics debug: OFF');
+        } else {
+          this.physics.world.createDebugGraphic();
+          console.log('🔧 Physics debug: ON - You can now see bounding boxes');
+        }
+      };
+      
+      (window as any).debugCharacters = () => {
+        console.log('🎭 Character Debugging Information:');
+        console.log('Available textures:', Object.keys(this.textures.list));
+        console.log('Character definitions:', CharacterDefinitions);
+        
+        // Check each character's assets
+        Object.entries(CharacterDefinitions).forEach(([name, config]) => {
+          console.log(`\n${name.toUpperCase()} Character:`);
+          console.log('  Config:', config);
+          
+          if (config.type === 'animation_sheets' && config.animationConfig) {
+            Object.entries(config.animationConfig.animations).forEach(([animName, anim]) => {
+              const exists = this.textures.exists(anim.key);
+              console.log(`  ${animName} (${anim.key}): ${exists ? '✅ LOADED' : '❌ MISSING'}`);
+              if (!exists) {
+                console.log(`    Expected path: ${anim.path}`);
+              }
+            });
+          }
+        });
+        
+        // Current player info
+        if (this.currentPlayer) {
+          const playerInfo = this.currentPlayer.getPlayerInfo();
+          console.log(`\nCurrent player character: ${playerInfo.character}`);
+          // Access private sprite property for debugging
+          const sprite = (this.currentPlayer as any).sprite;
+          console.log('Player sprite texture:', sprite?.texture?.key || 'NONE');
+        }
+      };
+
+      // Advanced tilemap debugging
+      (window as any).debugTilemap = () => {
+        console.log('🗺️ === TILEMAP DEBUG INFO ===');
+        
+        // Check tileset texture
+        const tilesetTexture = this.textures.get('cliffs_grass_tileset');
+        console.log('Tileset texture:', tilesetTexture);
+        console.log('Tileset dimensions:', tilesetTexture.source[0]?.width || 'UNKNOWN', 'x', tilesetTexture.source[0]?.height || 'UNKNOWN');
+        
+        // Check tile configuration
+        console.log('\nTile configurations:');
+        Object.entries(TilesetConfig.tiles).forEach(([name, config]) => {
+          const isValid = config.x >= 0 && config.y >= 0 && 
+                         config.x + config.width <= (tilesetTexture.source[0]?.width || 0) &&
+                         config.y + config.height <= (tilesetTexture.source[0]?.height || 0);
+          console.log(`  ${name}: ${isValid ? '✅' : '❌'} {x:${config.x}, y:${config.y}, w:${config.width}, h:${config.height}}`);
+        });
+        
+        // Check rendered tiles
+        console.log('\nRendered tiles in scene:');
+        const tileObjects = this.children.list.filter(child => child.getData && child.getData('tileType'));
+        console.log(`Total tile objects: ${tileObjects.length}`);
+        
+        if (tileObjects.length > 0) {
+          const firstTile = tileObjects[0] as Phaser.GameObjects.Image;
+          console.log('First tile:', {
+            position: { x: firstTile.x, y: firstTile.y },
+            displaySize: { width: firstTile.displayWidth, height: firstTile.displayHeight },
+            depth: firstTile.depth,
+            visible: firstTile.visible,
+            alpha: firstTile.alpha,
+            tileType: firstTile.getData('tileType')
+          });
+        }
+        
+        // Camera information
+        console.log('\nCamera info:');
+        console.log(`Camera scroll: (${this.cameras.main.scrollX}, ${this.cameras.main.scrollY})`);
+        console.log(`Camera bounds: ${this.cameras.main.getBounds()}`);
+        console.log(`World bounds: ${this.worldWidth}x${this.worldHeight}`);
+      };
+
+      (window as any).testTileVisibility = () => {
+        console.log('🧪 Testing tile visibility...');
+        
+        // Remove existing test tiles
+        this.children.list.filter(child => child.getData && child.getData('testTile')).forEach(tile => tile.destroy());
+        
+        // Create simple colored test tiles
+        const testTile1 = this.add.rectangle(100, 100, 32, 32, 0xff0000);
+        testTile1.setData('testTile', true);
+        testTile1.setDepth(10);
+        console.log('Created red test tile at (100, 100)');
+        
+        const testTile2 = this.add.rectangle(200, 100, 32, 32, 0x00ff00);
+        testTile2.setData('testTile', true);
+        testTile2.setDepth(10);
+        console.log('Created green test tile at (200, 100)');
+        
+        // Test tileset texture rendering
+        if (this.textures.exists('cliffs_grass_tileset')) {
+          const testTilesetRender = this.add.image(300, 100, 'cliffs_grass_tileset');
+          testTilesetRender.setData('testTile', true);
+          testTilesetRender.setDepth(10);
+          testTilesetRender.setDisplaySize(64, 64);
+          console.log('Created raw tileset test image at (300, 100)');
+          
+          // Test with crop
+          const testCroppedTile = this.add.image(400, 100, 'cliffs_grass_tileset');
+          testCroppedTile.setData('testTile', true);
+          testCroppedTile.setDepth(10);
+          testCroppedTile.setDisplaySize(32, 32);
+          testCroppedTile.setCrop(96, 80, 32, 32); // grass_main coordinates
+          console.log('Created cropped grass tile test at (400, 100)');
+        }
+        
+        console.log('✅ Test tiles created. Check the game for red, green, raw tileset, and cropped grass tiles.');
+      };
+      
+      (window as any).debugTilemap = () => {
+        console.log('🗺️ Tilemap Debugging Information:');
+        
+        // Check tileset texture
+        const texture = this.textures.get('cliffs_grass_tileset');
+        console.log('Tileset texture:', texture);
+        console.log('Tileset dimensions:', texture.source[0].width, 'x', texture.source[0].height);
+        
+        // Check rendered tiles
+        const tiles = this.children.list.filter(child => child.getData && child.getData('tileType'));
+        console.log('Total rendered tiles:', tiles.length);
+        console.log('Visible tiles:', tiles.filter(t => t.visible).length);
+        console.log('Tiles with alpha > 0:', tiles.filter(t => t.alpha > 0).length);
+        
+        // Sample tile details
+        if (tiles.length > 0) {
+          const sampleTile = tiles[0];
+          console.log('\nSample tile details:');
+          console.log('  Position:', sampleTile.x, sampleTile.y);
+          console.log('  Texture:', sampleTile.texture.key);
+          console.log('  Crop frame:', sampleTile.frame.cutX, sampleTile.frame.cutY, sampleTile.frame.cutWidth, sampleTile.frame.cutHeight);
+          console.log('  Display size:', sampleTile.displayWidth, sampleTile.displayHeight);
+          console.log('  Visible:', sampleTile.visible);
+          console.log('  Alpha:', sampleTile.alpha);
+          console.log('  Depth:', sampleTile.depth);
+          console.log('  Tint:', sampleTile.tintTopLeft);
+        }
+        
+        // Check camera
+        const camera = this.cameras.main;
+        console.log('\nCamera details:');
+        console.log('  Position:', camera.x, camera.y);
+        console.log('  Scroll:', camera.scrollX, camera.scrollY);
+        console.log('  Zoom:', camera.zoom);
+        console.log('  World view:', camera.worldView);
+        
+        // Check if tiles are in camera view
+        const tilesInView = tiles.filter(tile => {
+          const bounds = tile.getBounds();
+          return camera.worldView.contains(bounds.x, bounds.y) || 
+                 camera.worldView.intersects(bounds);
+        });
+        console.log('  Tiles in camera view:', tilesInView.length);
+      };
+      
+      (window as any).testTileVisibility = () => {
+        console.log('🔍 Testing tile visibility...');
+        
+        // Create a test tile without cropping
+        const testTile1 = this.add.image(400, 300, 'cliffs_grass_tileset');
+        testTile1.setDisplaySize(64, 64);
+        testTile1.setDepth(1000);
+        testTile1.setTint(0xff0000); // Red tint for visibility
+        console.log('Created uncropped test tile at center (should be red)');
+        
+        // Create a test tile with a simple crop
+        const testTile2 = this.add.image(500, 300, 'cliffs_grass_tileset');
+        testTile2.setDisplaySize(64, 64);
+        testTile2.setDepth(1000);
+        testTile2.setCrop(0, 0, 32, 32); // Crop top-left 32x32
+        testTile2.setTint(0x00ff00); // Green tint for visibility
+        console.log('Created cropped test tile at center-right (should be green)');
+      };
+      
       console.log('🛠️ Dev tools available:');
       console.log('  - resetMyCharacter(): Reset character selection');
       console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
@@ -212,6 +481,10 @@ class MainScene extends Phaser.Scene {
       console.log('  - createIsland(x, y, radius): Create cliff island');
       console.log('  - validateTerrain(): Check terrain for issues');
       console.log('  - exportTerrain(): Export terrain to JSON');
+      console.log('  - debugCharacters(): Debug character loading issues');
+      console.log('  🔍 TILEMAP DEBUGGING:');
+      console.log('  - debugTilemap(): Complete tilemap diagnostic');
+      console.log('  - testTileVisibility(): Test basic tile rendering');
     }
   }
   
@@ -291,14 +564,10 @@ class MainScene extends Phaser.Scene {
   }
 
   createFarmingWorld() {
-    // Create clean, minimal background
-    const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+    // Use simple farm background with invisible walls (fast hackathon approach)
+    this.createSimpleFarmBackground();
     
-    // Create tilemap-based terrain (replaces the simple ground rectangle)
-    this.createTilemapTerrain();
-    
-    // Add minimal visual structure without clutter
-    this.createMinimalStructure();
+    // No additional overlays needed - simple and fast!
   }
 
   createMinimalStructure() {
@@ -307,109 +576,353 @@ class MainScene extends Phaser.Scene {
     gridGraphics.lineStyle(1, 0x90EE90, 0.2);
     
     // Add subtle grid lines for spatial reference
-    for (let i = 0; i < 800; i += 100) {
+    for (let i = 0; i < 1600; i += 100) {
       gridGraphics.moveTo(i, 0);
-      gridGraphics.lineTo(i, 600);
+      gridGraphics.lineTo(i, 900);
     }
-    for (let j = 0; j < 600; j += 100) {
+    for (let j = 0; j < 900; j += 100) {
       gridGraphics.moveTo(0, j);
-      gridGraphics.lineTo(800, j);
+      gridGraphics.lineTo(1600, j);
     }
     gridGraphics.strokePath();
   }
 
-  createTilemapTerrain() {
-    // Create a tilemap with natural terrain using the LPC cliffs grass tileset
-    const tileSize = TilesetConfig.image.tileSize;
-    const mapWidth = Math.ceil(800 / tileSize); // 25 tiles
-    const mapHeight = Math.ceil(600 / tileSize); // 19 tiles
+  createSimpleFarmBackground() {
+    console.log(`🚜 Creating simple farm background with invisible walls (fast hackathon approach)`);
     
-    // Generate natural terrain layout
-    this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
+    // Set world dimensions for a farm area
+    this.worldWidth = 1600;
+    this.worldHeight = 1200;
     
-    // Create tiles based on the terrain layout
-    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    // Create simple farm background using graphics
+    this.createFarmBackgroundGraphics();
     
-    // Add decorative elements
-    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+    // Create invisible collision walls for farm boundaries and obstacles
+    this.createInvisibleWalls();
+    
+    console.log(`✅ Simple farm world created: ${this.worldWidth}x${this.worldHeight} with invisible walls`);
+  }
+  
+  createFarmBackgroundGraphics() {
+    // Create ultra-simple grass background
+    const grassBackground = this.add.graphics();
+    grassBackground.setDepth(-10); // Behind everything
+    
+    // Simple grass field (nice green)
+    grassBackground.fillStyle(0x4A7C59, 1); // Forest green
+    grassBackground.fillRect(0, 0, this.worldWidth, this.worldHeight);
+    
+    // Add minimal texture with subtle darker green patches
+    grassBackground.fillStyle(0x355E3B, 0.2); // Very subtle darker green
+    for (let i = 0; i < 20; i++) {
+      const x = Math.random() * this.worldWidth;
+      const y = Math.random() * this.worldHeight;
+      const size = 30 + Math.random() * 60;
+      grassBackground.fillCircle(x, y, size);
+    }
+    
+    console.log(`✅ Simple grass background created`);
+  }
+  
+  createInvisibleWalls() {
+    console.log(`🚧 Creating simple border walls`);
+    
+    // Create static physics group for invisible walls
+    const walls = this.physics.add.staticGroup();
+    
+    // Just basic border walls to keep players in bounds
+    const wallThickness = 32;
+    
+    // Top wall
+    const topWall = this.add.rectangle(this.worldWidth / 2, -wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    this.physics.add.existing(topWall, true);
+    walls.add(topWall);
+    
+    // Bottom wall  
+    const bottomWall = this.add.rectangle(this.worldWidth / 2, this.worldHeight + wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    this.physics.add.existing(bottomWall, true);
+    walls.add(bottomWall);
+    
+    // Left wall
+    const leftWall = this.add.rectangle(-wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    this.physics.add.existing(leftWall, true);
+    walls.add(leftWall);
+    
+    // Right wall
+    const rightWall = this.add.rectangle(this.worldWidth + wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    this.physics.add.existing(rightWall, true);
+    walls.add(rightWall);
+    
+    // Store wall group for player collision detection
+    this.invisibleWalls = walls;
+    
+    console.log(`✅ Created ${walls.children.size} simple border walls`);
+  }
+  
+  private setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
+    // Set collision for specific tile indices that represent solid objects
+    const solidTileIndices: number[] = [];
+    
+    // Get indices for all solid tile types
+    Object.entries(TilesetConfig.tiles).forEach(([tileName, config]) => {
+      if (config.collision && config.index !== undefined) {
+        solidTileIndices.push(config.index);
+      }
+    });
+    
+    if (solidTileIndices.length > 0) {
+      layer.setCollision(solidTileIndices);
+      console.log(`🛡️ Set collision for ${solidTileIndices.length} solid tile types:`, solidTileIndices);
+    }
   }
 
-  createTilesFromLayout(tileSize: number, mapWidth: number, mapHeight: number) {
-    // Create tiles based on the generated terrain layout
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        const tileType = this.terrainLayout[y][x];
-        const tileConfig = TilesetConfig.tiles[tileType];
-        
-        if (tileConfig) {
-          const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
-          
-          const tile = this.add.image(worldPos.x, worldPos.y, 'cliffs_grass_tileset');
-          tile.setOrigin(0.5, 0.5);
-          tile.setDisplaySize(tileSize, tileSize);
-          
-          // Apply tile-specific styling
-          this.applyTileStyle(tile, tileType);
-          
-          // Store collision tiles
-          if (tileConfig.collision) {
-            this.cliffTiles.push(tile);
-          }
-          
-          // Add tile data for debugging
-          tile.setData('tileType', tileType);
-          tile.setData('tilePos', { x, y });
+  // Painter Functions for Procedural World Generation
+
+  private createBaseLayer(baseTile: string, width: number, height: number): string[][] {
+    console.log(`🎨 Creating ${width}x${height} base layer with natural variation`);
+    
+    const layout: string[][] = [];
+    
+    // Create a foundation of variety - 80% main grass, 20% variant grass
+    for (let y = 0; y < height; y++) {
+      layout[y] = [];
+      for (let x = 0; x < width; x++) {
+        if (Math.random() > 0.8) {
+          // 20% chance: Use grass variants for natural variation
+          const variants = ['grass_pure', 'grass_with_cliff_base'];
+          layout[y][x] = variants[Math.floor(Math.random() * variants.length)];
+        } else {
+          // 80% chance: Use main grass tile
+          layout[y][x] = baseTile;
         }
       }
     }
+    
+    console.log(`✅ Base layer created with 80/20 grass variation`);
+    return layout;
   }
 
-  applyTileStyle(tile: Phaser.GameObjects.Image, tileType: string) {
-    // Apply visual styling based on tile type
-    switch (tileType) {
-      case 'cliff_top':
-        tile.setTint(0x8B4513); // Brown for cliff tops
-        tile.setAlpha(0.8);
-        break;
-      case 'cliff_face':
-        tile.setTint(0x654321); // Darker brown for cliff faces
-        tile.setAlpha(0.9);
-        break;
-      case 'cliff_corner':
-        tile.setTint(0x5D4037); // Corner cliff coloring
-        tile.setAlpha(0.85);
-        break;
-      case 'cliff_large':
-        tile.setTint(0x8B4513); // Brown for large cliff formations
-        tile.setAlpha(0.7);
-        break;
-      case 'grass_full':
-        tile.setTint(0x90EE90); // Green for grass
-        tile.setAlpha(0.3);
-        break;
-      case 'grass_sparse':
-        tile.setTint(0x228B22); // Darker green for sparse grass
-        tile.setAlpha(0.4);
-        break;
-      case 'cliff_grass_transition':
-      case 'grass_cliff_transition':
-        tile.setTint(0x6B8E23); // Olive green for transitions
-        tile.setAlpha(0.5);
-        // Add gentle animation to transition tiles
-        this.tweens.add({
-          targets: tile,
-          alpha: 0.3,
-          duration: 3000 + Math.random() * 2000,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-        break;
-      default:
-        tile.setTint(0xFFFFFF); // Default white tint
-        tile.setAlpha(0.5);
+  private paintBorders(layout: string[][]) {
+    const height = layout.length;
+    const width = layout[0].length;
+    
+    console.log(`🎨 Painting cliff borders`);
+    
+    // Paint top and bottom borders with cliffs
+    for (let x = 0; x < width; x++) {
+      layout[0][x] = x % 2 === 0 ? 'cliff_tall_1' : 'cliff_tall_2'; // Top border - alternating cliffs
+      layout[height - 1][x] = 'cliff_small'; // Bottom border - smaller cliffs
     }
+    
+    // Paint left and right borders with cliff transitions
+    for (let y = 1; y < height - 1; y++) {
+      layout[y][0] = 'grass_cliff_left'; // Left border - grass with cliff edge
+      layout[y][width - 1] = 'grass_cliff_right'; // Right border - grass with cliff edge
+    }
+    
+    // Paint corner cliffs for structural integrity
+    layout[0][0] = 'cliff_large';
+    layout[0][width - 1] = 'cliff_large';
+    layout[height - 1][0] = 'cliff_round';
+    layout[height - 1][width - 1] = 'cliff_round';
   }
+
+  private paintRectangularPlateau(layout: string[][], x: number, y: number, width: number, height: number) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Painting intelligent ${width}x${height} plateau at (${x}, ${y}) with proper borders`);
+    
+    // Ensure plateau fits within map bounds
+    const endX = Math.min(x + width, mapWidth);
+    const endY = Math.min(y + height, mapHeight);
+    
+    // STEP 1: Border First - Trace the outline with correct cliff tiles
+    for (let py = y; py < endY; py++) {
+      for (let px = x; px < endX; px++) {
+        const isTopEdge = (py === y);
+        const isBottomEdge = (py === endY - 1);
+        const isLeftEdge = (px === x);
+        const isRightEdge = (px === endX - 1);
+        const isCorner = (isTopEdge || isBottomEdge) && (isLeftEdge || isRightEdge);
+        const isEdge = isTopEdge || isBottomEdge || isLeftEdge || isRightEdge;
+        
+        if (isEdge) {
+          if (isCorner) {
+            // Corners get large cliff formations
+            layout[py][px] = 'cliff_large';
+          } else if (isBottomEdge) {
+            // Bottom edge: cliff face tiles
+            layout[py][px] = 'cliff_tall_1';
+          } else if (isTopEdge) {
+            // Top edge: grass-to-cliff-top transition
+            layout[py][px] = 'grass_cliff_bottom';
+          } else {
+            // Side edges: vertical cliff sides
+            layout[py][px] = isLeftEdge ? 'cliff_tall_2' : 'cliff_thin';
+          }
+        }
+      }
+    }
+    
+    // STEP 2: Fill Second - Fill the interior with different ground texture
+    for (let py = y + 1; py < endY - 1; py++) {
+      for (let px = x + 1; px < endX - 1; px++) {
+        // Interior filled with dirt/elevated ground texture
+        layout[py][px] = 'grass_with_cliff_base'; // Acts as "dirt_ground" equivalent
+      }
+    }
+    
+    console.log(`✅ Plateau painted with intelligent borders and interior fill`);
+  }
+
+  private paintCircularLake(layout: string[][], centerX: number, centerY: number, radius: number) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Painting natural circular lake at (${centerX}, ${centerY}) with radius ${radius} and proper transitions`);
+    
+    // STEP 1: Fill the inside of the circle with water tiles
+    // STEP 2: Trace the edge with grass-to-water transition tiles
+    
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        
+        if (distance <= radius - 1) {
+          // Inner water area - use pure grass as "water" (since we don't have water tiles)
+          // In a real implementation, this would be 'water_deep' or similar
+          layout[y][x] = 'grass_pure';
+        }
+        else if (distance <= radius) {
+          // Water edge - slightly different water
+          layout[y][x] = 'grass_pure';
+        }
+        else if (distance <= radius + 1.5) {
+          // Lake shore transitions - create natural grass-to-water edges
+          // Use different transition tiles based on position relative to center
+          const angle = Math.atan2(y - centerY, x - centerX);
+          const normalizedAngle = ((angle + Math.PI) / (2 * Math.PI)) * 4; // 0-4 range
+          
+          if (normalizedAngle < 1) {
+            layout[y][x] = 'grass_cliff_left'; // Left shore
+          } else if (normalizedAngle < 2) {
+            layout[y][x] = 'grass_cliff_bottom'; // Bottom shore
+          } else if (normalizedAngle < 3) {
+            layout[y][x] = 'grass_cliff_right'; // Right shore  
+          } else {
+            layout[y][x] = 'grass_cliff_bottom'; // Top shore
+          }
+        }
+        // Else: leave existing tile (no modification beyond transition zone)
+      }
+    }
+    
+    console.log(`✅ Natural lake painted with water fill and directional shore transitions`);
+  }
+
+  private paintPath(layout: string[][], points: Array<{x: number, y: number}>) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Painting path connecting ${points.length} points`);
+    
+    // Connect each point to the next
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      
+      // Use Bresenham-like algorithm to connect points
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+      const sx = start.x < end.x ? 1 : -1;
+      const sy = start.y < end.y ? 1 : -1;
+      let err = dx - dy;
+      
+      let x = start.x;
+      let y = start.y;
+      
+      while (true) {
+        // Place path tile if within bounds and on grass
+        if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
+          const currentTile = layout[y][x];
+          if (currentTile.includes('grass')) {
+            layout[y][x] = 'sticks'; // Use sticks as "path_pebbles" equivalent
+          }
+        }
+        
+        if (x === end.x && y === end.y) break;
+        
+        const e2 = 2 * err;
+        if (e2 > -dy) {
+          err -= dy;
+          x += sx;
+        }
+        if (e2 < dx) {
+          err += dx;
+          y += sy;
+        }
+      }
+    }
+    
+    console.log(`✅ Path painted connecting all points`);
+  }
+
+  private scatterDecorations(layout: string[][]) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Scattering organic decorations across the world`);
+    
+    let decorationsPlaced = 0;
+    
+    // Loop through the entire map and add decorations with small probability
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const currentTile = layout[y][x];
+        
+        // Only place decorations on grass tiles
+        if (currentTile === 'grass_main' || currentTile === 'grass_pure') {
+          if (Math.random() < 0.02) { // 2% chance for decoration
+            const decorations = ['rocks_brown', 'rocks_dark', 'ladder'];
+            const decoration = decorations[Math.floor(Math.random() * decorations.length)];
+            layout[y][x] = decoration;
+            decorationsPlaced++;
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ Scattered ${decorationsPlaced} organic decorations`);
+  }
+
+  private paintScatteredFeatures(layout: string[][]) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Adding scattered features with improved algorithms`);
+    
+    // Add a few small cliff outcrops for visual interest
+    for (let i = 0; i < 5; i++) {
+      const x = Math.floor(Math.random() * (mapWidth - 6)) + 3;
+      const y = Math.floor(Math.random() * (mapHeight - 6)) + 3;
+      
+      // Create small 2x2 cliff formations only on suitable terrain
+      if (layout[y][x] === 'grass_main' && 
+          layout[y][x + 1] === 'grass_main' &&
+          layout[y + 1][x] === 'grass_main' &&
+          layout[y + 1][x + 1] === 'grass_main') {
+        layout[y][x] = 'cliff_round';
+        layout[y][x + 1] = 'cliff_small';
+        layout[y + 1][x] = 'grass_cliff_bottom';
+        layout[y + 1][x + 1] = 'grass_cliff_bottom';
+      }
+    }
+    
+    console.log(`✅ Scattered features added with improved placement logic`);
+  }
+
+  // Old manual rendering methods removed - now using proper Phaser Tilemap system
 
   addTerrainDecorations(tileSize: number, mapWidth: number, mapHeight: number) {
     // Add decorative elements based on terrain layout
@@ -497,46 +1010,59 @@ class MainScene extends Phaser.Scene {
   }
 
 
-  // Enhanced collision detection using terrain layout
-  checkCliffCollision(x: number, y: number): boolean {
-    const playerRadius = 16; // Approximate player collision radius
-    const tileSize = TilesetConfig.image.tileSize;
+  // Enhanced tile-based collision detection using Phaser Tilemap system
+  checkTileCollision(worldX: number, worldY: number): boolean {
+    const tilemapLayer = (this as any).tilemapLayer as Phaser.Tilemaps.TilemapLayer;
     
-    // Convert world coordinates to tile coordinates
-    const tilePos = TilemapUtils.worldToTile(x, y, tileSize);
+    if (!tilemapLayer) {
+      // Fallback to old collision system if tilemap layer not available
+      // Check if mapLayout is properly initialized
+      if (this.mapLayout.length === 0 || !this.mapLayout[0]) {
+        return false; // No collision if map not initialized
+      }
+      
+      const tileSize = 32;
+      const tileX = Math.floor(worldX / tileSize);
+      const tileY = Math.floor(worldY / tileSize);
+      
+      if (tileX < 0 || tileX >= this.mapLayout[0].length || 
+          tileY < 0 || tileY >= this.mapLayout.length) {
+        return true;
+      }
+      
+      return this.collisionMap[tileY][tileX];
+    }
     
-    // Check collision in a 3x3 area around the player
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const checkX = tilePos.x + dx;
-        const checkY = tilePos.y + dy;
-        
-        // Check bounds
-        if (checkX >= 0 && checkX < this.terrainLayout[0].length && 
-            checkY >= 0 && checkY < this.terrainLayout.length) {
-          
-          const tileType = this.terrainLayout[checkY][checkX];
-          
-          // Check if tile has collision
-          if (TilemapUtils.hasCollision(tileType)) {
-            const tileWorldPos = TilemapUtils.tileToWorld(checkX, checkY, tileSize);
-            const tileRadius = tileSize / 2;
-            
-            // Calculate distance between player and tile center
-            const distance = Math.sqrt(
-              Math.pow(x - tileWorldPos.x, 2) + Math.pow(y - tileWorldPos.y, 2)
-            );
-            
-            // Check if player would collide with tile
-            if (distance < (playerRadius + tileRadius)) {
-              return true;
-            }
-          }
-        }
+    // Use Phaser's built-in tilemap collision checking
+    const tile = tilemapLayer.getTileAtWorldXY(worldX, worldY);
+    return tile ? tile.collides : false;
+  }
+  
+  // Enhanced collision detection that checks player boundaries
+  checkPlayerCollision(centerX: number, centerY: number): boolean {
+    const playerSize = 16; // Half the player's collision box size
+    
+    // Check all four corners of the player's collision box
+    const corners = [
+      { x: centerX - playerSize, y: centerY - playerSize }, // Top-left
+      { x: centerX + playerSize, y: centerY - playerSize }, // Top-right
+      { x: centerX - playerSize, y: centerY + playerSize }, // Bottom-left
+      { x: centerX + playerSize, y: centerY + playerSize }  // Bottom-right
+    ];
+    
+    // If any corner is in a solid tile, collision detected
+    for (const corner of corners) {
+      if (this.checkTileCollision(corner.x, corner.y)) {
+        return true;
       }
     }
     
     return false;
+  }
+  
+  // Legacy method for backward compatibility
+  checkCliffCollision(x: number, y: number): boolean {
+    return this.checkPlayerCollision(x, y);
   }
 
   createUI() {
@@ -546,6 +1072,7 @@ class MainScene extends Phaser.Scene {
     // Simple controls info at bottom
     const controlsBg = this.add.rectangle(120, 580, 220, 30, 0x000000, 0.6);
     controlsBg.setStrokeStyle(1, 0x90EE90, 0.3);
+    controlsBg.setScrollFactor(0); // Pin to camera
     
     const controls = this.add.text(120, 580, '🎮 WASD: Move  💬 Enter: Chat', {
       fontSize: '12px',
@@ -553,6 +1080,7 @@ class MainScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif'
     });
     controls.setOrigin(0.5);
+    controls.setScrollFactor(0); // Pin to camera
   }
 
   async connectToServer() {
@@ -663,6 +1191,13 @@ class MainScene extends Phaser.Scene {
         return;
       }
       
+      // Force current player to spawn at center of screen
+      if (isCurrentPlayer) {
+        player.x = 400; // Center X (800/2)
+        player.y = 300; // Center Y (600/2)
+        console.log('🎯 Current player spawned at center:', player.x, player.y);
+      }
+      
       // Determine character type - check global selection first, then fall back to player-specific
       let characterType: CharacterType;
       
@@ -731,6 +1266,9 @@ class MainScene extends Phaser.Scene {
       
       if (isCurrentPlayer) {
         this.currentPlayer = playerObject;
+        // Start camera following the current player
+        this.updateCameraFollow();
+        console.log('📷 Camera now following current player');
       }
       
       console.log('Added player:', sessionId, player.name, 'with character:', characterType);
@@ -799,16 +1337,16 @@ class MainScene extends Phaser.Scene {
     // Handle input with directional sprite changes and collision detection
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       const potentialX = Math.max(20, newX - speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(potentialX, newY)) {
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         this.lastDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      const potentialX = Math.min(780, newX + speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(potentialX, newY)) {
+      const potentialX = Math.min(this.worldWidth - 20, newX + speed);
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         this.lastDirection = 'right';
@@ -817,16 +1355,16 @@ class MainScene extends Phaser.Scene {
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       const potentialY = Math.max(20, newY - speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(newX, potentialY)) {
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         this.lastDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      const potentialY = Math.min(580, newY + speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(newX, potentialY)) {
+      const potentialY = Math.min(this.worldHeight - 20, newY + speed);
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         this.lastDirection = 'down';
@@ -841,6 +1379,8 @@ class MainScene extends Phaser.Scene {
     // Send movement to server
     if (moved) {
       this.room.send('move', { x: newX, y: newY });
+      // Update camera to follow player
+      this.updateCameraFollow();
     }
   }
 
@@ -928,15 +1468,16 @@ function Game() {
   useEffect(() => {
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 800,
-      height: 600,
+      width: 1600,
+      height: 900,
       parent: 'game-container',
       backgroundColor: '#87CEEB',
       scene: MainScene,
       physics: {
         default: 'arcade',
         arcade: {
-          gravity: { y: 0, x: 0 }
+          gravity: { y: 0, x: 0 },
+          debug: false // Set to true to see bounding boxes
         }
       }
     };

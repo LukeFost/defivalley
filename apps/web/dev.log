@@ -140,3 +140,226 @@ https://nextjs.org/docs/messages/module-not-found
 Import trace for requested module:
 ./components/Game.tsx
 ./components/GameWrapper.tsx
+ ✓ Compiled in 1277ms (5716 modules)
+ ✓ Compiled in 374ms (5698 modules)
+ ✓ Compiled in 1092ms (5698 modules)
+ ✓ Compiled in 335ms (5698 modules)
+ ✓ Compiled in 399ms (5698 modules)
+ ✓ Compiled in 379ms (5698 modules)
+ ✓ Compiled in 416ms (5698 modules)
+ ✓ Compiled in 484ms (5698 modules)
+ ✓ Compiled in 378ms (5698 modules)
+ ✓ Compiled in 969ms (5698 modules)
+ ✓ Compiled in 353ms (5698 modules)
+ ✓ Compiled in 408ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 383ms (5698 modules)
+ ✓ Compiled in 404ms (5698 modules)
+ ✓ Compiled in 393ms (5698 modules)
+ ✓ Compiled in 427ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 412ms (5698 modules)
+ ✓ Compiled in 431ms (5698 modules)
+ ✓ Compiled in 494ms (5698 modules)
+ ✓ Compiled in 510ms (5698 modules)
+ ✓ Compiled in 1513ms (5698 modules)
+ ✓ Compiled in 402ms (5698 modules)
+ ✓ Compiled in 441ms (5698 modules)
+ ✓ Compiled in 2.4s (5698 modules)
+ ✓ Compiled in 637ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 394ms (5698 modules)
+ ✓ Compiled in 1170ms (5698 modules)
+ ✓ Compiled in 737ms (5698 modules)
+ ✓ Compiled in 640ms (5698 modules)
+ ✓ Compiled in 439ms (5698 modules)
+ ✓ Compiled in 443ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 692ms (5698 modules)
+ ✓ Compiled in 521ms (5698 modules)
+ ✓ Compiled in 458ms (5698 modules)
+ ✓ Compiled in 453ms (5698 modules)
+ ✓ Compiled in 477ms (5698 modules)
+ ✓ Compiled in 450ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 458ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 521ms (5698 modules)
+ ✓ Compiled in 912ms (5698 modules)
+ ✓ Compiled in 516ms (5698 modules)
+ ✓ Compiled in 427ms (5698 modules)
+ ✓ Compiled in 466ms (5698 modules)
+ ✓ Compiled in 480ms (5698 modules)
+ ✓ Compiled in 518ms (5698 modules)
+ ✓ Compiled in 448ms (5698 modules)
+ ✓ Compiled in 490ms (5698 modules)
+ ✓ Compiled in 455ms (5698 modules)
+ ✓ Compiled in 534ms (5698 modules)
+ ✓ Compiled in 456ms (5698 modules)
+ ✓ Compiled in 531ms (5698 modules)
+ ✓ Compiled in 456ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 530ms (5698 modules)
+ ✓ Compiled in 485ms (5698 modules)
+ ✓ Compiled in 489ms (5698 modules)
+ ✓ Compiled in 517ms (5698 modules)
+ ✓ Compiled in 496ms (5698 modules)
+ ✓ Compiled in 485ms (5698 modules)
+ ✓ Compiled in 928ms (5698 modules)
+ ✓ Compiled in 476ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 570ms (5698 modules)
+ ✓ Compiled in 502ms (5698 modules)
+ ✓ Compiled in 566ms (5698 modules)
+ ✓ Compiled in 579ms (5698 modules)
+ ✓ Compiled in 580ms (5698 modules)
+ ✓ Compiled in 533ms (5698 modules)
+ ✓ Compiled in 948ms (5698 modules)
+ ✓ Compiled in 497ms (5698 modules)
+ ✓ Compiled in 483ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 536ms (5698 modules)
+ ✓ Compiled in 500ms (5698 modules)
+ ✓ Compiled in 497ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 509ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 589ms (5698 modules)
+ ✓ Compiled in 452ms (5698 modules)
+ ✓ Compiled in 492ms (5698 modules)
+ ✓ Compiled in 611ms (5698 modules)
+ ✓ Compiled in 502ms (5698 modules)
+ ✓ Compiled in 2.7s (5716 modules)
+ ✓ Compiled in 416ms (5698 modules)
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Expected ';', got 'jsx'
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:377:1]
+ [2m374[0m |     </Drawer>
+ [2m375[0m |   )
+ [2m376[0m | 
+ [2m377[0m |       <style jsx>{`
+     : [35;1m             ^^^[0m
+ [2m378[0m |         .floating-trigger {
+ [2m379[0m |           position: fixed;
+ [2m380[0m |           top: 20px;
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Expected ';', got 'jsx'
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:377:1]
+ [2m374[0m |     </Drawer>
+ [2m375[0m |   )
+ [2m376[0m | 
+ [2m377[0m |       <style jsx>{`
+     : [35;1m             ^^^[0m
+ [2m378[0m |         .floating-trigger {
+ [2m379[0m |           position: fixed;
+ [2m380[0m |           top: 20px;
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ✓ Compiled in 562ms (5700 modules)
+ ✓ Compiled in 426ms (5700 modules)
+ ✓ Compiled in 392ms (5700 modules)
+ ✓ Compiled in 497ms (5718 modules)
+ ✓ Compiled in 348ms (5700 modules)

@@ -82,8 +82,8 @@ export default function SettingsDialog() {
   const hideSettingsModal = useAppStore((state) => state.hideSettingsModal);
   const addNotification = useAppStore((state) => state.addNotification);
   
-  const [selectedCharacter, setSelectedCharacter] = useState<CharacterType>('warrior');
-  const [currentCharacter, setCurrentCharacter] = useState<CharacterType>('warrior');
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterType>('knight');
+  const [currentCharacter, setCurrentCharacter] = useState<CharacterType>('knight');
   
   // Set mounted state and load current character selection from localStorage on mount
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function SettingsDialog() {
       setSelectedCharacter(savedCharacter);
       console.log('⚙️ [SETTINGS] Loaded saved character:', savedCharacter);
     } else {
-      console.log('⚙️ [SETTINGS] No saved character found, using default warrior');
+      console.log('⚙️ [SETTINGS] No saved character found, using default knight');
     }
   }, []);
   
