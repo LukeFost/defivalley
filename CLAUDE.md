@@ -255,6 +255,7 @@ Test Client: http://172.31.50.134:2567/test.html
 - **WASD Interference**: Fixed - movement disabled when chat is active
 - **SSR Issues**: Game component uses dynamic loading with `ssr: false`
 - **Network Access**: Test with `/test.html` client for connection debugging
+- **Dialog Visibility**: Fixed z-index stacking context - dialogs now use `z-[1000]`
 
 ## Web3 Authentication System
 
@@ -360,6 +361,23 @@ http://localhost:3000
 
 ### Common Development Issues & Solutions
 
+**🔧 Dialog Visibility Issues**
+```bash
+# Issue: Dialogs open but are not visible
+# Root Cause: Z-index stacking context conflicts
+# Solution: Updated z-index hierarchy:
+# - Notifications: z-index: 10000 (highest)
+# - All Dialogs: z-index: 1000 (above game content)
+# - Phaser Canvas: z-index: 0/auto (default)
+```
+
+**🔧 BigInt Render Loops**
+```bash
+# Issue: BigInt serialization errors causing render loops
+# Solution: Added to QueryClient configuration:
+structuralSharing: false  # Prevents BigInt comparison loops
+```
+
 **🔧 Turbopack Error ("Next.js package not found")**
 ```bash
 # Solution: Disable Turbopack temporarily
@@ -378,12 +396,76 @@ nvm alias default 22  # Make it permanent
 - ✅ `notifications.length` undefined → Added null checks
 - ✅ `useUI.getState()` error → Use hook results directly  
 - ✅ Controlled input warnings → Ensured `plantAmount || ''` fallbacks
+- ✅ Dialog visibility issues → Fixed z-index stacking context
+- ✅ BigInt render loops → Added `structuralSharing: false` to QueryClient
 
 ### User Experience
 - **New Users**: Sign up with email/social → Auto-wallet created → Start playing
 - **Crypto Users**: Connect existing wallet → Verify identity → Start playing  
 - **Cross-chain**: Seamless switching between gaming (Saga) and DeFi (Arbitrum)
 - **Mobile**: Full WalletConnect support for mobile wallet apps
+
+## Transaction Tracker & Block Explorer Integration
+
+The DeFi Valley transaction tracker provides real-time monitoring of cross-chain transactions with direct links to blockchain explorers.
+
+### Explorer Integration Features
+- **🔗 Clickable Transaction Hashes**: All transaction hashes are clickable links to their respective block explorers
+- **🌐 Multi-Chain Support**: Integrates with Saga Chainlet, Arbitrum Sepolia, and Axelar Network explorers
+- **📱 New Tab Opening**: All explorer links open in new tabs for seamless navigation
+- **🎯 Smart Chain Detection**: Automatically routes to the correct explorer based on transaction type
+
+### Supported Block Explorers
+```typescript
+// Explorer URLs for each network
+Saga Chainlet: https://yieldfield-2751669528484000-1.sagaexplorer.io/tx/{hash}
+Arbitrum Sepolia: https://sepolia.arbiscan.io/tx/{hash}
+Axelar Network: https://testnet.axelarscan.io/gmp/{hash}
+```
+
+### Transaction Tracking Features
+- **📊 Real-time Status Updates**: Live progress tracking through transaction lifecycle
+- **🔄 Cross-chain Flow Visualization**: Visual progress through Saga → Axelar → Arbitrum
+- **❌ Failed Transaction Analysis**: Direct links to failed transactions for debugging
+- **⚡ Retry Functionality**: One-click retry for failed transactions
+- **📝 Transaction History**: Persistent history with explorer link access
+
+### Transaction Status Indicators
+```typescript
+// Transaction lifecycle with explorer access
+1. Preparing → Validation and parameter checking
+2. Wallet Confirmation → User wallet interaction
+3. Saga Transaction → [Clickable: Saga Explorer Link]
+4. Cross-chain Bridge → [Clickable: Axelar Explorer Link]  
+5. DeFi Deposit/Harvest → [Clickable: Arbitrum Explorer Link]
+6. Completed → Full cross-chain flow success
+```
+
+### Developer Usage
+```typescript
+// Transaction tracker automatically handles explorer links
+import TransactionTracker from '@/components/TransactionTracker';
+
+// Explorer URL generation (built-in)
+const getExplorerUrl = (txHash: string, chain: 'saga' | 'arbitrum' | 'axelar') => {
+  // Automatically routes to correct explorer
+};
+
+// Usage in components
+<TransactionTracker /> // Includes all explorer integration
+```
+
+### Debugging Failed Transactions
+When transactions fail (like gas issues), users can:
+1. **Click the transaction hash** in the tracker
+2. **View detailed error information** in the block explorer
+3. **Analyze gas usage and failure reasons**
+4. **Use the retry button** for automatic retry with adjusted parameters
+
+**Example**: Failed Saga transaction due to low gas
+- Transaction Hash: `0xf2802f37...d7efe` 
+- Explorer Link: [Saga Explorer](https://yieldfield-2751669528484000-1.sagaexplorer.io/tx/0xf2802f3782eb191486f4d047c7c470f1b2937f15e34f0f4ed4ed8bf0d2ad7efe)
+- Status: Gas < 0.1 Gwei → User can see exact failure reason
 
 ## Configuration Variables
 For cross-chain deployment, configure these variables in `packages/contracts/.env`:
