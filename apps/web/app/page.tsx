@@ -7,9 +7,9 @@ import Notifications from '@/components/Notifications';
 
 export default function Home() {
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f0f0' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', backgroundImage: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       <header style={{ padding: '20px', textAlign: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: '32px', color: '#333' }}>
+        <h1 style={{ margin: 0, fontSize: '32px', color: '#333', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           🌱 DeFi Valley
         </h1>
         <p style={{ margin: '10px 0', fontSize: '16px', color: '#666' }}>
@@ -20,7 +20,14 @@ export default function Home() {
         </p>
       </header>
       
-      <main style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
+      <main style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        gap: '20px', 
+        flexWrap: 'wrap',
+        padding: '20px',
+        alignItems: 'flex-start'
+      }}>
         <Auth />
         <GameWrapper />
       </main>
