@@ -217,24 +217,16 @@ export const makeStore = () => {
           },
           
           showPlantModal: () => {
-            console.log('🌱 [STORE] showPlantModal action called');
-            console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
             set((state) => {
               state.ui.showPlantModal = true;
-              console.log('🌱 [STORE] Setting showPlantModal to true');
             });
-            console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
           },
           
           hidePlantModal: () => {
-            console.log('🌱 [STORE] hidePlantModal action called');
-            console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
             set((state) => {
               state.ui.showPlantModal = false;
               state.ui.plantAmount = '';
-              console.log('🌱 [STORE] Setting showPlantModal to false');
             });
-            console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
           },
           
           showHarvestModal: () => {

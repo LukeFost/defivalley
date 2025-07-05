@@ -224,10 +224,7 @@ export function Auth() {
                 <div className="header-buttons">
                   <button 
                     onClick={() => {
-                      console.log('⚙️ [AUTH] Settings button clicked!');
-                      console.log('⚙️ [AUTH] showSettingsModal function:', typeof showSettingsModal);
                       showSettingsModal();
-                      console.log('⚙️ [AUTH] showSettingsModal called');
                     }}
                     className="settings-btn"
                     title="Settings"
@@ -286,15 +283,7 @@ export function Auth() {
               <div className="farm-actions">
                 <button 
                   onClick={() => {
-                    console.log('🌱 [AUTH] Plant Seeds button clicked!');
-                    console.log('🌱 [AUTH] showPlantModal function type:', typeof showPlantModal);
-                    console.log('🌱 [AUTH] showPlantModal function:', showPlantModal);
-                    console.log('🌱 [AUTH] Current chain ID:', chainId);
-                    console.log('🌱 [AUTH] Expected chain ID:', config.sagaChainId);
-                    console.log('🌱 [AUTH] Button disabled?', chainId !== config.sagaChainId);
-                    console.log('🌱 [AUTH] Calling showPlantModal...');
                     showPlantModal();
-                    console.log('🌱 [AUTH] showPlantModal called successfully');
                   }}
                   className="action-btn plant"
                   disabled={chainId !== config.sagaChainId}
@@ -304,11 +293,7 @@ export function Auth() {
                 
                 <button 
                   onClick={() => {
-                    console.log('Transactions button clicked!');
-                    console.log('toggleTransactionTracker function:', toggleTransactionTracker);
-                    console.log('showTransactionTracker state:', showTransactionTracker);
                     toggleTransactionTracker();
-                    console.log('toggleTransactionTracker called');
                   }}
                   className="action-btn transactions"
                 >
