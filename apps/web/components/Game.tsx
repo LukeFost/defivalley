@@ -5,6 +5,8 @@ import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterConfig, CharacterType } from '../lib/character.config';
+import { CropSystem, CropType } from '../lib/CropSystem';
+import { CropContextMenu } from './CropContextMenu';
 
 interface GameState {
   players: Map<string, {
@@ -35,6 +37,7 @@ class MainScene extends Phaser.Scene {
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down'; // Track player direction for sprite animation
+  private cropSystem!: CropSystem;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -50,6 +53,10 @@ class MainScene extends Phaser.Scene {
       frameWidth: CharacterConfig.player.frameWidth,
       frameHeight: CharacterConfig.player.frameHeight
     });
+    
+    // Initialize and preload crop system
+    this.cropSystem = new CropSystem(this);
+    this.cropSystem.preload();
   }
 
   async create() {
@@ -61,6 +68,9 @@ class MainScene extends Phaser.Scene {
 
     // Create animations for different characters
     this.createCharacterAnimations();
+    
+    // Initialize crop system
+    this.cropSystem.create();
 
     // Setup development tools
     this.setupDevTools();
@@ -114,6 +124,14 @@ class MainScene extends Phaser.Scene {
           const playerAddress = 'current-player'; // This would be replaced with actual address
           MainScene.resetPlayerCharacter(playerAddress);
           console.log('🎮 Character reset! Reload the page to get a new character.');
+        }
+      };
+      
+      // Add crop system development tools
+      (window as any).clearAllCrops = () => {
+        if (this.cropSystem) {
+          this.cropSystem.clearAllCrops();
+          console.log('🧹 All crops cleared!');
         }
       };
     }
@@ -454,6 +472,11 @@ class MainScene extends Phaser.Scene {
   update() {
     if (!this.room || !this.currentPlayer) return;
 
+    // Update crop system
+    if (this.cropSystem) {
+      this.cropSystem.update();
+    }
+
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
@@ -516,6 +539,40 @@ class MainScene extends Phaser.Scene {
       this.room.leave();
     }
     this.scene.stop();
+  }
+  
+  // Crop system methods for external access
+  getCropSystem(): CropSystem {
+    return this.cropSystem;
+  }
+  
+  plantCrop(x: number, y: number, cropType: CropType): boolean {
+    if (!this.cropSystem) return false;
+    if (!this.cropSystem.canPlantAt(x, y)) return false;
+    
+    this.cropSystem.plantCrop(x, y, cropType);
+    return true;
+  }
+  
+  removeCropAt(x: number, y: number): boolean {
+    if (!this.cropSystem) return false;
+    
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    if (!crop) return false;
+    
+    return this.cropSystem.removeCrop(crop.id);
+  }
+  
+  getCropAt(x: number, y: number) {
+    if (!this.cropSystem) return null;
+    
+    const crop = this.cropSystem.getCropAtPosition(x, y);
+    return crop ? { id: crop.id, type: crop.type, stage: crop.stage } : null;
+  }
+  
+  canPlantAt(x: number, y: number): boolean {
+    if (!this.cropSystem) return false;
+    return this.cropSystem.canPlantAt(x, y);
   }
 }
 
@@ -592,9 +649,43 @@ function Game() {
     }
   };
 
+  // Crop system handlers
+  const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.plantCrop(x, y, cropType);
+    }
+  };
+
+  const handleRemoveCrop = (x: number, y: number) => {
+    if (sceneRef.current) {
+      sceneRef.current.removeCropAt(x, y);
+    }
+  };
+
+  const handleCanPlantAt = (x: number, y: number) => {
+    if (sceneRef.current) {
+      return sceneRef.current.canPlantAt(x, y);
+    }
+    return false;
+  };
+
+  const handleGetCropAt = (x: number, y: number) => {
+    if (sceneRef.current) {
+      return sceneRef.current.getCropAt(x, y);
+    }
+    return null;
+  };
+
   return (
     <div className="game-wrapper">
-      <div id="game-container" />
+      <CropContextMenu
+        onPlantCrop={handlePlantCrop}
+        onRemoveCrop={handleRemoveCrop}
+        canPlantAt={handleCanPlantAt}
+        getCropAt={handleGetCropAt}
+      >
+        <div id="game-container" />
+      </CropContextMenu>
       
       {/* Chat UI */}
       <div className="chat-container">
