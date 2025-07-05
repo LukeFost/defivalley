@@ -6,6 +6,7 @@ import { sagaChainlet } from '../app/wagmi'
 import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
 import { useAppStore, useTransactions, usePlayerData, useConfig } from '../app/store'
+import { NetworkSelector } from './NetworkSelector'
 
 export function Auth() {
   const { ready, authenticated, user, login, logout } = usePrivy()
@@ -146,6 +147,17 @@ export function Auth() {
                     </span>
                   </div>
                 )}
+              </div>
+
+              {/* Network Selector */}
+              <div className="network-selector-section">
+                <div className="network-selector-label">Switch Network:</div>
+                <NetworkSelector 
+                  variant="dropdown"
+                  className="network-selector-widget"
+                  showTestnets={true}
+                  categoryFilter="all"
+                />
               </div>
 
               <div className="chain-actions">
@@ -400,6 +412,20 @@ export function Auth() {
         .balance-value {
           font-weight: 500;
           color: #333;
+        }
+        
+        .network-selector-section {
+          margin: 12px 0;
+        }
+        
+        .network-selector-label {
+          font-size: 12px;
+          color: #666;
+          margin-bottom: 6px;
+        }
+        
+        .network-selector-widget {
+          width: 100%;
         }
         
         .chain-actions {
