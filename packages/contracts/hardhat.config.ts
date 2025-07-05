@@ -1,11 +1,31 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import { config as dotenvConfig } from "dotenv";
+import { defineChain } from "viem";
 
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
-import { configVariable } from "hardhat/config";
 
 // Load environment variables
 dotenvConfig();
+
+// Define custom Saga chainlet for viem
+const sagaChainlet = defineChain({
+  id: 2751669528484000,
+  name: 'Saga Chainlet',
+  network: 'saga-chainlet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: [process.env.SAGA_TESTNET_RPC_URL || 'https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io'],
+    },
+    public: {
+      http: [process.env.SAGA_TESTNET_RPC_URL || 'https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io'],
+    },
+  },
+});
 
 const config: HardhatUserConfig = {
   /*
@@ -16,6 +36,9 @@ const config: HardhatUserConfig = {
    * so this list is larger than what you would normally have.
    */
   plugins: [hardhatToolboxViemPlugin],
+  viem: {
+    chains: [sagaChainlet],
+  },
   paths: {
     sources: "./", // Contracts are in the root directory
   },
@@ -82,8 +105,8 @@ const config: HardhatUserConfig = {
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+      url: process.env.SEPOLIA_RPC_URL ?? "",
+      accounts: [process.env.SEPOLIA_PRIVATE_KEY ?? ""],
     },
     // Arbitrum Sepolia for DeFiVault deployment
     arbitrumSepolia: {

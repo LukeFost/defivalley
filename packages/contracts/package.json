@@ -23,5 +23,14 @@
   "dependencies": {
     "@axelar-network/axelar-gmp-sdk-solidity": "^6.0.6",
     "dotenv": "^17.0.1"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "clean": "hardhat clean",
+    "deploy:arbitrum": "hardhat ignition deploy ignition/modules/DeFiVaultFixed.ts --network arbitrumSepolia",
+    "deploy:saga": "hardhat ignition deploy ignition/modules/GameControllerFixed.ts --network sagaTestnet",
+    "deploy:configure": "hardhat ignition deploy ignition/modules/ConfigureFixed.ts --network sagaTestnet",
+    "deploy:test": "hardhat run scripts/test-end-to-end.ts --network sagaTestnet"
   }
 }
