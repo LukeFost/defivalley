@@ -303,16 +303,54 @@ DeFiVault (Arbitrum): 0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673
 ```
 
 ### Web3 Development Setup
+
+**Prerequisites:**
+- Node.js 22+ (required for Hardhat 3 Alpha)
+- Set default Node version: `nvm alias default 22`
+
 ```bash
 # Install dependencies (already configured)
 pnpm install
 
-# Start development with Web3 auth
-pnpm dev --filter=web
+# Start frontend only (recommended for testing)
+cd apps/web
+pnpm dev
+
+# Or start all services
+pnpm dev
 
 # Access authenticated app
 http://localhost:3000
 ```
+
+**If Turbopack fails:** Remove `--turbopack` from `apps/web/package.json` dev script.
+
+### Frontend Architecture
+- **Contract ABIs**: Updated with latest deployment artifacts  
+- **Store Management**: Zustand with proper initialization safeguards
+- **Error Handling**: Protected against undefined state during hydration
+- **Input Controls**: Proper controlled component patterns
+
+### Common Development Issues & Solutions
+
+**🔧 Turbopack Error ("Next.js package not found")**
+```bash
+# Solution: Disable Turbopack temporarily
+# Edit apps/web/package.json:
+"dev": "next dev --port 3000"  # Remove --turbopack flag
+```
+
+**🔧 Node Version Conflicts**
+```bash
+# Ensure Node 22+ for all dependencies
+nvm use 22
+nvm alias default 22  # Make it permanent
+```
+
+**🔧 Runtime Errors Fixed**
+- ✅ `notifications.length` undefined → Added null checks
+- ✅ `useUI.getState()` error → Use hook results directly  
+- ✅ Controlled input warnings → Ensured `plantAmount || ''` fallbacks
 
 ### User Experience
 - **New Users**: Sign up with email/social → Auto-wallet created → Start playing
@@ -515,6 +553,45 @@ cast call $DEFI_VAULT "totalDepositCap()" --rpc-url $ARBITRUM_RPC
 ✅ **Access Control**: Role-based permissions for critical functions  
 ✅ **Gas Optimization**: Nested-if command routing for efficiency  
 ✅ **Event Emission**: Comprehensive logging for monitoring and alerts
+
+## 🔒 Repository Security & Public Release Guidelines
+
+### CRITICAL: This repository is PUBLIC and hackathon-ready
+- **✅ NO SENSITIVE FILES COMMITTED**: Private keys, API keys, and secrets are properly excluded
+- **✅ CLAUDE DIRECTORIES PROTECTED**: Both `.claude/` and `claude/` are gitignored but preserved locally
+- **✅ ENVIRONMENT SECURITY**: All `.env` files are gitignored and contain only local development data
+- **✅ CLEAN GIT HISTORY**: No sensitive data has ever been committed to version control
+
+### Files That Must NEVER Be Committed:
+- `.env` files (contain private keys and API credentials)
+- `.mcp.json` (contains OpenAI API keys)
+- `.claude/` and `claude/` directories (AI development brain)
+- `.vscode/` (IDE settings)
+- `.npmrc` (package registry credentials)
+- `temp_*.json` (temporary build artifacts)
+
+### Safe for Public Viewing:
+- All source code in `apps/` and `packages/`
+- Configuration files (hardhat.config.ts, package.json, etc.)
+- Documentation and README files
+- Smart contract code and deployment scripts
+- `.env.example` files (templates without real values)
+
+### Local Development Security:
+- Private keys exist only in local `.env` files
+- API keys stored locally in `.mcp.json`
+- AI documentation in `claude/` directories (local only)
+- Use `npx hardhat keystore set` for secure key management
+- Never commit real credentials - only use placeholders in public files
+
+### If Sensitive Data is Accidentally Committed:
+1. **STOP** - Do not push to remote
+2. **Rotate keys immediately** - Generate new private keys and API keys
+3. **Rewrite git history** - Use git filter-branch or BFG to remove
+4. **Update .gitignore** - Ensure patterns catch the sensitive files
+5. **Verify clean** - Double-check no secrets remain in history
+
+This repository is configured for safe public sharing while preserving local development capabilities.
 
 ## Game Mechanics with Enhanced Security 🛡️
 

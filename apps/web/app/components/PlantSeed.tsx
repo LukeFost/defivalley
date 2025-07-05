@@ -85,7 +85,9 @@ export default function PlantSeed() {
     chainId: config.sagaChainId
   });
   
+  const ui = useUI();
   const {
+    isPlantModalOpen,
     showPlantModal,
     hidePlantModal,
     selectedSeedType,
@@ -93,7 +95,10 @@ export default function PlantSeed() {
     plantAmount,
     setPlantAmount,
     addNotification
-  } = useUI();
+  } = ui;
+  
+  // Debug: Check modal state
+  console.log('PlantSeed - isPlantModalOpen:', isPlantModalOpen);
   
   const { seedTypes } = usePlayerData();
   const { plantSeed, isLoading, estimateGas } = useCrossChainTx();
@@ -187,18 +192,15 @@ export default function PlantSeed() {
     setPlantAmount(formatUnits(finalAmount, 6));
   };
   
-  console.log('PlantSeed render - showPlantModal:', showPlantModal);
-  
-  if (!showPlantModal) {
-    console.log('PlantSeed modal is hidden');
+  if (!isPlantModalOpen) {
     return null;
   }
   
-  console.log('PlantSeed modal should be visible!');
+  console.log('🎉 PlantSeed modal rendering now!');
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-red-500 bg-opacity-90 flex items-center justify-center z-50 p-4" style={{zIndex: 9999}}>
+      <div className="bg-yellow-300 border-4 border-red-600 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Plant Seeds for DeFi Yield</h2>

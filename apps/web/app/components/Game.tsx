@@ -82,13 +82,7 @@ class MainScene extends Phaser.Scene {
 
   createCharacterAnimations() {
     // Create sprite sheet configurations for the characters
-    // The RPGCharacterSprites32x32.png has 20 characters in a 4x5 grid
-    const characterFrames: Phaser.Types.Animations.GenerateFrameNumbers = {
-      start: 0,
-      end: 19
-    };
-
-    // For now, we'll use static frames. Later we can add walking animations
+    // Based on the actual sprite sheet: looks like 20 columns x many rows
     // Each character is 32x32 pixels
     if (!this.textures.exists('characterFrames')) {
       this.textures.addSpriteSheet('characterFrames', this.textures.get('characters').getSourceImage(), {
@@ -96,6 +90,22 @@ class MainScene extends Phaser.Scene {
         frameHeight: 32
       });
     }
+
+    // Create sprite sheet for soldier sprites
+    if (!this.textures.exists('soldierFrames')) {
+      this.textures.addSpriteSheet('soldierFrames', this.textures.get('soldier').getSourceImage(), {
+        frameWidth: 32,
+        frameHeight: 32
+      });
+    }
+
+    // Debug: Log sprite sheet info to console
+    console.log('Character sprite sheet loaded:', {
+      width: this.textures.get('characters').getSourceImage().width,
+      height: this.textures.get('characters').getSourceImage().height,
+      framesX: Math.floor(this.textures.get('characters').getSourceImage().width / 32),
+      framesY: Math.floor(this.textures.get('characters').getSourceImage().height / 32)
+    });
   }
 
   async connectToServer() {
@@ -208,7 +218,17 @@ class MainScene extends Phaser.Scene {
       
       // Create player sprite using character frames
       // Use different character frames for different players
-      const characterIndex = Math.abs(sessionId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % 20;
+      // Get sprite sheet dimensions to use all available characters
+      const spriteTexture = this.textures.get('characters');
+      const frameWidth = 32;
+      const frameHeight = 32;
+      const totalFramesX = Math.floor(spriteTexture.getSourceImage().width / frameWidth);
+      const totalFramesY = Math.floor(spriteTexture.getSourceImage().height / frameHeight);
+      const totalFrames = totalFramesX * totalFramesY;
+      
+      const characterIndex = Math.abs(sessionId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % totalFrames;
+      console.log(`🎭 Player ${player.name} using character ${characterIndex} out of ${totalFrames} available (${totalFramesX}x${totalFramesY} grid)`);
+      
       const playerSprite = this.add.sprite(player.x, player.y, 'characterFrames', characterIndex);
       playerSprite.setScale(1.5); // Scale up the 32x32 sprite slightly
       

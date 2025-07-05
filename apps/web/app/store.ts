@@ -505,7 +505,14 @@ export const usePlayerData = () => useAppStore(state => ({
 }));
 
 export const useUI = () => useAppStore(state => ({
-  ...state.ui,
+  // UI state values (boolean flags for modal visibility)
+  selectedSeedType: state.ui.selectedSeedType,
+  plantAmount: state.ui.plantAmount,
+  showTransactionTracker: state.ui.showTransactionTracker,
+  isPlantModalOpen: state.ui.showPlantModal,
+  isHarvestModalOpen: state.ui.showHarvestModal,
+  notifications: state.ui.notifications,
+  // UI action functions
   setSelectedSeedType: state.setSelectedSeedType,
   setPlantAmount: state.setPlantAmount,
   toggleTransactionTracker: state.toggleTransactionTracker,

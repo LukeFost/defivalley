@@ -318,7 +318,14 @@ export default function TransactionTracker() {
   const { active: activeTransactions, history: transactionHistory, retry } = useTransactions();
   const { showTransactionTracker, toggleTransactionTracker, clearNotifications } = useUI();
   
-  if (!showTransactionTracker) return null;
+  console.log('TransactionTracker render - showTransactionTracker:', showTransactionTracker);
+  
+  if (!showTransactionTracker) {
+    console.log('TransactionTracker is hidden');
+    return null;
+  }
+  
+  console.log('TransactionTracker should be visible!');
   
   const allTransactions = [...activeTransactions, ...transactionHistory.slice(0, 10)];
   
