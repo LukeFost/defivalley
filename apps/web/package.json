@@ -11,6 +11,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@0xsquid/sdk": "^2.10.0",
     "@0xsquid/squid-types": "^0.1.168",
     "@axelar-network/axelarjs-sdk": "^0.17.4",
     "@privy-io/react-auth": "^2.17.3",

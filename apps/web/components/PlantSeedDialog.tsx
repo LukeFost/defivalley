@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { useCrossChainTx } from '../app/hooks/useCrossChainTx';
+import { useCrossChainTx, useSquidRouter } from '../app/hooks/useCrossChainTx';
 import { useAppStore, usePlayerData, useConfig, SeedType } from '../app/store';
+import ChainTokenSelector from './ChainTokenSelector';
 import {
   Dialog,
   DialogContent,
@@ -109,10 +110,27 @@ export default function PlantSeedDialog() {
   
   const { seedTypes } = usePlayerData();
   const { plantSeed, isLoading, estimateGas } = useCrossChainTx();
+  const { getQuote } = useSquidRouter();
   
   const [estimatedGas, setEstimatedGas] = useState<bigint>(BigInt(0));
   const [isValidAmount, setIsValidAmount] = useState(false);
   const [amountError, setAmountError] = useState('');
+  
+  // Auto-bridge state
+  const [showAutoBridge, setShowAutoBridge] = useState(false);
+  const [bridgeSelection, setBridgeSelection] = useState<{
+    chainId: number | null;
+    tokenAddress: string | null;
+    chainName: string;
+    tokenSymbol: string;
+  }>({
+    chainId: null,
+    tokenAddress: null,
+    chainName: '',
+    tokenSymbol: '',
+  });
+  const [bridgeQuote, setBridgeQuote] = useState<any>(null);
+  const [isGettingBridgeQuote, setIsGettingBridgeQuote] = useState(false);
   
   const selectedSeed = seedTypes.find(s => s.id === selectedSeedType);
 
@@ -155,6 +173,41 @@ export default function PlantSeedDialog() {
     }
   }, [usdcBalance, selectedSeedType, estimateGas]);
   
+  // Auto-bridge quote fetching
+  const getBridgeQuote = useCallback(async () => {
+    if (!bridgeSelection.chainId || !bridgeSelection.tokenAddress || !plantAmount || !address) {
+      setBridgeQuote(null);
+      return;
+    }
+
+    setIsGettingBridgeQuote(true);
+    try {
+      const quote = await getQuote({
+        fromChain: bridgeSelection.chainId,
+        toChain: config.sagaChainId,
+        fromToken: bridgeSelection.tokenAddress,
+        toToken: config.usdcAddress,
+        fromAmount: parseUnits(plantAmount, 6).toString(),
+        fromAddress: address,
+        toAddress: address,
+      });
+
+      setBridgeQuote(quote);
+    } catch (error) {
+      console.error('Failed to get bridge quote:', error);
+      setBridgeQuote(null);
+    } finally {
+      setIsGettingBridgeQuote(false);
+    }
+  }, [bridgeSelection, plantAmount, address, getQuote, config]);
+
+  // Get bridge quote when auto-bridge parameters change
+  useEffect(() => {
+    if (showAutoBridge) {
+      getBridgeQuote();
+    }
+  }, [showAutoBridge, bridgeSelection, plantAmount, getBridgeQuote]);
+
   // Debounced validation with 400ms delay
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -175,18 +228,25 @@ export default function PlantSeedDialog() {
     }
     
     try {
-      const result = await plantSeed({
+      const plantParams = {
         seedType: selectedSeedType,
         amount: plantAmount,
-        gasEstimate: estimatedGas
-      });
+        gasEstimate: estimatedGas,
+        enableAutoBridge: showAutoBridge,
+        fromChain: bridgeSelection.chainId || undefined,
+        fromToken: bridgeSelection.tokenAddress || undefined,
+      };
+
+      const result = await plantSeed(plantParams);
       
       if (result.success) {
         hidePlantModal();
         addNotification({
           type: 'success',
-          title: 'Seed Planting Started',
-          message: 'Your cross-chain transaction has been initiated!'
+          title: showAutoBridge ? 'Auto-Bridge & Seed Planting Started' : 'Seed Planting Started',
+          message: showAutoBridge 
+            ? 'Your assets will be bridged automatically and then planted!'
+            : 'Your cross-chain transaction has been initiated!'
         });
       }
     } catch (error) {
@@ -250,6 +310,87 @@ export default function PlantSeedDialog() {
               </div>
             </div>
           )}
+
+          {/* Auto-Bridge Toggle */}
+          <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-purple-900">Auto-Bridge Assets</h3>
+                <p className="text-sm text-purple-700">
+                  Bridge assets from any supported chain (70+ chains including Ethereum, Polygon, BSC, etc.)
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAutoBridge(!showAutoBridge)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  showAutoBridge ? 'bg-purple-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showAutoBridge ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
+            {showAutoBridge && (
+              <div className="mt-4">
+                <ChainTokenSelector
+                  onSelectionChange={setBridgeSelection}
+                  className="border-t border-purple-200 pt-4"
+                />
+                
+                {/* Bridge Quote Display */}
+                {isGettingBridgeQuote && (
+                  <div className="mt-4 flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    <span className="ml-2 text-purple-600">Getting bridge quote...</span>
+                  </div>
+                )}
+                
+                {bridgeQuote && (
+                  <div className="mt-4 p-3 bg-white border border-purple-200 rounded-lg">
+                    <h4 className="font-medium text-purple-900 mb-2">Bridge Quote</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-purple-600">Route:</span>
+                        <span className="font-medium text-purple-800">
+                          {bridgeSelection.chainName} → Saga Chainlet
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-purple-600">You Send:</span>
+                        <span className="font-medium text-purple-800">
+                          {plantAmount} {bridgeSelection.tokenSymbol}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-purple-600">You Receive:</span>
+                        <span className="font-medium text-purple-800">
+                          ~{bridgeQuote.toAmount ? formatUnits(BigInt(bridgeQuote.toAmount), 6) : '0'} USDC
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-purple-600">Bridge Time:</span>
+                        <span className="font-medium text-purple-800">
+                          ~{bridgeQuote.estimatedRouteDuration ? Math.ceil(bridgeQuote.estimatedRouteDuration / 60) : '5'} minutes
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {showAutoBridge && !bridgeSelection.chainId && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      Select a source chain and token to enable auto-bridging
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           
           {/* Seed Selection */}
           <div>
@@ -383,18 +524,24 @@ export default function PlantSeedDialog() {
           
           <button
             onClick={handlePlantSeed}
-            disabled={!isValidAmount || isLoading}
+            disabled={!isValidAmount || isLoading || (showAutoBridge && !bridgeSelection.chainId)}
             className={`px-8 py-3 rounded-lg font-semibold transition-all ${
-              isValidAmount && !isLoading
-                ? 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
+              isValidAmount && !isLoading && (!showAutoBridge || bridgeSelection.chainId)
+                ? showAutoBridge
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
+                  : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
             {isLoading ? (
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Planting...</span>
+                <span>{showAutoBridge ? 'Bridging & Planting...' : 'Planting...'}</span>
               </div>
+            ) : showAutoBridge ? (
+              bridgeSelection.chainId 
+                ? '🌉 Auto-Bridge & Plant Seed'
+                : 'Select Chain & Token to Continue'
             ) : (
               'Plant Seed & Start Earning'
             )}
