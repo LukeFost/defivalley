@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
-import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
+import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
@@ -114,11 +114,6 @@ class MainScene extends Phaser.Scene {
       console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
     });
     
-    // Load the legacy character sprite sheet for backward compatibility
-    this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
-      frameWidth: CharacterConfig.player.frameWidth,
-      frameHeight: CharacterConfig.player.frameHeight
-    });
     
     // Load all character animation sheets dynamically from CharacterDefinitions
     Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {

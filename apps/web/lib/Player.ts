@@ -1,5 +1,4 @@
 import { 
-  CharacterConfig, 
   CharacterType, 
   Direction, 
   AnimationState,
@@ -100,32 +99,15 @@ export class Player extends Phaser.GameObjects.Container {
       }
     }
     
-    // For spritesheet-based characters or fallback
-    const spritesheetConfig = this.characterConfig.spritesheetConfig;
-    if (spritesheetConfig) {
-      console.log(`🎭 Using spritesheet character with key: player_characters`);
-      if (scene.textures.exists('player_characters')) {
-        return scene.add.sprite(0, 0, 'player_characters');
-      } else {
-        console.warn(`⚠️ Texture player_characters not found!`);
-      }
-    }
+    // If animation texture doesn't exist, create fallback
+    console.error(`❌ No valid texture found for character ${this.playerInfo.character}! Creating fallback texture.`);
+    const graphics = scene.add.graphics();
+    graphics.fillStyle(0x4a90e2, 1); // Blue rectangle
+    graphics.fillRect(0, 0, 32, 32);
+    graphics.generateTexture('fallback_character', 32, 32);
+    graphics.destroy();
     
-    // Legacy fallback
-    console.log(`🎭 Using legacy fallback with key: ${this.characterConfig.key}`);
-    if (scene.textures.exists(this.characterConfig.key)) {
-      return scene.add.sprite(0, 0, this.characterConfig.key);
-    } else {
-      console.error(`❌ No valid texture found for character ${this.playerInfo.character}! Creating fallback texture.`);
-      // Create a fallback texture programmatically
-      const graphics = scene.add.graphics();
-      graphics.fillStyle(0x4a90e2, 1); // Blue rectangle instead of green
-      graphics.fillRect(0, 0, 32, 32);
-      graphics.generateTexture('fallback_character', 32, 32);
-      graphics.destroy(); // Clean up the graphics object
-      
-      return scene.add.sprite(0, 0, 'fallback_character');
-    }
+    return scene.add.sprite(0, 0, 'fallback_character');
   }
 
   /**
@@ -288,18 +270,10 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Updates static sprites (like RPG character sheet)
+   * Updates static sprites - simplified since we only have animation-based characters now
    */
   private updateStaticSprite(): void {
-    const spritesheetConfig = this.characterConfig.spritesheetConfig;
-    if (!spritesheetConfig) return;
-
-    const directionIndex = spritesheetConfig.directions[this.playerInfo.direction];
-    const frameIndex = spritesheetConfig.characterIndex * spritesheetConfig.framesPerCharacter + directionIndex;
-    
-    this.sprite.setFrame(frameIndex);
-    
-    // Handle directional flipping for static sprites too
+    // All characters are now animation-based, fallback to simple static display
     this.updateSpriteFlipping();
   }
 
