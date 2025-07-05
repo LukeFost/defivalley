@@ -3,12 +3,10 @@
 import { useState } from 'react'
 import { useChainId, useSwitchChain } from 'wagmi'
 import { 
-  enabledNetworks, 
-  getNetworkDisplayName, 
-  isTestnetNetwork,
-  getNetworkCategory 
-} from '../app/wagmi'
-import { getNetworkById } from '../app/lib/networks'
+  getNetworkById, 
+  getDefaultNetworks,
+  type NetworkConfig 
+} from '../app/lib/networks'
 
 interface NetworkSelectorProps {
   className?: string
@@ -27,6 +25,9 @@ export function NetworkSelector({
   const { switchChain, isPending } = useSwitchChain()
   const [isOpen, setIsOpen] = useState(false)
 
+  // Get enabled networks
+  const enabledNetworks = getDefaultNetworks()
+  
   // Filter networks based on props
   const filteredNetworks = enabledNetworks.filter(network => {
     if (!showTestnets && network.isTestnet) return false
@@ -35,11 +36,16 @@ export function NetworkSelector({
   })
 
   const currentNetwork = getNetworkById(chainId)
-  const isCurrentTestnet = isTestnetNetwork(chainId)
+  const isCurrentTestnet = currentNetwork?.isTestnet ?? true
+
+  const getNetworkDisplayName = (chainId: number): string => {
+    const network = getNetworkById(chainId)
+    return network?.name || `Chain ${chainId}`
+  }
 
   const handleNetworkChange = async (targetChainId: number) => {
     try {
-      await switchChain({ chainId: targetChainId })
+      await switchChain({ chainId: targetChainId as any })
       setIsOpen(false)
     } catch (error) {
       console.error('Failed to switch network:', error)

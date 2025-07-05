@@ -125,7 +125,7 @@ export function usePlantSeed() {
           '0x0000000000000000000000000000000000000000' // Native gas token
         ],
         value: gasEstimate, // Cross-chain gas payment
-        gasPrice: 100000000n // 0.1 Gwei minimum required by Saga
+        gasPrice: BigInt('100000000') // 0.1 Gwei minimum required by Saga
       });
       
       updateTransaction(txId, { 
