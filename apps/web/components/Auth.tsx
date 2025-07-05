@@ -23,7 +23,7 @@ export function Auth() {
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
   const [isMounted, setIsMounted] = useState(false)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  // Removed unused isDrawerOpen state - Drawer manages its own state internally
   
   // DeFi Valley state integration
   const { active: activeTransactions } = useTransactions()
@@ -358,7 +358,7 @@ export function Auth() {
   )
 
   return (
-    <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+    <Drawer>
       {/* Floating trigger button */}
       <FloatingTrigger />
       
