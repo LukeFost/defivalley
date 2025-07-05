@@ -14,7 +14,39 @@ const gameServer = new Server({
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Define the GameRoom
+// Add middleware for JSON parsing
+app.use(express.json());
+
+// API endpoint to get active worlds
+app.get('/api/worlds', (req, res) => {
+  try {
+    const { databaseService } = require('./services/DatabaseService');
+    const activeWorlds = databaseService.getActiveWorlds();
+    res.json({ worlds: activeWorlds });
+  } catch (error) {
+    console.error('❌ Error fetching active worlds:', error);
+    res.status(500).json({ error: 'Failed to fetch active worlds' });
+  }
+});
+
+// API endpoint to check if a world exists
+app.get('/api/worlds/:worldId/exists', (req, res) => {
+  try {
+    const { databaseService } = require('./services/DatabaseService');
+    const worldId = req.params.worldId;
+    const exists = databaseService.playerExists(worldId);
+    res.json({ exists, worldId });
+  } catch (error) {
+    console.error(`❌ Error checking world existence for ${req.params.worldId}:`, error);
+    res.status(500).json({ error: 'Failed to check world existence' });
+  }
+});
+
+// Define the GameRoom with dynamic room creation
+// Room IDs will be based on world owner IDs (e.g., wallet addresses)
+gameServer.define('world', GameRoom).filterBy(['worldOwnerId']);
+
+// Keep backwards compatibility with generic 'game' room
 gameServer.define('game', GameRoom);
 
 // Get local IP address

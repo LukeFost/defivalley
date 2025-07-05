@@ -59,10 +59,15 @@ const Game = dynamic(() => import('./Game'), {
   )
 });
 
-export default function GameWrapper() {
+interface GameWrapperProps {
+  worldId?: string;
+  isOwnWorld?: boolean;
+}
+
+export default function GameWrapper({ worldId, isOwnWorld }: GameWrapperProps) {
   return (
     <div className="game-container">
-      <Game />
+      <Game worldId={worldId} isOwnWorld={isOwnWorld} />
       <style jsx>{`
         .game-container {
           position: relative;

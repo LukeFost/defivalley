@@ -45,6 +45,8 @@ class MainScene extends Phaser.Scene {
   private terrainLayout: string[][] = [];
   private debugMode: boolean = false;
   private cropSystem!: CropSystem;
+  private worldId?: string;
+  private isOwnWorld?: boolean;
   
   // Camera system properties
   private worldWidth: number = 1600; // Will be updated based on map size
@@ -1056,6 +1058,11 @@ class MainScene extends Phaser.Scene {
     controls.setScrollFactor(0); // Pin to camera
   }
 
+  setWorldConfiguration(worldId?: string, isOwnWorld?: boolean) {
+    this.worldId = worldId;
+    this.isOwnWorld = isOwnWorld;
+  }
+
   async connectToServer() {
     try {
       // Try to detect the appropriate server URL
@@ -1070,11 +1077,24 @@ class MainScene extends Phaser.Scene {
       const endpoint = `ws://${serverHost}:${port}`;
       console.log('Connecting to:', endpoint);
       
+      // Determine room type and options based on world configuration
+      let roomType = 'game'; // fallback to generic room
+      let roomOptions: any = {
+        name: `Player${Math.floor(Math.random() * 1000)}`
+      };
+
+      if (this.worldId) {
+        roomType = 'world';
+        roomOptions = {
+          name: `Player${Math.floor(Math.random() * 1000)}`,
+          worldOwnerId: this.worldId
+        };
+        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'})`);
+      }
+      
       try {
         this.client = new Client(endpoint);
-        this.room = await this.client.joinOrCreate<GameState>('game', {
-          name: `Player${Math.floor(Math.random() * 1000)}`
-        });
+        this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
       } catch (connectionError) {
         console.log('Primary connection failed, trying localhost fallback...');
         // Fallback to localhost if the detected hostname fails
@@ -1082,9 +1102,7 @@ class MainScene extends Phaser.Scene {
           const fallbackEndpoint = `ws://localhost:${port}`;
           console.log('Fallback connecting to:', fallbackEndpoint);
           this.client = new Client(fallbackEndpoint);
-          this.room = await this.client.joinOrCreate<GameState>('game', {
-            name: `Player${Math.floor(Math.random() * 1000)}`
-          });
+          this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
         } else {
           throw connectionError;
         }
@@ -1394,7 +1412,12 @@ class MainScene extends Phaser.Scene {
   }
 }
 
-function Game() {
+interface GameProps {
+  worldId?: string;
+  isOwnWorld?: boolean;
+}
+
+function Game({ worldId, isOwnWorld }: GameProps) {
   const gameRef = useRef<Phaser.Game | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -1426,6 +1449,10 @@ function Game() {
       const scene = gameRef.current?.scene.getScene('MainScene') as MainScene;
       if (scene) {
         sceneRef.current = scene;
+        
+        // Configure world settings
+        scene.setWorldConfiguration(worldId, isOwnWorld);
+        
         scene.init({
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);

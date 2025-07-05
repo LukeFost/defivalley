@@ -225,6 +225,76 @@ export class DatabaseService {
   }
 
   /**
+   * Get complete world data for a player (player info + all crops)
+   */
+  getWorldData(worldOwnerId: string): { player: Player | null; crops: Crop[] } {
+    try {
+      // Get player data (will create if doesn't exist)
+      const player = this.getPlayer(worldOwnerId, `Player_${worldOwnerId.slice(0, 8)}`);
+      
+      // Get all unharvested crops for this player
+      const crops = this.getUnharvestedCrops(worldOwnerId);
+      
+      return { player, crops };
+    } catch (error) {
+      console.error(`❌ Error loading world data for ${worldOwnerId}:`, error);
+      return { player: null, crops: [] };
+    }
+  }
+
+  /**
+   * Get list of active worlds (players with unharvested crops or recent activity)
+   */
+  getActiveWorlds(): Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT 
+          p.id as playerId,
+          p.name as playerName,
+          p.updated_at as lastActivity,
+          COUNT(c.id) as cropCount
+        FROM players p
+        LEFT JOIN crops c ON p.id = c.player_id AND c.harvested = FALSE
+        GROUP BY p.id, p.name, p.updated_at
+        ORDER BY p.updated_at DESC
+        LIMIT 20
+      `);
+      
+      return stmt.all() as Array<{ playerId: string; playerName: string; cropCount: number; lastActivity: string }>;
+    } catch (error) {
+      console.error('❌ Error getting active worlds:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if a player exists in the database
+   */
+  playerExists(playerId: string): boolean {
+    try {
+      const stmt = this.db.prepare('SELECT COUNT(*) as count FROM players WHERE id = ?');
+      const result = stmt.get(playerId) as { count: number };
+      return result.count > 0;
+    } catch (error) {
+      console.error(`❌ Error checking if player exists: ${playerId}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get player-specific crops only (for world isolation)
+   */
+  getPlayerWorldCrops(playerId: string): Crop[] {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM crops WHERE player_id = ? AND harvested = FALSE');
+      return stmt.all(playerId) as Crop[];
+    } catch (error) {
+      console.error(`❌ Error getting crops for player ${playerId}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Close database connection
    */
   close(): void {
