@@ -2,10 +2,10 @@
 
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
-import { sagaChainlet } from '../wagmi'
+import { sagaChainlet } from '../app/wagmi'
 import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
-import { useAppStore, useTransactions, usePlayerData, useConfig } from '../store'
+import { useAppStore, useTransactions, usePlayerData, useConfig } from '../app/store'
 
 export function Auth() {
   const { ready, authenticated, user, login, logout } = usePrivy()

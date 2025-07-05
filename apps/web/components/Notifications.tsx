@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useUI, Notification } from '../store';
+import { useUI, Notification } from '../app/store';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -200,7 +200,7 @@ export default function Notifications() {
           position: fixed;
           top: 20px;
           right: 20px;
-          z-index: 1000;
+          z-index: 10000;
           pointer-events: none;
         }
 

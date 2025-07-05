@@ -4,10 +4,10 @@ import { PrivyProvider } from '@privy-io/react-auth'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { hashFn } from 'wagmi/query'
-import { config } from '../wagmi'
+import { config } from '../app/wagmi'
 import { ReactNode, useState, useEffect } from 'react'
 import React from 'react'
-import { makeStore, StoreContext } from '../store'
+import { makeStore, StoreContext } from '../app/store'
 
 // This component handles manual rehydration of the Zustand store
 function HydrationBoundary({ children }: { children: ReactNode }) {

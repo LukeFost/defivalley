@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
-import { Player, PlayerInfo } from '../../lib/Player';
-import { CharacterConfig, CharacterType } from '../../lib/character.config';
+import { Player, PlayerInfo } from '../lib/Player';
+import { CharacterConfig, CharacterType } from '../lib/character.config';
 
 interface GameState {
   players: Map<string, {
