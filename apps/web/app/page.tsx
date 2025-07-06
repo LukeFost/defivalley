@@ -11,19 +11,16 @@ import { ArrowLeft } from 'lucide-react';
 import { CorralScene } from '@/components/scenes/CorralScene';
 import { OrchardScene } from '@/components/scenes/OrchardScene';
 import { WellScene } from '@/components/scenes/WellScene';
-import { StakingOfficeScene } from '@/components/scenes/StakingOfficeScene';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { MintModal } from '@/components/modals/MintModal';
 import { StakeModal } from '@/components/modals/StakeModal';
 import { QuestBookHUD } from '@/components/QuestBookHUD';
-import { InteractiveStakeDemo } from '@/components/InteractiveStakeDemo';
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<'browser' | 'game'>('browser');
   const [selectedWorldId, setSelectedWorldId] = useState<string>('');
   const [isOwnWorld, setIsOwnWorld] = useState<boolean>(false);
   const [overlayOpen, setOverlayOpen] = useState<boolean>(false);
-  const [showInteractiveDemo, setShowInteractiveDemo] = useState<boolean>(false);
 
   const handleEnterWorld = (worldId: string, isOwn: boolean) => {
     setSelectedWorldId(worldId);
@@ -80,23 +77,12 @@ export default function Home() {
           )}
         </div>
         
-        <div className="bottom-bar-actions">
-          <Button
-            onClick={() => setShowInteractiveDemo(true)}
-            variant="outline"
-            size="sm"
-            className="demo-button"
-          >
-            🎭 Interactive Demo
-          </Button>
-          
-          <button 
-            className="overlay-toggle"
-            onClick={() => setOverlayOpen(!overlayOpen)}
-          >
-            ☰ Menu
-          </button>
-        </div>
+        <button 
+          className="overlay-toggle"
+          onClick={() => setOverlayOpen(!overlayOpen)}
+        >
+          ☰ Menu
+        </button>
       </div>
       
       {/* Overlay panel - initially hidden */}
@@ -253,26 +239,6 @@ export default function Home() {
         .farm-id {
           font-size: 12px;
           opacity: 0.7;
-        }
-        
-        .bottom-bar-actions {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-        }
-        
-        .demo-button {
-          background: linear-gradient(135deg, #87CEEB, #4682B4);
-          border: none;
-          color: #1a202c;
-          font-weight: 600;
-          transition: all 0.2s;
-        }
-        
-        .demo-button:hover {
-          background: linear-gradient(135deg, #4682B4, #87CEEB);
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(135, 206, 235, 0.3);
         }
         
         .overlay-toggle {
@@ -499,11 +465,12 @@ export default function Home() {
       {/* DeFi Valley Modal Components */}
       <SettingsDialog />
       
-      {/* Building Scene Components */}
+      {/* Flow Building Scene Components */}
       <CorralScene />
       <OrchardScene />
       <WellScene />
-      <StakingOfficeScene />
+      
+      {/* Legacy Modals - TODO: Remove these when dialogue system is complete */}
       <SwapModal />
       <MintModal />
       <StakeModal />
@@ -513,11 +480,6 @@ export default function Home() {
       
       {/* Global Notification System */}
       <Notifications />
-      
-      {/* Interactive Stake Demo */}
-      {showInteractiveDemo && (
-        <InteractiveStakeDemo onClose={() => setShowInteractiveDemo(false)} />
-      )}
     </div>
   );
 }

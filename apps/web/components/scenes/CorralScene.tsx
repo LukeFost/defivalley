@@ -1,26 +1,24 @@
 import { useUI } from '@/app/store';
-import { useChainId, useSwitchChain } from 'wagmi';
+import { useChainId } from 'wagmi';
 import { flowMainnet } from '@/app/wagmi';
-import { InteractiveBuildingScene } from './InteractiveBuildingScene';
+import { SimpleInteractiveScene } from './SimpleInteractiveScene';
 
 /**
  * CorralScene component for Flow → FROTH swapping
- * Full-screen interactive dialogue with the Corral NPC
+ * Full-screen interactive dialogue that opens SwapModal
  */
 export function CorralScene() {
   const { isCorralModalOpen, hideCorralModal, showSwapModal } = useUI();
   const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
   
   const isOnFlow = chainId === flowMainnet.id;
+  
+  // Only render this scene on Flow network
+  if (!isOnFlow || !isCorralModalOpen) {
+    return null;
+  }
 
   const handleSwapClick = () => {
-    if (!isOnFlow) {
-      // Switch to Flow network first
-      switchChain({ chainId: flowMainnet.id });
-      return;
-    }
-    
     hideCorralModal();
     showSwapModal();
   };
@@ -31,17 +29,17 @@ export function CorralScene() {
 
   const npcConfig = {
     npcName: 'Cowboy Pete',
-    greeting: "Howdy, partner! Welcome to the Flow Trading Corral. I handle all the token trading in these parts - from FLOW to FROTH swaps, all the way to helping folks plant their sFVIX volatility crops! This here's your one-stop shop for the complete Flow DeFi journey.",
+    greeting: "Howdy, partner! Welcome to the Flow Trading Corral. I handle all the token trading in these parts. Ready to swap some FLOW for FROTH? I'll guide you through the whole process!",
     backgroundColorHex: 0xD2691E, // Saddle brown for western theme
-    actionChoiceText: 'Start my Flow journey (FLOW→FROTH→FVIX→sFVIX)',
+    actionChoiceText: 'I want to swap FLOW → FROTH',
     actionCallback: handleSwapClick,
-    infoChoiceText: 'Tell me about sFVIX volatility farming',
-    infoDialogue: "Well I'll be! You're asking about the advanced stuff, partner. See, once you complete the full journey - swapping FLOW to FROTH at my corral, minting FVIX at the Ancient Well, and staking for sFVIX at the Sacred Orchard - then you can plant those sFVIX tokens as special volatility crops right here in the valley! These ain't your ordinary crops - they grow with the Flow network's market movements and earn real yields. It's the future of farming, I tell ya!",
+    infoChoiceText: 'Tell me about the trading process',
+    infoDialogue: "Well partner, it's simple as can be! You give me your FLOW tokens, and I'll swap them for FROTH using our advanced DEX. The rates are fair and the process is instant. Your FROTH tokens will be the gateway to the rest of your DeFi valley journey!",
     leaveText: '👋 Tip my hat and leave'
   };
 
   return (
-    <InteractiveBuildingScene
+    <SimpleInteractiveScene
       isOpen={isCorralModalOpen}
       onClose={handleClose}
       config={npcConfig}

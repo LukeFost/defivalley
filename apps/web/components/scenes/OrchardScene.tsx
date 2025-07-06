@@ -1,17 +1,12 @@
 import { useUI } from '@/app/store';
-import { InteractiveBuildingScene } from './InteractiveBuildingScene';
+import { FlowInteractiveScene } from './FlowInteractiveScene';
 
 /**
  * OrchardScene component for FVIX → sFVIX staking
- * Full-screen interactive dialogue with the Orchard NPC
+ * Full-screen interactive dialogue with direct transaction handling
  */
 export function OrchardScene() {
-  const { isOrchardModalOpen, hideOrchardModal, showStakeModal } = useUI();
-
-  const handleStakeClick = () => {
-    hideOrchardModal();
-    showStakeModal();
-  };
+  const { isOrchardModalOpen, hideOrchardModal } = useUI();
 
   const handleClose = () => {
     hideOrchardModal();
@@ -19,21 +14,16 @@ export function OrchardScene() {
 
   const npcConfig = {
     npcName: 'Elder Thessa',
-    greeting: "Welcome to the Sacred Orchard, dear traveler! I am Elder Thessa, guardian of this mystical grove. Here, your FVIX tokens can take root and flourish into sFVIX, bearing fruit through yield rewards over time. Once you have sFVIX, you can plant them as volatility crops in the valley's fertile soil!",
+    greeting: "Welcome to the Sacred Orchard, dear traveler! I am Elder Thessa, guardian of this mystical grove. Here, your FVIX tokens can take root and flourish into sFVIX, bearing fruit through yield rewards over time. Ready to stake your FVIX tokens?",
     backgroundColorHex: 0x228B22, // Forest green for orchard theme
-    actionChoiceText: 'I want to stake FVIX → sFVIX',
-    actionCallback: handleStakeClick,
-    infoChoiceText: 'Tell me about sFVIX planting',
-    infoDialogue: "Ah, the ancient art of volatility farming! Once you've staked FVIX into sFVIX here in my orchard, those sFVIX tokens can be planted as special crops in DeFi Valley. These aren't ordinary seeds - they're volatility plants that grow with the Flow network's market movements! Visit the Trading Corral when you have sFVIX tokens, and they can help you plant them as crops that earn real yields while you tend your digital farm.",
-    leaveText: '🚶‍♀️ Leave the sacred grove'
+    buildingType: 'orchard' as const,
   };
 
   return (
-    <InteractiveBuildingScene
+    <FlowInteractiveScene
       isOpen={isOrchardModalOpen}
       onClose={handleClose}
       config={npcConfig}
-      sceneKey="orchard"
     />
   );
 }

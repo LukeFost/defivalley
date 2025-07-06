@@ -24,7 +24,7 @@ interface InteractiveBuildingSceneProps {
 
 /**
  * Generic Interactive Building Scene using Phaser Visual Novel system
- * Replaces the modal-based BuildingInteractionScene with full-screen Phaser scenes
+ * This is the working version from the demo
  */
 class BuildingScene extends VisualNovelScene {
   private npcConfig: BuildingNPCConfig;
@@ -40,11 +40,24 @@ class BuildingScene extends VisualNovelScene {
     // Set building-specific background
     this.setBackground(undefined, this.npcConfig.backgroundColorHex);
     
-    // Start the conversation immediately
-    this.startConversation();
+    // Hide the return button since we have our own close mechanism
+    const returnButton = this.children.list.find((child: any) => 
+      child.type === 'Container' && child.y === 20
+    );
+    if (returnButton) {
+      returnButton.setVisible(false);
+    }
+    
+    // Start the conversation immediately after a brief delay to ensure scene is ready
+    this.time.delayedCall(100, () => {
+      console.log('🎭 Starting building conversation');
+      this.startConversation();
+    });
   }
 
   private startConversation(): void {
+    console.log('🎭 Building startConversation called');
+    
     const choices: DialogueChoice[] = [
       {
         text: this.npcConfig.actionChoiceText,
@@ -72,7 +85,28 @@ class BuildingScene extends VisualNovelScene {
       choices: choices,
     };
     
+    console.log('🎭 Calling showDialogue with:', initialDialogue);
     this.showDialogue(initialDialogue);
+    
+    // Force dialogue visibility and ensure it's rendered
+    this.time.delayedCall(200, () => {
+      if (this.dialogueContainer) {
+        console.log('🎭 Forcing dialogue container visible');
+        this.dialogueContainer.setVisible(true);
+        this.dialogueContainer.setAlpha(1);
+        
+        // Log the state
+        console.log('🎭 Dialogue container state:', {
+          visible: this.dialogueContainer.visible,
+          alpha: this.dialogueContainer.alpha,
+          x: this.dialogueContainer.x,
+          y: this.dialogueContainer.y,
+          depth: this.dialogueContainer.depth
+        });
+      } else {
+        console.error('🎭 No dialogue container found!');
+      }
+    });
   }
 
   private handleAction(): void {
@@ -211,7 +245,7 @@ export function InteractiveBuildingScene({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className="fixed inset-0 z-[1000] bg-black">
       {/* Loading indicator */}
       {!isGameReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900">

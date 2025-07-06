@@ -305,8 +305,11 @@ export class VisualNovelScene extends Phaser.Scene {
    * @param config - Dialogue configuration
    */
   protected showDialogue(config: DialogueConfig): void {
+    console.log('🎭 showDialogue called with:', config);
+    
     // Create dialogue container if it doesn't exist
     if (!this.dialogueContainer) {
+      console.log('🎭 Creating dialogue container');
       this.createDialogueContainer();
     }
 
@@ -384,7 +387,7 @@ export class VisualNovelScene extends Phaser.Scene {
 
     choices.forEach((choice, index) => {
       const buttonContainer = this.add.container(startX, startY + index * 60);
-      buttonContainer.setDepth(101);
+      buttonContainer.setDepth(600); // Higher than dialogue box
 
       const buttonBg = this.add.graphics();
       buttonBg.fillStyle(0x2d3748, 0.9);
@@ -508,8 +511,10 @@ export class VisualNovelScene extends Phaser.Scene {
    * Create the dialogue container and its components
    */
   protected createDialogueContainer(): void {
+    console.log('💬 Creating dialogue container at scale:', this.scale.width, 'x', this.scale.height);
+    
     this.dialogueContainer = this.add.container(0, 0);
-    this.dialogueContainer.setDepth(100);
+    this.dialogueContainer.setDepth(500);
 
     // Create dialogue background
     this.dialogueBackground = this.add.graphics();
@@ -545,6 +550,7 @@ export class VisualNovelScene extends Phaser.Scene {
 
     // Start hidden
     this.dialogueContainer.setVisible(false);
+    this.dialogueContainer.setDepth(500); // Ensure it's above everything
 
     console.log(`💬 Dialogue container created`);
   }
