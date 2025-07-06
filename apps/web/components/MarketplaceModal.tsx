@@ -67,13 +67,15 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
     isWrapping, 
     isUnwrapping,
     isLoadingBalances,
-    error: wrapError 
+    error: wrapError,
+    refetchETH,
+    refetchVbETH
   } = useWrapETH();
 
   // Get token balances
-  const { balance: vbEthBalance } = useTokenBalance(TOKENS.vbETH, address);
-  const { balance: vbUsdcBalance } = useTokenBalance(TOKENS.vbUSDC, address);
-  const { balance: agoraUsdBalance } = useTokenBalance(TOKENS.AUSDC, address);
+  const { balance: vbEthBalance, refetch: refetchVbEthBalance } = useTokenBalance(TOKENS.vbETH, address);
+  const { balance: vbUsdcBalance, refetch: refetchVbUsdcBalance } = useTokenBalance(TOKENS.vbUSDC, address);
+  const { balance: agoraUsdBalance, refetch: refetchAgoraUsdBalance } = useTokenBalance(TOKENS.AUSDC, address);
 
   // Effect to handle live quotes
   useEffect(() => {
@@ -102,6 +104,14 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
     stopLiveQuotes();
   }, [tokenIn, tokenOut]);
 
+  // Refresh balances when tokens change
+  useEffect(() => {
+    if (address) {
+      console.log('🔄 Token selection changed, refreshing balances...');
+      refreshAllBalances();
+    }
+  }, [tokenIn, tokenOut, address]);
+
   // Parse swap amount
   const swapAmountBigInt = useMemo(() => {
     if (!swapAmount || parseFloat(swapAmount) <= 0) return BigInt(0);
@@ -113,12 +123,43 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
     }
   }, [swapAmount, tokenIn]);
 
+  // Debug effect to log approval state changes
+  useEffect(() => {
+    console.log("Approval state:", {
+      isApproving: isSushiApproving,
+      allowance: sushiAllowance.toString(),
+      needsApproval: swapAmountBigInt > 0 ? checkApprovalNeeded(swapAmountBigInt) : false
+    });
+  }, [isSushiApproving, sushiAllowance, swapAmountBigInt, checkApprovalNeeded]);
+
+  // Function to refresh all token balances
+  const refreshAllBalances = async () => {
+    console.log('🔄 Refreshing all token balances...');
+    try {
+      await Promise.all([
+        refetchVbEthBalance(),
+        refetchVbUsdcBalance(),
+        refetchAgoraUsdBalance(),
+        refetchETH(),
+        refetchVbETH()
+      ]);
+      console.log('✅ All balances refreshed');
+    } catch (error) {
+      console.error('Error refreshing balances:', error);
+    }
+  };
+
   // Handle approval for SushiSwap
   const handleApprove = async () => {
     if (swapAmountBigInt === BigInt(0)) return;
     try {
-      console.log('🍣 Approving token for SushiSwap...');
-      await approveToken(tokenIn, swapAmountBigInt);
+      console.log('🍣 Approving token for SushiSwap...', {
+        tokenIn,
+        amount: swapAmountBigInt.toString(),
+        currentAllowance: sushiAllowance.toString()
+      });
+      const result = await approveToken(tokenIn, swapAmountBigInt);
+      console.log('🍣 Approval result:', result);
     } catch (err) {
       console.error('Approval error:', err);
     }
@@ -133,12 +174,14 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
       const result = await swap(tokenIn, tokenOut, swapAmountBigInt);
       
       if (result?.success) {
-        // console.log('Swap successful:', result.hash);
+        console.log('Swap successful:', result.hash);
         setSwapAmount('');
+        // Refresh all token balances after successful swap
+        await refreshAllBalances();
         // Could add success notification here
       }
     } catch (err) {
-      // console.error('Swap failed:', err);
+      console.error('Swap failed:', err);
     }
   };
 
@@ -544,8 +587,10 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
                 await unwrapWETH(wrapAmount);
               }
               setWrapAmount('');
+              // Refresh balances after successful wrap/unwrap
+              await refreshAllBalances();
             } catch (err) {
-              // console.error('Wrap/unwrap failed:', err);
+              console.error('Wrap/unwrap failed:', err);
             }
           }}
           disabled={!address || !wrapAmount || parseFloat(wrapAmount) <= 0 || isWrapping || isUnwrapping}

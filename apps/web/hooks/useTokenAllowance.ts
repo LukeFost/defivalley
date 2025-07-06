@@ -116,6 +116,25 @@ export function useTokenAllowance(tokenAddress: Address, spenderAddress?: Addres
     }
   }, [isApprovalSuccess, refetchAllowance]);
 
+  // Poll allowance while approval is pending
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isApproving && !isApprovalSuccess) {
+      // Poll every 3 seconds while approval is pending
+      interval = setInterval(() => {
+        console.log("Polling allowance during approval...");
+        refetchAllowance();
+      }, 3000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isApproving, isApprovalSuccess, refetchAllowance]);
+
   return {
     // Allowance data
     allowance: allowance || BigInt(0),

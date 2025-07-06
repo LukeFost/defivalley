@@ -182,5 +182,9 @@ export function useWrapETH() {
 
     // Error state
     error: error || wrapError?.message || unwrapError?.message,
+    
+    // Refetch functions
+    refetchETH,
+    refetchVbETH,
   };
 }
