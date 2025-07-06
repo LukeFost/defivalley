@@ -197,9 +197,7 @@ export default function Notifications() {
 
       <style jsx>{`
         .notifications-container {
-          position: fixed;
-          top: 500px;
-          left: 16px;
+          position: relative;
           z-index: 10000;
           pointer-events: none;
         }
