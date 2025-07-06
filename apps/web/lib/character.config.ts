@@ -17,13 +17,23 @@ export interface CharacterConfiguration {
   };
   // For animation sheets type (like knight)
   animationConfig?: {
+    defaultState?: string; // Default animation state for this character
     animations: Record<string, {
       key: string;
       path: string;
+      atlasPath?: string; // Optional: path to atlas JSON file for Texture Packer exports
       frames: number;
       frameRate: number;
       repeat: boolean;
+      frameNames?: string[]; // Optional: specific frame names for atlas animations
     }>;
+  };
+  // For idle directional atlas
+  idleAtlas?: {
+    key: string;
+    path: string;
+    atlasPath: string;
+    frameMap: Record<Direction, string>; // Maps directions to frame names
   };
   // For characters with directional rotation frames
   rotationFrames?: Record<Direction, number>;
@@ -35,30 +45,46 @@ interface AnimationPreset {
   frameHeight: number;
   scale: number;
   basePath: string;
-  animations: Record<string, { frames: number; frameRate: number; file: string }>;
+  animations: Record<string, { frames: number; frameRate: number; file: string; atlasFile?: string }>;
+  idleAtlas?: {
+    file: string;
+    atlasFile: string;
+    frameMap: Record<Direction, string>;
+  };
   rotationFrames?: Record<Direction, number>;
 }
 
 // Animation preset configurations for DRY principle
 const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
   cowboy: {
-    frameWidth: 58,
-    frameHeight: 115,
+    frameWidth: 128,
+    frameHeight: 128,
     scale: 0.5,
     basePath: '/sprites/Cowboy',
     animations: {
-      idle: { frames: 1, frameRate: 1, file: 'Walk_Cycle_Cowboy.png' }, // Frame 0 only - idle pose
-      walk: { frames: 11, frameRate: 12, file: 'Walk_Cycle_Cowboy.png' }, // All 11 frames - complete walk cycle
-      run: { frames: 11, frameRate: 16, file: 'Walk_Cycle_Cowboy.png' }, // All 11 frames - faster walk cycle
+      walk: { frames: 11, frameRate: 12, file: '_walk/walk.png', atlasFile: '_walk/walk.json' }, // New atlas-based walk cycle
+      run: { frames: 11, frameRate: 16, file: '_walk/walk.png', atlasFile: '_walk/walk.json' }, // Same atlas, faster rate
+      stomp: { frames: 10, frameRate: 10, file: '_stomp/stomp.png', atlasFile: '_stomp/stomp.json' }, // Error state stomp animation
       // Rotation sprite sheet for directional facing (5 frames: left, left-front, front, right-front, right)
-      rotate: { frames: 5, frameRate: 1, file: 'Rotation_Cycle_Cowboy.png' }, // Static directional frames
+      rotate: { frames: 5, frameRate: 1, file: '_rotate/rotate.png', atlasFile: '_rotate/rotate.json' }, // New atlas-based rotation frames
     },
-    // Add directional frame mapping for rotation sprite
+    // Idle directional atlas
+    idleAtlas: {
+      file: '_idle/idle.png',
+      atlasFile: '_idle/idle.json',
+      frameMap: {
+        left: 'West_idle.png',
+        right: 'East_idle.png',
+        up: 'North_idle.png',
+        down: 'South_idle.png'
+      }
+    },
+    // Add directional frame mapping for rotation sprite (0-indexed)
     rotationFrames: {
-      left: 0,      // Frame 0: facing left
-      down: 2,      // Frame 2: facing forward/down
-      right: 4,     // Frame 4: facing right
-      up: 2,        // Frame 2: facing forward (no back view, use front)
+      right: 0,     // Frame 0: Untitled_Artwork-1.png - facing right
+      down: 2,      // Frame 2: Untitled_Artwork-3.png - facing down
+      left: 4,      // Frame 4: Untitled_Artwork-5.png - facing left
+      up: 2,        // Frame 2: Untitled_Artwork-3.png - facing down (no back view, use front)
     },
   },
 } as const;
@@ -67,10 +93,12 @@ const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
 function createAnimationConfig(preset: keyof typeof ANIMATION_PRESETS): CharacterConfiguration['animationConfig'] {
   const config = ANIMATION_PRESETS[preset];
   return {
+    defaultState: 'idle', // Explicitly set the default animation state
     animations: Object.entries(config.animations).reduce((acc, [state, anim]) => {
       acc[state] = {
         key: `${preset}_${state}`,
         path: `${config.basePath}/${anim.file}`,
+        atlasPath: anim.atlasFile ? `${config.basePath}/${anim.atlasFile}` : undefined,
         frames: anim.frames,
         frameRate: anim.frameRate,
         repeat: true,
@@ -90,6 +118,12 @@ function createCharacterConfig(name: string, preset: keyof typeof ANIMATION_PRES
     scale: config.scale,
     type: 'animation_sheets',
     animationConfig: createAnimationConfig(preset),
+    idleAtlas: config.idleAtlas ? {
+      key: `${preset}_idle`,
+      path: `${config.basePath}/${config.idleAtlas.file}`,
+      atlasPath: `${config.basePath}/${config.idleAtlas.atlasFile}`,
+      frameMap: config.idleAtlas.frameMap
+    } : undefined,
     rotationFrames: config.rotationFrames,
   };
 }
@@ -103,7 +137,7 @@ export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
 export type CharacterType = keyof typeof CharacterDefinitions;
 
 // Animation state type for characters that support animations
-export type AnimationState = 'idle' | 'walk' | 'run';
+export type AnimationState = 'idle' | 'walk' | 'run' | 'stomp';
 
 // Helper function to get character configuration
 export function getCharacterConfig(character: CharacterType): CharacterConfiguration {

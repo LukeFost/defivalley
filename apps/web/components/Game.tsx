@@ -41,6 +41,7 @@ class MainScene extends Phaser.Scene {
   private currentPlayer!: Player;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
+  private oKey!: Phaser.Input.Keyboard.Key;
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down';
@@ -117,12 +118,25 @@ class MainScene extends Phaser.Scene {
     
     // Load all character animation sheets dynamically from CharacterDefinitions
     Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {
+      // Load idle atlas if present
+      if (character.idleAtlas) {
+        this.load.atlas(character.idleAtlas.key, character.idleAtlas.path, character.idleAtlas.atlasPath);
+      }
+      
+      // Load animation sheets
       if (character.type === 'animation_sheets' && character.animationConfig) {
         Object.entries(character.animationConfig.animations).forEach(([animName, animation]) => {
-          this.load.spritesheet(animation.key, animation.path, {
-            frameWidth: character.frameWidth,
-            frameHeight: character.frameHeight
-          });
+          // Check if this is an atlas or a regular spritesheet
+          if (animation.atlasPath) {
+            // Load as atlas (Texture Packer format)
+            this.load.atlas(animation.key, animation.path, animation.atlasPath);
+          } else {
+            // Load as regular spritesheet
+            this.load.spritesheet(animation.key, animation.path, {
+              frameWidth: character.frameWidth,
+              frameHeight: character.frameHeight
+            });
+          }
         });
       }
     });
@@ -159,6 +173,7 @@ class MainScene extends Phaser.Scene {
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
+    this.oKey = this.input.keyboard!.addKey('O');
 
     // Connect to Colyseus after scene is fully ready
     this.time.delayedCall(100, () => {
@@ -1283,7 +1298,13 @@ class MainScene extends Phaser.Scene {
     // Don't process movement if chat is active
     if (chatActive) return;
 
-    const speed = 3;
+    // Handle O key for stomp animation
+    if (Phaser.Input.Keyboard.JustDown(this.oKey)) {
+      this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
+      console.log('🦶 Stomp animation triggered!');
+    }
+
+    const speed = 6;
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
@@ -1436,10 +1457,15 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const { address } = useAccount();
 
   useEffect(() => {
+    // Calculate dimensions based on viewport minus bottom bar
+    const BAR_HEIGHT = 64; // Must match CSS --bar-height
+    const gameWidth = window.innerWidth;
+    const gameHeight = window.innerHeight - BAR_HEIGHT;
+    
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 1600,
-      height: 900,
+      width: gameWidth,
+      height: gameHeight,
       parent: 'game-container',
       backgroundColor: '#87CEEB',
       scene: MainScene,
@@ -1449,6 +1475,19 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           gravity: { y: 0, x: 0 },
           debug: false // Set to true to see bounding boxes
         }
+      },
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        parent: 'game-container',
+        width: '100%',
+        height: '100%'
+      },
+      render: {
+        pixelArt: false,
+        antialias: true,
+        transparent: false,
+        clearBeforeRender: true,
+        preserveDrawingBuffer: false
       }
     };
 
@@ -1477,6 +1516,15 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
     }, 500);
 
+    // Handle window resize
+    const handleResize = () => {
+      if (gameRef.current) {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight - BAR_HEIGHT;
+        gameRef.current.scale.resize(newWidth, newHeight);
+      }
+    };
+
     // Handle Enter key for chat
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger if user is already typing in chat input
@@ -1490,12 +1538,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
     };
 
+    window.addEventListener('resize', handleResize);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy(true);
       }
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -1614,24 +1664,22 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       <style jsx>{`
         .game-wrapper {
           position: relative;
-          display: inline-block;
-          width: 800px;
-          height: 600px;
+          width: 100%;
+          height: 100%;
           background: transparent;
         }
 
         #game-container {
           width: 100%;
           height: 100%;
-          border-radius: 8px;
           overflow: hidden;
           position: relative;
         }
 
         .chat-container {
-          position: absolute;
-          bottom: 20px;
-          left: 20px;
+          position: fixed;
+          top: 280px;
+          left: 16px;
           width: 300px;
           max-height: 200px;
           pointer-events: none;

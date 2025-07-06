@@ -15,7 +15,7 @@ import { hashPlayerId } from "../utils/auth";
 
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
-  private worldOwnerId: string;
+  private worldOwnerId: string = 'default';
   private authenticatedClients = new Map<string, AuthenticatedClient>();
 
   onCreate(options: any) {
