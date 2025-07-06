@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@axelar-network/axelar-gmp-sdk-solidity": "^6.0.6",
+    "@layerzerolabs/oapp-evm": "^0.3.2",
     "dotenv": "^17.0.1"
   },
   "scripts": {
