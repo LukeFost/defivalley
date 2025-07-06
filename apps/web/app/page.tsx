@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react';
 import { CorralScene } from '@/components/scenes/CorralScene';
 import { OrchardScene } from '@/components/scenes/OrchardScene';
 import { WellScene } from '@/components/scenes/WellScene';
+import { StakingOfficeScene } from '@/components/scenes/StakingOfficeScene';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { MintModal } from '@/components/modals/MintModal';
 import { StakeModal } from '@/components/modals/StakeModal';
@@ -502,6 +503,7 @@ export default function Home() {
       <CorralScene />
       <OrchardScene />
       <WellScene />
+      <StakingOfficeScene />
       <SwapModal />
       <MintModal />
       <StakeModal />

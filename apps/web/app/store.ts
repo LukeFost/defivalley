@@ -431,6 +431,7 @@ export const makeStore = () => {
               showCorralModal: false,
               showWellModal: false,
               showOrchardModal: false,
+              showStakingOfficeModal: false,
               showSwapModal: false,
               showMintModal: false,
               showStakeModal: false,
@@ -501,6 +502,8 @@ export const useUI = () => useAppStore(state => ({
   hideWellModal: state.hideWellModal,
   showOrchardModal: state.showOrchardModal,
   hideOrchardModal: state.hideOrchardModal,
+  showStakingOfficeModal: state.showStakingOfficeModal,
+  hideStakingOfficeModal: state.hideStakingOfficeModal,
   toggleQuestBook: state.toggleQuestBook,
   // Flow Transaction modal actions
   showSwapModal: state.showSwapModal,
