@@ -100,7 +100,7 @@ export function QuestBookHUD() {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80">
+    <div className="fixed top-4 left-4 z-50 w-80">
       <Card className="bg-white/95 backdrop-blur-sm shadow-lg border border-blue-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">

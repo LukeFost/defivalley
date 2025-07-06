@@ -1,46 +1,3 @@
-// Transaction status types
-export type TxStatus = 
-  | 'idle'
-  | 'preparing'
-  | 'wallet_confirm' 
-  | 'saga_pending'
-  | 'axelar_processing'
-  | 'arbitrum_pending' 
-  | 'completed'
-  | 'failed';
-
-// Cross-chain transaction type
-export interface CrossChainTx {
-  id: string;
-  type: 'plant_seed' | 'harvest_seed' | 'claim_yield';
-  status: TxStatus;
-  player: `0x${string}`;
-  
-  // Seed planting details
-  seedType?: number;
-  seedId?: number;
-  amount?: string; // BigInt as string
-  gasEstimate?: string; // BigInt as string
-  
-  // Transaction hashes
-  sagaTxHash?: string;
-  arbitrumTxHash?: string;
-  axelarTxId?: string;
-  axelarTxHash?: string; // Added for TransactionTracker compatibility
-  
-  // Timing
-  startTime: number;
-  lastUpdated: number;
-  estimatedCompletionTime?: number;
-  
-  // Error handling
-  error?: string;
-  retryCount: number;
-  
-  // Optimistic updates
-  optimisticSeedId?: number;
-  optimisticYield?: string;
-}
 
 // Seed types configuration
 export interface SeedType {
@@ -104,7 +61,6 @@ export interface FlowQuest {
 export interface UIState {
   selectedSeedType: number;
   plantAmount: string;
-  showTransactionTracker: boolean;
   showPlantModal: boolean;
   showHarvestModal: boolean;
   showSettingsModal: boolean;
@@ -131,10 +87,6 @@ export interface Notification {
 
 // Complete app state
 export interface AppState {
-  // Transaction management
-  activeTransactions: CrossChainTx[];
-  transactionHistory: CrossChainTx[];
-  
   // Game data
   playerState: PlayerState | null;
   seedPositions: SeedPosition[];
@@ -151,23 +103,17 @@ export interface AppState {
   config: {
     sagaChainId: 2751669528484000;
     arbitrumChainId: 421614;
+    flowChainId: 747;
     gameControllerAddress: `0x${string}`;
     defiVaultAddress: `0x${string}`;
     usdcAddress: `0x${string}`;
+    sFvixAddress: `0x${string}`;
     refreshInterval: number;
   };
 }
 
 // Store actions
 export interface AppActions {
-  // Transaction management
-  addTransaction: (tx: Omit<CrossChainTx, 'id' | 'startTime' | 'lastUpdated' | 'retryCount'>) => string;
-  updateTransaction: (id: string, updates: Partial<CrossChainTx>) => void;
-  completeTransaction: (id: string) => void;
-  failTransaction: (id: string, error: string) => void;
-  retryTransaction: (id: string) => void;
-  clearCompletedTransactions: () => void;
-  
   // Game state management
   setPlayerState: (state: PlayerState) => void;
   updateSeedPositions: (positions: SeedPosition[]) => void;
@@ -187,7 +133,6 @@ export interface AppActions {
   // UI actions
   setSelectedSeedType: (type: number) => void;
   setPlantAmount: (amount: string) => void;
-  toggleTransactionTracker: () => void;
   showPlantModal: () => void;
   hidePlantModal: () => void;
   showHarvestModal: () => void;
@@ -221,8 +166,6 @@ export interface AppActions {
 
 // Initial state
 export const initialState: AppState = {
-  activeTransactions: [],
-  transactionHistory: [],
   playerState: null,
   seedPositions: [],
   vaultPosition: null,
@@ -253,13 +196,21 @@ export const initialState: AppState = {
       isActive: true,
       description: 'Maximum yield for serious investors',
       apy: 5
+    },
+    {
+      id: 4,
+      name: 'sFVIX Volatility Plant',
+      minAmount: BigInt('1000000000000000000'), // 1 sFVIX (18 decimals)
+      growthTime: 24 * 60 * 60, // 24 hours
+      isActive: true,
+      description: 'Grows with Flow network volatility rewards - requires Flow blockchain connection',
+      apy: 8
     }
   ],
   flowQuests: {}, // Empty by default
   ui: {
     selectedSeedType: 1,
     plantAmount: '',
-    showTransactionTracker: false,
     showPlantModal: false,
     showHarvestModal: false,
     showSettingsModal: false,
@@ -275,9 +226,11 @@ export const initialState: AppState = {
   config: {
     sagaChainId: 2751669528484000,
     arbitrumChainId: 421614,
+    flowChainId: 747,
     gameControllerAddress: '0x896C39e19EcA825cE6bA66102E6752052049a4b1',
     defiVaultAddress: '0x2b2034AD5e2E0b4634002dDA83d1fd536cb4e673',
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    sFvixAddress: '0x2751dB789ab49e4f1CFA192831c19D8f40c708c9',
     refreshInterval: 30000 // 30 seconds
   }
 };
