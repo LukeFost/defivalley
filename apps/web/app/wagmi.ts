@@ -67,9 +67,43 @@ export const katanaChain = {
   },
 } as const
 
+// Define Flow Mainnet custom chain
+export const flowMainnet = {
+  id: 747,
+  name: 'Flow EVM',
+  network: 'flow-mainnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Flow',
+    symbol: 'FLOW',
+  },
+  rpcUrls: {
+    default: { 
+      http: ['https://mainnet.evm.nodes.onflow.org'] 
+    },
+    public: { 
+      http: ['https://mainnet.evm.nodes.onflow.org'] 
+    },
+  },
+  blockExplorers: {
+    default: { 
+      name: 'Flow Explorer', 
+      url: 'https://evm.flowscan.io' 
+    },
+  },
+  contracts: {
+    punchSwapRouter: {
+      address: '0xf45AFe28fd5519d5f8C1d4787a4D5f724C0eFa4d',
+    },
+    pumpFlowFactory: {
+      address: '0x576Be17F4dFa0E4964034e2E3dD29465B225B8d4',
+    },
+  },
+} as const
+
 // Wagmi configuration
 export const config = createConfig({
-  chains: [sagaChainlet, arbitrumSepolia, katanaChain],
+  chains: [sagaChainlet, arbitrumSepolia, katanaChain, flowMainnet],
   connectors: [
     injected(),
     walletConnect({
@@ -80,6 +114,7 @@ export const config = createConfig({
     [sagaChainlet.id]: http(),
     [arbitrumSepolia.id]: http(),
     [katanaChain.id]: http(),
+    [flowMainnet.id]: http(),
   },
   ssr: true,
   storage: createStorage({

@@ -10,6 +10,8 @@ import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { BankBuilding } from '../lib/BankBuilding';
 import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
+import { FlowBankBuilding } from '../lib/FlowBankBuilding';
+import { FlowMarketplaceBuilding } from '../lib/FlowMarketplaceBuilding';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { UIStack } from './UIStack';
@@ -18,7 +20,8 @@ import { MarketplaceModal } from './MarketplaceModal';
 import { ConnectWalletButton } from './ConnectWalletButton';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
+import { katanaChain, flowMainnet } from '../app/wagmi';
 
 interface GameState {
   players: Map<string, {
@@ -56,10 +59,13 @@ class MainScene extends Phaser.Scene {
   private cropSystem!: CropSystem;
   private bankBuilding!: BankBuilding;
   private marketplaceBuilding!: MarketplaceBuilding;
+  private flowBankBuilding?: FlowBankBuilding;
+  private flowMarketplaceBuilding?: FlowMarketplaceBuilding;
   private worldId?: string;
   private isOwnWorld?: boolean;
   private address?: string;
   private user?: any;
+  private currentChainId?: number;
   
   // Camera system properties
   private worldWidth: number = 2500; // Increased from 2000 to allow walking further right
@@ -187,11 +193,8 @@ class MainScene extends Phaser.Scene {
     // Initialize crop system
     this.cropSystem.create();
 
-    // Create bank building in the lower right area
-    this.bankBuilding = new BankBuilding(this, 1000, 600);
-    
-    // Create marketplace building much higher above the bank
-    this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
+    // Create network-specific buildings (will be created based on chain ID)
+    this.createNetworkSpecificBuildings();
 
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -1070,7 +1073,7 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    // Check collision with bank building
+    // Check collision with Katana buildings
     if (this.bankBuilding) {
       for (const corner of corners) {
         if (this.bankBuilding.checkCollision(corner.x, corner.y)) {
@@ -1079,10 +1082,26 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    // Check collision with marketplace building
     if (this.marketplaceBuilding) {
       for (const corner of corners) {
         if (this.marketplaceBuilding.checkCollision(corner.x, corner.y)) {
+          return true;
+        }
+      }
+    }
+    
+    // Check collision with Flow buildings
+    if (this.flowBankBuilding) {
+      for (const corner of corners) {
+        if (this.flowBankBuilding.checkCollision(corner.x, corner.y)) {
+          return true;
+        }
+      }
+    }
+    
+    if (this.flowMarketplaceBuilding) {
+      for (const corner of corners) {
+        if (this.flowMarketplaceBuilding.checkCollision(corner.x, corner.y)) {
           return true;
         }
       }
@@ -1099,19 +1118,6 @@ class MainScene extends Phaser.Scene {
   createUI() {
     // Create minimal UI with only essential elements
     const uiContainer = this.add.container(0, 0);
-    
-    // Simple controls info at bottom
-    const controlsBg = this.add.rectangle(120, 580, 220, 30, 0x000000, 0.6);
-    controlsBg.setStrokeStyle(1, 0x90EE90, 0.3);
-    controlsBg.setScrollFactor(0); // Pin to camera
-    
-    const controls = this.add.text(120, 580, '🎮 WASD: Move  💬 Enter: Chat', {
-      fontSize: '12px',
-      color: '#FFFFFF',
-      fontFamily: 'Arial, sans-serif'
-    });
-    controls.setOrigin(0.5);
-    controls.setScrollFactor(0); // Pin to camera
   }
 
   setWorldConfiguration(worldId?: string, isOwnWorld?: boolean) {
@@ -1122,6 +1128,63 @@ class MainScene extends Phaser.Scene {
   setAuthInfo(address?: string, user?: any) {
     this.address = address;
     this.user = user;
+  }
+
+  setChainId(chainId: number) {
+    const oldChainId = this.currentChainId;
+    this.currentChainId = chainId;
+    
+    // If chain ID changed, recreate buildings
+    if (oldChainId !== chainId) {
+      this.createNetworkSpecificBuildings();
+    }
+  }
+
+  createNetworkSpecificBuildings() {
+    // Destroy existing buildings
+    this.bankBuilding?.destroy();
+    this.marketplaceBuilding?.destroy();
+    this.flowBankBuilding?.destroy();
+    this.flowMarketplaceBuilding?.destroy();
+
+    // Clear references
+    this.bankBuilding = undefined as any;
+    this.marketplaceBuilding = undefined as any;
+    this.flowBankBuilding = undefined;
+    this.flowMarketplaceBuilding = undefined;
+
+    const isOnKatana = this.currentChainId === katanaChain.id;
+    const isOnFlow = this.currentChainId === flowMainnet.id;
+
+    console.log(`🌐 Creating buildings for network: ${this.currentChainId} (Katana: ${isOnKatana}, Flow: ${isOnFlow})`);
+
+    if (isOnKatana) {
+      // Create Katana buildings at original positions
+      this.bankBuilding = new BankBuilding(this, 1000, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
+      console.log('🔶 Created Katana buildings');
+    } else if (isOnFlow) {
+      // Create Flow buildings at different positions for variety
+      this.flowBankBuilding = new FlowBankBuilding(this, 300, 200);
+      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 300, 600);
+      console.log('🟣 Created Flow buildings');
+    } else {
+      // Default case - create Katana buildings
+      console.log('⚪ Unknown network, creating default Katana buildings');
+      this.bankBuilding = new BankBuilding(this, 1000, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
+    }
+
+    // Set up event listeners for new buildings
+    this.setupBuildingEventListeners();
+  }
+
+  setupBuildingEventListeners() {
+    // Clear existing listeners first
+    this.events.removeAllListeners('bankInteraction');
+    this.events.removeAllListeners('marketplaceInteraction');
+    this.events.removeAllListeners('flowBankInteraction');
+    this.events.removeAllListeners('flowMarketplaceInteraction');
   }
 
   async connectToServer() {
@@ -1141,10 +1204,23 @@ class MainScene extends Phaser.Scene {
       // Get player ID from wallet address or user ID
       const playerId = this.address || this.user?.id || `guest_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Format address for display (show first 6 and last 4 characters)
+      const formatAddress = (addr: string): string => {
+        if (addr.length > 10) {
+          return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+        }
+        return addr;
+      };
+      
+      // Use wallet address as display name, with formatted fallback
+      const displayName = this.address 
+        ? formatAddress(this.address)
+        : `Player${Math.floor(Math.random() * 1000)}`;
+      
       // Determine room type and options based on world configuration
       let roomType = 'game'; // fallback to generic room
       const roomOptions: RoomOptions = {
-        name: this.user?.google?.name || this.user?.email?.address?.split('@')[0] || `Player${Math.floor(Math.random() * 1000)}`,
+        name: displayName,
         playerId: playerId
       };
 
@@ -1177,7 +1253,7 @@ class MainScene extends Phaser.Scene {
         console.log('State changed, players:', state.players);
         
         // Make sure scene is initialized before handling players
-        if (!this.scene.isActive()) {
+        if (!this.scene || !this.scene.isActive()) {
           console.log('Scene not ready yet, skipping state update');
           return;
         }
@@ -1233,7 +1309,7 @@ class MainScene extends Phaser.Scene {
       const isCurrentPlayer = sessionId === this.sessionId;
       
       // Check if scene is active and ready
-      if (!this.scene.isActive() || !this.add) {
+      if (!this.scene || !this.scene.isActive() || !this.add) {
         console.log('Scene not ready for adding player');
         return;
       }
@@ -1333,16 +1409,26 @@ class MainScene extends Phaser.Scene {
       this.cropSystem.update();
     }
 
-    // Update bank building interaction
+    // Update Katana building interactions
     if (this.bankBuilding && this.currentPlayer) {
       this.bankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
       this.bankBuilding.checkInteraction();
     }
     
-    // Update marketplace building interaction
     if (this.marketplaceBuilding && this.currentPlayer) {
       this.marketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
       this.marketplaceBuilding.checkInteraction();
+    }
+    
+    // Update Flow building interactions
+    if (this.flowBankBuilding && this.currentPlayer) {
+      this.flowBankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
+      this.flowBankBuilding.checkInteraction();
+    }
+    
+    if (this.flowMarketplaceBuilding && this.currentPlayer) {
+      this.flowMarketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
+      this.flowMarketplaceBuilding.checkInteraction();
     }
 
     // Check if chat is active by looking for active input elements
@@ -1506,10 +1592,13 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
   const [showMorphoModal, setShowMorphoModal] = useState(false);
   const [showMarketplaceModal, setShowMarketplaceModal] = useState(false);
+  const [showFlowStakingModal, setShowFlowStakingModal] = useState(false);
+  const [showFlowSwapModal, setShowFlowSwapModal] = useState(false);
   
   // Get user authentication info
   const { user } = usePrivy();
   const { address } = useAccount();
+  const chainId = useChainId();
 
   useEffect(() => {
     // Calculate dimensions based on viewport minus bottom bar
@@ -1558,6 +1647,11 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         scene.setWorldConfiguration(worldId, isOwnWorld);
         scene.setAuthInfo(address, user);
         
+        // Set chain ID for network-specific buildings
+        if (chainId) {
+          scene.setChainId(chainId);
+        }
+        
         scene.init({
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
@@ -1569,16 +1663,26 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           setSelectedCrop(crop);
         });
         
-        // Set up bank interaction event listener
+        // Set up Katana building interaction listeners
         scene.events.on('bankInteraction', () => {
           console.log('🏦 Opening Morpho deposit modal');
           setShowMorphoModal(true);
         });
         
-        // Set up marketplace interaction event listener
         scene.events.on('marketplaceInteraction', () => {
           console.log('🏪 Opening marketplace modal');
           setShowMarketplaceModal(true);
+        });
+        
+        // Set up Flow building interaction listeners
+        scene.events.on('flowBankInteraction', () => {
+          console.log('🟠 Opening Flow staking modal');
+          setShowFlowStakingModal(true);
+        });
+        
+        scene.events.on('flowMarketplaceInteraction', () => {
+          console.log('🟣 Opening Flow swap modal');
+          setShowFlowSwapModal(true);
         });
       }
     }, 500);
@@ -1616,6 +1720,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  // Monitor chain changes and update buildings
+  useEffect(() => {
+    if (sceneRef.current && chainId) {
+      console.log(`🌐 Chain changed to: ${chainId}`);
+      sceneRef.current.setChainId(chainId);
+    }
+  }, [chainId]);
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1744,6 +1856,44 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         onClose={() => setShowMarketplaceModal(false)}
       />
 
+      {/* Flow Staking Modal (Placeholder) */}
+      {showFlowStakingModal && (
+        <div className="modal-overlay" onClick={() => setShowFlowStakingModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🟠 Flow FVIX Staking</h2>
+              <button onClick={() => setShowFlowStakingModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Flow FVIX staking interface coming soon!</p>
+              <p>This will allow you to stake FVIX tokens to earn sFVIX yield.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flow Swap Modal (Placeholder) */}
+      {showFlowSwapModal && (
+        <div className="modal-overlay" onClick={() => setShowFlowSwapModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🟣 Flow DeFi Hub</h2>
+              <button onClick={() => setShowFlowSwapModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Flow DeFi marketplace coming soon!</p>
+              <p>This will include:</p>
+              <ul>
+                <li>FLOW → FROTH swaps via PunchSwap</li>
+                <li>FROTH → FVIX conversion (10,000:1)</li>
+                <li>FVIX → sFVIX staking</li>
+                <li>Meme coin creation with PumpFlow</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .game-wrapper {
           position: relative;
@@ -1820,6 +1970,87 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           background: rgba(255, 255, 255, 0.2);
           border-color: rgba(255, 255, 255, 0.5);
           box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .modal-content {
+          background: #1a1a1a;
+          border-radius: 12px;
+          padding: 0;
+          max-width: 500px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+          border: 2px solid #333;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px;
+          border-bottom: 1px solid #333;
+          background: linear-gradient(135deg, #9932cc, #ff6b35);
+        }
+
+        .modal-header h2 {
+          margin: 0;
+          color: white;
+          font-size: 1.5rem;
+          font-weight: 600;
+        }
+
+        .modal-header button {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 1.5rem;
+          cursor: pointer;
+          padding: 0;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.2s;
+        }
+
+        .modal-header button:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-body {
+          padding: 20px;
+          color: #e0e0e0;
+        }
+
+        .modal-body p {
+          margin: 0 0 15px 0;
+          line-height: 1.6;
+        }
+
+        .modal-body ul {
+          margin: 15px 0 0 20px;
+          padding: 0;
+        }
+
+        .modal-body li {
+          margin: 8px 0;
+          color: #b0b0b0;
         }
       `}</style>
     </div>

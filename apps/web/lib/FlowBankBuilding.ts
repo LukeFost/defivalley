@@ -1,0 +1,231 @@
+/**
+ * FlowBankBuilding - Interactive bank structure for Flow DeFi staking
+ * Handles Flow bank sprite, collision detection, and player interaction
+ * Supports FVIX staking and sFVIX vault operations
+ */
+
+export class FlowBankBuilding extends Phaser.GameObjects.Container {
+  private bankSprite: Phaser.GameObjects.Sprite;
+  private glowEffect?: Phaser.GameObjects.Graphics;
+  private interactionZone: Phaser.Geom.Circle;
+  private isPlayerNear: boolean = false;
+  private interactionRadius: number = 250;
+  public scene: Phaser.Scene;
+  private interactionKey?: Phaser.Input.Keyboard.Key;
+  private promptText?: Phaser.GameObjects.Text;
+
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y);
+    this.scene = scene;
+
+    // Create Flow bank sprite (reuse bank sprite with different styling)
+    this.bankSprite = scene.add.sprite(0, 0, "flow_bank");
+    this.bankSprite.setScale(0.4);
+    this.bankSprite.setTint(0xff6b35); // Orange tint for Flow DeFi vault
+    this.add(this.bankSprite);
+
+    // Create interaction zone
+    this.interactionZone = new Phaser.Geom.Circle(x, y, this.interactionRadius);
+
+    // Create glow effect (initially hidden)
+    this.createGlowEffect();
+
+    // Create interaction prompt (initially hidden)
+    this.createPromptText();
+
+    // Set up interaction key
+    this.interactionKey = scene.input.keyboard?.addKey("E");
+
+    // Add this container to the scene
+    scene.add.existing(this);
+
+    // Set depth to be above ground but below UI
+    this.setDepth(10);
+
+    console.log("🟠 Flow Bank building created at", x, y);
+  }
+
+  private createGlowEffect() {
+    this.glowEffect = this.scene.add.graphics();
+    this.glowEffect.lineStyle(4, 0xffa500, 0.8); // Orange glow for Flow vault
+    this.glowEffect.strokeCircle(0, 0, this.interactionRadius);
+    this.glowEffect.setAlpha(0);
+    this.add(this.glowEffect);
+
+    // Add pulsing animation
+    this.scene.tweens.add({
+      targets: this.glowEffect,
+      alpha: { from: 0.3, to: 0.8 },
+      duration: 1000,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  private createPromptText() {
+    this.promptText = this.scene.add.text(0, -60, "Press E for Flow Vault", {
+      fontSize: "16px",
+      color: "#ffffff",
+      backgroundColor: "#ff6b35",
+      padding: { x: 8, y: 4 },
+    });
+    this.promptText.setOrigin(0.5);
+    this.promptText.setAlpha(0);
+    this.add(this.promptText);
+  }
+
+  /**
+   * Check if a player is within interaction range
+   */
+  checkPlayerProximity(playerX: number, playerY: number): boolean {
+    const distance = Phaser.Math.Distance.Between(
+      this.x,
+      this.y,
+      playerX,
+      playerY
+    );
+    const wasNear = this.isPlayerNear;
+    this.isPlayerNear = distance <= this.interactionRadius;
+
+    // Update visual feedback
+    if (this.isPlayerNear !== wasNear) {
+      if (this.isPlayerNear) {
+        this.onPlayerEnterRange();
+      } else {
+        this.onPlayerExitRange();
+      }
+    }
+
+    return this.isPlayerNear;
+  }
+
+  private onPlayerEnterRange() {
+    console.log("🟠 Player entered Flow bank interaction range");
+
+    // Show glow effect
+    if (this.glowEffect) {
+      this.scene.tweens.add({
+        targets: this.glowEffect,
+        alpha: 1,
+        duration: 300,
+        ease: "Power2",
+      });
+    }
+
+    // Show prompt text
+    if (this.promptText) {
+      this.scene.tweens.add({
+        targets: this.promptText,
+        alpha: 1,
+        y: -70,
+        duration: 300,
+        ease: "Back.easeOut",
+      });
+    }
+
+    // Add slight scale animation to bank
+    this.scene.tweens.add({
+      targets: this.bankSprite,
+      scaleX: 0.42,
+      scaleY: 0.42,
+      duration: 300,
+      ease: "Back.easeOut",
+    });
+  }
+
+  private onPlayerExitRange() {
+    console.log("🟠 Player exited Flow bank interaction range");
+
+    // Hide glow effect
+    if (this.glowEffect) {
+      this.scene.tweens.add({
+        targets: this.glowEffect,
+        alpha: 0,
+        duration: 300,
+        ease: "Power2",
+      });
+    }
+
+    // Hide prompt text
+    if (this.promptText) {
+      this.scene.tweens.add({
+        targets: this.promptText,
+        alpha: 0,
+        y: -60,
+        duration: 300,
+        ease: "Power2",
+      });
+    }
+
+    // Reset bank scale
+    this.scene.tweens.add({
+      targets: this.bankSprite,
+      scaleX: 0.4,
+      scaleY: 0.4,
+      duration: 300,
+      ease: "Power2",
+    });
+  }
+
+  /**
+   * Check if interaction key was pressed while player is near
+   */
+  checkInteraction(): boolean {
+    if (
+      this.isPlayerNear &&
+      this.interactionKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactionKey)
+    ) {
+      console.log("🟠 Flow Bank interaction triggered!");
+      this.scene.events.emit("flowBankInteraction");
+
+      // Visual feedback for interaction
+      this.scene.tweens.add({
+        targets: this.bankSprite,
+        scaleX: 0.36,
+        scaleY: 0.36,
+        duration: 100,
+        yoyo: true,
+        ease: "Power2",
+      });
+
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the bank's collision bounds for physics
+   */
+  getCollisionBounds(): Phaser.Geom.Rectangle {
+    const width = this.bankSprite.displayWidth * 0.8;
+    const height = this.bankSprite.displayHeight * 0.8;
+    return new Phaser.Geom.Rectangle(
+      this.x - width / 2,
+      this.y - height / 2,
+      width,
+      height
+    );
+  }
+
+  /**
+   * Check if a point collides with the bank building
+   */
+  checkCollision(x: number, y: number): boolean {
+    const bounds = this.getCollisionBounds();
+    return bounds.contains(x, y);
+  }
+
+  /**
+   * Update method to be called from scene update
+   */
+  update() {
+    // Additional update logic if needed
+  }
+
+  preload(scene: Phaser.Scene) {
+    // Load Flow bank sprite (reuse bank sprite)
+    scene.load.image("flow_bank", "/bank.png");
+  }
+}
