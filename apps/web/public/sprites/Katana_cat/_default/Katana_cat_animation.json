@@ -1,0 +1,293 @@
+{
+	"textures": [
+		{
+			"image": "Katana_cat_animation.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 1690,
+				"h": 130
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "Untitled_Artwork-1.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-2.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 131,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-3.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 261,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-4.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 391,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-5.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 521,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-6.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 651,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-7.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 781,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-8.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 911,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-9.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1041,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-10.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1171,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-11.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1301,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-12.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1431,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				},
+				{
+					"filename": "Untitled_Artwork-13.png",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 128,
+						"h": 128
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 128,
+						"h": 128
+					},
+					"frame": {
+						"x": 1561,
+						"y": 1,
+						"w": 128,
+						"h": 128
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "https://www.codeandweb.com/texturepacker",
+		"version": "3.0",
+		"smartupdate": "$TexturePacker:SmartUpdate:294de0e38423ad61e76f75fbad4a517e:6b80b2a6145fde7562de00ad870fd17e:2fe429118d90709051980539824d73d0$"
+	}
+}

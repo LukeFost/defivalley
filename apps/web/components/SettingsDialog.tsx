@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../app/store';
-import { CharacterDefinitions, CharacterType, CharacterConfig } from '../lib/character.config';
+import { CharacterDefinitions, CharacterType } from '../lib/character.config';
 import {
   Dialog,
   DialogContent,

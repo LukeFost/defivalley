@@ -10,17 +10,24 @@ import {
   ERROR_CODES,
   CROP_COLLISION_RADIUS 
 } from "../types/game.types";
+import { JoinOptions, AuthenticatedClient } from "../types/auth.types";
+import { hashPlayerId } from "../utils/auth";
 
 export class GameRoom extends Room<GameState> {
   maxClients = 10;
+  private worldOwnerId: string = 'default';
+  private authenticatedClients = new Map<string, AuthenticatedClient>();
 
   onCreate(options: any) {
     this.setState(new GameState());
     
-    console.log("🎮 GameRoom created with options:", options);
+    // Get the world owner ID from options (defaults to 'default' for fallback)
+    this.worldOwnerId = options.worldOwnerId || 'default';
     
-    // Load existing crops from database
-    this.loadCropsFromDatabase();
+    console.log(`🎮 GameRoom created for world: ${this.worldOwnerId}`, options);
+    
+    // Load world-specific data from database
+    this.loadWorldFromDatabase(this.worldOwnerId);
     
     // Set up message handlers
     this.onMessage("move", (client, message) => {
@@ -37,7 +44,7 @@ export class GameRoom extends Room<GameState> {
       if (!player) return;
       
       this.broadcast('chat', {
-        playerId: client.sessionId,
+        playerId: player.id,
         name: player.name,
         message: message.text,
         timestamp: Date.now()
@@ -60,34 +67,62 @@ export class GameRoom extends Room<GameState> {
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 100);
   }
 
-  onJoin(client: Client, options: any) {
-    console.log(`👋 ${client.sessionId} joined the game`);
+  onJoin(client: Client, options: JoinOptions) {
+    // Get the actual player ID from options (validated on frontend)
+    const playerId = options.playerId || hashPlayerId(client.sessionId);
+    
+    // Determine if this client is the world owner (host) or a visitor
+    const isHost = playerId === this.worldOwnerId;
+    
+    // Store authenticated client info
+    this.authenticatedClients.set(client.sessionId, {
+      sessionId: client.sessionId,
+      playerId,
+      isHost
+    });
+    
+    console.log(`👋 ${client.sessionId} (${playerId}) joined world ${this.worldOwnerId} as ${isHost ? 'HOST' : 'VISITOR'}`);
     
     // Create a new player
     const player = new Player();
-    player.id = client.sessionId;
-    player.name = options.name || `Player ${client.sessionId.substr(0, 6)}`;
+    player.id = playerId;  // Use the actual player ID
+    player.name = options.name || `Player ${playerId.substr(0, 8)}`;
     player.x = Math.random() * 800; // Random spawn position
     player.y = Math.random() * 600;
     player.connected = true;
     
-    // Load player data from database
-    const dbPlayer = databaseService.getPlayer(client.sessionId, player.name);
-    player.xp = dbPlayer.xp;
+    // Load player data from database (only load XP for the world owner)
+    if (isHost) {
+      const dbPlayer = databaseService.getPlayer(playerId, player.name);
+      player.xp = dbPlayer.xp;
+    } else {
+      // Visitors start with 0 XP in this world context
+      player.xp = 0;
+    }
     
     // Add player to game state
     this.state.players.set(client.sessionId, player);
     
-    // Send welcome message
+    // Send welcome message with world context
+    const worldOwnerName = this.getWorldOwnerName();
+    const welcomeMessage = isHost 
+      ? `Welcome to your farm, ${player.name}! There are ${this.state.players.size} players here.`
+      : `Welcome to ${worldOwnerName}'s farm! You are visiting as ${player.name}.`;
+    
     client.send('welcome', { 
-      message: `Welcome ${player.name}! There are ${this.state.players.size} players online.`,
-      playerId: client.sessionId 
+      message: welcomeMessage,
+      playerId: playerId,  // Send the actual player ID
+      sessionId: client.sessionId,  // Also send session ID for client reference
+      isHost: isHost,
+      worldOwnerId: this.worldOwnerId,
+      worldOwnerName: worldOwnerName
     });
     
     // Broadcast to all other clients
     this.broadcast('player-joined', { 
-      playerId: client.sessionId,
+      playerId: playerId,
       name: player.name,
+      isHost: isHost,
       totalPlayers: this.state.players.size
     }, { except: client });
   }
@@ -96,15 +131,19 @@ export class GameRoom extends Room<GameState> {
   onLeave(client: Client, consented: boolean) {
     console.log(`👋 ${client.sessionId} left the game`);
     
+    // Clean up authenticated client info
+    this.authenticatedClients.delete(client.sessionId);
+    
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.connected = false;
+      const playerId = player.id; // Save player ID before deletion
       
       // Remove player after 30 seconds
       setTimeout(() => {
         this.state.players.delete(client.sessionId);
         this.broadcast('player-left', { 
-          playerId: client.sessionId,
+          playerId: playerId,
           totalPlayers: this.state.players.size 
         });
       }, 30000);
@@ -128,12 +167,17 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
-  private loadCropsFromDatabase() {
+  private loadWorldFromDatabase(worldOwnerId: string) {
     try {
-      // Load all unharvested crops from database
-      const allCrops = databaseService.db.prepare('SELECT * FROM crops WHERE harvested = FALSE').all() as any[];
+      const worldData = databaseService.getWorldData(worldOwnerId);
       
-      for (const dbCrop of allCrops) {
+      if (!worldData.player) {
+        console.log(`🆕 Creating new world for player: ${worldOwnerId}`);
+        return;
+      }
+      
+      // Load crops specific to this world
+      for (const dbCrop of worldData.crops) {
         const crop = new Crop();
         crop.id = dbCrop.id;
         crop.playerId = dbCrop.player_id;
@@ -148,9 +192,18 @@ export class GameRoom extends Room<GameState> {
         this.state.crops.set(crop.id, crop);
       }
       
-      console.log(`📦 Loaded ${allCrops.length} crops from database`);
+      console.log(`📦 Loaded world for ${worldOwnerId}: ${worldData.crops.length} crops, XP: ${worldData.player.xp}`);
     } catch (error) {
-      console.error('❌ Error loading crops from database:', error);
+      console.error(`❌ Error loading world for ${worldOwnerId}:`, error);
+    }
+  }
+
+  private getWorldOwnerName(): string {
+    try {
+      const worldData = databaseService.getWorldData(this.worldOwnerId);
+      return worldData.player?.name || `Player_${this.worldOwnerId.slice(0, 8)}`;
+    } catch (error) {
+      return `Player_${this.worldOwnerId.slice(0, 8)}`;
     }
   }
 
@@ -164,6 +217,17 @@ export class GameRoom extends Room<GameState> {
       this.sendError(client, {
         code: ERROR_CODES.PLAYER_NOT_FOUND,
         message: 'Player not found'
+      });
+      return;
+    }
+
+    // Check if player is the world owner (only host can plant)
+    const authClient = this.authenticatedClients.get(client.sessionId);
+    if (!authClient || !authClient.isHost) {
+      this.sendError(client, {
+        code: ERROR_CODES.INVALID_REQUEST,
+        message: 'Only the farm owner can plant seeds',
+        details: { worldOwnerId: this.worldOwnerId, playerId: authClient?.playerId || 'unknown' }
       });
       return;
     }
@@ -216,7 +280,7 @@ export class GameRoom extends Room<GameState> {
         // Create crop in database
         const now = new Date().toISOString();
         const cropId = databaseService.saveCrop({
-          player_id: client.sessionId,
+          player_id: authClient.playerId,
           seed_type: seedType,
           x: x,
           y: y,
@@ -228,7 +292,7 @@ export class GameRoom extends Room<GameState> {
 
         // Update player XP
         const newXP = player.xp + seedConfig.xpGain;
-        databaseService.updatePlayerXP(client.sessionId, newXP);
+        databaseService.updatePlayerXP(authClient.playerId, newXP);
 
         return { cropId, now, newXP };
       });
@@ -236,7 +300,7 @@ export class GameRoom extends Room<GameState> {
       // Create crop in game state
       const crop = new Crop();
       crop.id = result.cropId;
-      crop.playerId = client.sessionId;
+      crop.playerId = authClient.playerId;
       crop.seedType = seedType;
       crop.x = x;
       crop.y = y;
@@ -261,7 +325,7 @@ export class GameRoom extends Room<GameState> {
       // Broadcast to all players
       this.broadcast('crop_planted', {
         cropId: result.cropId,
-        playerId: client.sessionId,
+        playerId: authClient.playerId,
         playerName: player.name,
         seedType: seedType,
         x: x,
@@ -284,6 +348,17 @@ export class GameRoom extends Room<GameState> {
       this.sendError(client, {
         code: ERROR_CODES.PLAYER_NOT_FOUND,
         message: 'Player not found'
+      });
+      return;
+    }
+
+    // Check if player is the world owner (only host can harvest)
+    const authClient = this.authenticatedClients.get(client.sessionId);
+    if (!authClient || !authClient.isHost) {
+      this.sendError(client, {
+        code: ERROR_CODES.INVALID_REQUEST,
+        message: 'Only the farm owner can harvest crops',
+        details: { worldOwnerId: this.worldOwnerId, playerId: authClient?.playerId || 'unknown' }
       });
       return;
     }
@@ -370,7 +445,7 @@ export class GameRoom extends Room<GameState> {
 
       // Broadcast harvest event
       this.broadcast('harvest_event', {
-        playerId: client.sessionId,
+        playerId: authClient.playerId,
         playerName: player.name,
         cropId: cropId,
         seedType: crop.seedType,

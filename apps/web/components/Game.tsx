@@ -4,13 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
-import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
+import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { CropStats } from './CropStats';
+import { RoomOptions } from '../types/colyseus.types';
+import { usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
 
 interface GameState {
   players: Map<string, {
@@ -38,6 +41,7 @@ class MainScene extends Phaser.Scene {
   private currentPlayer!: Player;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
+  private oKey!: Phaser.Input.Keyboard.Key;
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down';
@@ -45,6 +49,10 @@ class MainScene extends Phaser.Scene {
   private terrainLayout: string[][] = [];
   private debugMode: boolean = false;
   private cropSystem!: CropSystem;
+  private worldId?: string;
+  private isOwnWorld?: boolean;
+  private address?: string;
+  private user?: any;
   
   // Camera system properties
   private worldWidth: number = 1600; // Will be updated based on map size
@@ -107,20 +115,28 @@ class MainScene extends Phaser.Scene {
       console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
     });
     
-    // Load the legacy character sprite sheet for backward compatibility
-    this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
-      frameWidth: CharacterConfig.player.frameWidth,
-      frameHeight: CharacterConfig.player.frameHeight
-    });
     
     // Load all character animation sheets dynamically from CharacterDefinitions
     Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {
+      // Load idle atlas if present
+      if (character.idleAtlas) {
+        this.load.atlas(character.idleAtlas.key, character.idleAtlas.path, character.idleAtlas.atlasPath);
+      }
+      
+      // Load animation sheets
       if (character.type === 'animation_sheets' && character.animationConfig) {
         Object.entries(character.animationConfig.animations).forEach(([animName, animation]) => {
-          this.load.spritesheet(animation.key, animation.path, {
-            frameWidth: character.frameWidth,
-            frameHeight: character.frameHeight
-          });
+          // Check if this is an atlas or a regular spritesheet
+          if (animation.atlasPath) {
+            // Load as atlas (Texture Packer format)
+            this.load.atlas(animation.key, animation.path, animation.atlasPath);
+          } else {
+            // Load as regular spritesheet
+            this.load.spritesheet(animation.key, animation.path, {
+              frameWidth: character.frameWidth,
+              frameHeight: character.frameHeight
+            });
+          }
         });
       }
     });
@@ -157,6 +173,7 @@ class MainScene extends Phaser.Scene {
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
+    this.oKey = this.input.keyboard!.addKey('O');
 
     // Connect to Colyseus after scene is fully ready
     this.time.delayedCall(100, () => {
@@ -1056,6 +1073,16 @@ class MainScene extends Phaser.Scene {
     controls.setScrollFactor(0); // Pin to camera
   }
 
+  setWorldConfiguration(worldId?: string, isOwnWorld?: boolean) {
+    this.worldId = worldId;
+    this.isOwnWorld = isOwnWorld;
+  }
+  
+  setAuthInfo(address?: string, user?: any) {
+    this.address = address;
+    this.user = user;
+  }
+
   async connectToServer() {
     try {
       // Try to detect the appropriate server URL
@@ -1070,11 +1097,25 @@ class MainScene extends Phaser.Scene {
       const endpoint = `ws://${serverHost}:${port}`;
       console.log('Connecting to:', endpoint);
       
+      // Get player ID from wallet address or user ID
+      const playerId = this.address || this.user?.id || `guest_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Determine room type and options based on world configuration
+      let roomType = 'game'; // fallback to generic room
+      const roomOptions: RoomOptions = {
+        name: this.user?.google?.name || this.user?.email?.address?.split('@')[0] || `Player${Math.floor(Math.random() * 1000)}`,
+        playerId: playerId
+      };
+
+      if (this.worldId) {
+        roomType = 'world';
+        roomOptions.worldOwnerId = this.worldId;
+        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'}) with playerId: ${playerId}`);
+      }
+      
       try {
         this.client = new Client(endpoint);
-        this.room = await this.client.joinOrCreate<GameState>('game', {
-          name: `Player${Math.floor(Math.random() * 1000)}`
-        });
+        this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
       } catch (connectionError) {
         console.log('Primary connection failed, trying localhost fallback...');
         // Fallback to localhost if the detected hostname fails
@@ -1082,9 +1123,7 @@ class MainScene extends Phaser.Scene {
           const fallbackEndpoint = `ws://localhost:${port}`;
           console.log('Fallback connecting to:', fallbackEndpoint);
           this.client = new Client(fallbackEndpoint);
-          this.room = await this.client.joinOrCreate<GameState>('game', {
-            name: `Player${Math.floor(Math.random() * 1000)}`
-          });
+          this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
         } else {
           throw connectionError;
         }
@@ -1259,7 +1298,13 @@ class MainScene extends Phaser.Scene {
     // Don't process movement if chat is active
     if (chatActive) return;
 
-    const speed = 3;
+    // Handle O key for stomp animation
+    if (Phaser.Input.Keyboard.JustDown(this.oKey)) {
+      this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
+      console.log('🦶 Stomp animation triggered!');
+    }
+
+    const speed = 6;
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
@@ -1394,19 +1439,33 @@ class MainScene extends Phaser.Scene {
   }
 }
 
-function Game() {
+interface GameProps {
+  worldId?: string;
+  isOwnWorld?: boolean;
+}
+
+function Game({ worldId, isOwnWorld }: GameProps) {
   const gameRef = useRef<Phaser.Game | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
+  
+  // Get user authentication info
+  const { user } = usePrivy();
+  const { address } = useAccount();
 
   useEffect(() => {
+    // Calculate dimensions based on viewport minus bottom bar
+    const BAR_HEIGHT = 64; // Must match CSS --bar-height
+    const gameWidth = window.innerWidth;
+    const gameHeight = window.innerHeight - BAR_HEIGHT;
+    
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 1600,
-      height: 900,
+      width: gameWidth,
+      height: gameHeight,
       parent: 'game-container',
       backgroundColor: '#87CEEB',
       scene: MainScene,
@@ -1416,6 +1475,19 @@ function Game() {
           gravity: { y: 0, x: 0 },
           debug: false // Set to true to see bounding boxes
         }
+      },
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        parent: 'game-container',
+        width: '100%',
+        height: '100%'
+      },
+      render: {
+        pixelArt: false,
+        antialias: true,
+        transparent: false,
+        clearBeforeRender: true,
+        preserveDrawingBuffer: false
       }
     };
 
@@ -1426,6 +1498,11 @@ function Game() {
       const scene = gameRef.current?.scene.getScene('MainScene') as MainScene;
       if (scene) {
         sceneRef.current = scene;
+        
+        // Configure world settings and auth info
+        scene.setWorldConfiguration(worldId, isOwnWorld);
+        scene.setAuthInfo(address, user);
+        
         scene.init({
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
@@ -1438,6 +1515,15 @@ function Game() {
         });
       }
     }, 500);
+
+    // Handle window resize
+    const handleResize = () => {
+      if (gameRef.current) {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight - BAR_HEIGHT;
+        gameRef.current.scale.resize(newWidth, newHeight);
+      }
+    };
 
     // Handle Enter key for chat
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1452,12 +1538,14 @@ function Game() {
       }
     };
 
+    window.addEventListener('resize', handleResize);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy(true);
       }
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -1576,24 +1664,22 @@ function Game() {
       <style jsx>{`
         .game-wrapper {
           position: relative;
-          display: inline-block;
-          width: 800px;
-          height: 600px;
+          width: 100%;
+          height: 100%;
           background: transparent;
         }
 
         #game-container {
           width: 100%;
           height: 100%;
-          border-radius: 8px;
           overflow: hidden;
           position: relative;
         }
 
         .chat-container {
-          position: absolute;
-          bottom: 20px;
-          left: 20px;
+          position: fixed;
+          top: 280px;
+          left: 16px;
           width: 300px;
           max-height: 200px;
           pointer-events: none;

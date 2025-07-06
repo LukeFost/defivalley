@@ -19,6 +19,7 @@
     "better-sqlite3": "^11.7.0",
     "colyseus": "^0.16.4",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.5.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "5.8.2"

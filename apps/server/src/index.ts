@@ -3,7 +3,10 @@ import { createServer } from "http";
 import express from "express";
 import path from "path";
 import { networkInterfaces } from "os";
+import rateLimit from "express-rate-limit";
 import { GameRoom } from "./rooms/GameRoom";
+import { databaseService } from "./services/DatabaseService";
+import { sanitizeWorldId, validatePagination } from "./utils/validation";
 
 const port = Number(process.env.PORT || 2567);
 const app = express();
@@ -14,7 +17,70 @@ const gameServer = new Server({
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Define the GameRoom
+// Add middleware for JSON parsing with size limit
+app.use(express.json({ limit: '10mb' }));
+
+// Configure rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
+
+// API endpoint to get active worlds with pagination
+app.get('/api/worlds', (req, res) => {
+  try {
+    const { page, limit } = validatePagination(req.query.page as string, req.query.limit as string);
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    
+    const activeWorlds = databaseService.getActiveWorlds(limit, (page - 1) * limit, search);
+    const totalWorlds = databaseService.getTotalWorldsCount(search);
+    
+    res.json({ 
+      worlds: activeWorlds,
+      pagination: {
+        page,
+        limit,
+        total: totalWorlds,
+        totalPages: Math.ceil(totalWorlds / limit)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching active worlds:', error);
+    res.status(500).json({ error: 'Failed to fetch active worlds' });
+  }
+});
+
+// API endpoint to check if a world exists with input validation
+app.get('/api/worlds/:worldId/exists', (req, res) => {
+  try {
+    const worldId = sanitizeWorldId(req.params.worldId);
+    
+    if (!worldId) {
+      return res.status(400).json({ 
+        error: 'Invalid world ID format',
+        exists: false 
+      });
+    }
+    
+    const exists = databaseService.playerExists(worldId);
+    res.json({ exists, worldId });
+  } catch (error) {
+    console.error(`❌ Error checking world existence:`, error);
+    res.status(500).json({ error: 'Failed to check world existence' });
+  }
+});
+
+// Define the GameRoom with dynamic room creation
+// Room IDs will be based on world owner IDs (e.g., wallet addresses)
+gameServer.define('world', GameRoom).filterBy(['worldOwnerId']);
+
+// Keep backwards compatibility with generic 'game' room
 gameServer.define('game', GameRoom);
 
 // Get local IP address

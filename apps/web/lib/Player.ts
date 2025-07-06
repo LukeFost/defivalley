@@ -1,5 +1,4 @@
 import { 
-  CharacterConfig, 
   CharacterType, 
   Direction, 
   AnimationState,
@@ -23,6 +22,7 @@ export interface PlayerInfo {
   xp?: number;
   animationState?: AnimationState;
   isMoving?: boolean;
+  isError?: boolean;
 }
 
 export class Player extends Phaser.GameObjects.Container {
@@ -40,6 +40,7 @@ export class Player extends Phaser.GameObjects.Container {
       ...playerInfo,
       animationState: playerInfo.animationState || 'idle',
       isMoving: playerInfo.isMoving || false,
+      isError: playerInfo.isError || false,
     };
     
     // Get character configuration
@@ -47,24 +48,8 @@ export class Player extends Phaser.GameObjects.Container {
     
     // Create sprite based on character type
     this.sprite = this.createCharacterSprite(scene);
-    
-    // Create nameplate
-    this.nameplate = scene.add.text(0, -40, playerInfo.name, {
-      fontSize: '12px',
-      color: playerInfo.isCurrentPlayer ? '#00ff00' : '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 4, y: 2 },
-    });
-    this.nameplate.setOrigin(0.5, 0.5);
-    
-    // Create level badge
-    this.badge = scene.add.text(20, -20, `L${playerInfo.level || 1}`, {
-      fontSize: '10px',
-      color: '#ffffff',
-      backgroundColor: '#4a90e2',
-      padding: { x: 3, y: 1 },
-    });
-    this.badge.setOrigin(0.5, 0.5);
+    this.nameplate = this.createNameplate(scene);
+    this.badge = this.createBadge(scene);
     
     // Add elements to container
     this.add([this.sprite, this.nameplate, this.badge]);
@@ -75,6 +60,11 @@ export class Player extends Phaser.GameObjects.Container {
     // Set initial position
     this.setPosition(x, y);
     
+    // Create animations upfront for performance
+    if (hasAnimations(this.playerInfo.character)) {
+      this.createAnimations();
+    }
+    
     // Initialize sprite display
     this.updateSprite();
   }
@@ -83,48 +73,155 @@ export class Player extends Phaser.GameObjects.Container {
    * Creates the appropriate sprite based on character configuration
    */
   private createCharacterSprite(scene: Phaser.Scene): Phaser.GameObjects.Sprite {
-    if (this.characterConfig.type === 'animation_sheets') {
-      // For animation-based characters (like knight), create with idle animation
-      const idleAnim = this.characterConfig.animationConfig?.animations.idle;
-      if (idleAnim) {
-        console.log(`🎭 Creating sprite for ${this.playerInfo.character} with texture key: ${idleAnim.key}`);
-        
-        // Check if texture exists before creating sprite
-        if (scene.textures.exists(idleAnim.key)) {
-          return scene.add.sprite(0, 0, idleAnim.key);
-        } else {
-          console.warn(`⚠️ Texture ${idleAnim.key} not found! Falling back to legacy character sprite.`);
-          console.log('Available textures:', scene.textures.list);
-          // Fall through to legacy fallback
-        }
+    let textureKey = 'fallback_character'; // Default fallback
+    let frameName: string | undefined;
+    
+    // Check if we have an idle atlas for directional idle frames
+    if (this.characterConfig.idleAtlas && scene.textures.exists(this.characterConfig.idleAtlas.key)) {
+      textureKey = this.characterConfig.idleAtlas.key;
+      // Default to facing down
+      frameName = this.characterConfig.idleAtlas.frameMap.down;
+    } else if (this.characterConfig.type === 'animation_sheets' && this.characterConfig.animationConfig) {
+      // Fallback to animation config if no idle atlas
+      const animConfig = this.characterConfig.animationConfig;
+      const defaultAnim = animConfig.animations[animConfig.defaultState || 'walk'];
+      if (defaultAnim && scene.textures.exists(defaultAnim.key)) {
+        textureKey = defaultAnim.key;
       }
     }
     
-    // For spritesheet-based characters or fallback
-    const spritesheetConfig = this.characterConfig.spritesheetConfig;
-    if (spritesheetConfig) {
-      console.log(`🎭 Using spritesheet character with key: player_characters`);
-      if (scene.textures.exists('player_characters')) {
-        return scene.add.sprite(0, 0, 'player_characters');
-      } else {
-        console.warn(`⚠️ Texture player_characters not found!`);
-      }
-    }
-    
-    // Legacy fallback
-    console.log(`🎭 Using legacy fallback with key: ${this.characterConfig.key}`);
-    if (scene.textures.exists(this.characterConfig.key)) {
-      return scene.add.sprite(0, 0, this.characterConfig.key);
-    } else {
-      console.error(`❌ No valid texture found for character ${this.playerInfo.character}! Creating fallback texture.`);
-      // Create a fallback texture programmatically
+    if (!scene.textures.exists(textureKey)) {
+      console.error(`Fallback texture ${textureKey} not found! Creating a placeholder.`);
       const graphics = scene.add.graphics();
-      graphics.fillStyle(0x4a90e2, 1); // Blue rectangle instead of green
+      graphics.fillStyle(0x4a90e2, 1);
       graphics.fillRect(0, 0, 32, 32);
       graphics.generateTexture('fallback_character', 32, 32);
-      graphics.destroy(); // Clean up the graphics object
+      graphics.destroy();
+      textureKey = 'fallback_character';
+    }
+    
+    const sprite = frameName 
+      ? scene.add.sprite(0, 0, textureKey, frameName)
+      : scene.add.sprite(0, 0, textureKey);
       
-      return scene.add.sprite(0, 0, 'fallback_character');
+    if (this.characterConfig.scale) {
+      sprite.setScale(this.characterConfig.scale);
+    }
+    
+    // Set sprite origin to center for proper rotation and rendering
+    sprite.setOrigin(0.5, 0.5);
+    
+    // Enable auto-clearing to prevent ghosting
+    sprite.setBlendMode(Phaser.BlendModes.NORMAL);
+    
+    return sprite;
+  }
+
+  /**
+   * Creates the nameplate text object
+   */
+  private createNameplate(scene: Phaser.Scene): Phaser.GameObjects.Text {
+    const nameplate = scene.add.text(0, -40, this.playerInfo.name, {
+      fontSize: '12px',
+      color: this.playerInfo.isCurrentPlayer ? '#00ff00' : '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 4, y: 2 },
+    });
+    nameplate.setOrigin(0.5, 0.5);
+    return nameplate;
+  }
+
+  /**
+   * Creates the level badge text object
+   */
+  private createBadge(scene: Phaser.Scene): Phaser.GameObjects.Text {
+    const badge = scene.add.text(20, -20, `L${this.playerInfo.level || 1}`, {
+      fontSize: '10px',
+      color: '#ffffff',
+      backgroundColor: '#4a90e2',
+      padding: { x: 3, y: 1 },
+    });
+    badge.setOrigin(0.5, 0.5);
+    return badge;
+  }
+
+  /**
+   * Creates all animations for the character upfront
+   */
+  private createAnimations(): void {
+    const animConfig = this.characterConfig.animationConfig;
+    if (!animConfig) return;
+
+    for (const state in animConfig.animations) {
+      const animation = animConfig.animations[state];
+      const animKey = `${this.playerInfo.character}_${state}`;
+
+      if (!this.scene.anims.exists(animKey)) {
+        // Skip idle animations as we're using static frames
+        if (state === 'idle') {
+          continue;
+        }
+        
+        // Check if this is an atlas-based animation
+        if (animation.atlasPath) {
+          // For atlas animations, use frame names from the atlas
+          const frameNames = [];
+          
+          // Special handling for stomp animation - frames are in specific order
+          if (state === 'stomp') {
+            // Correct frame order based on the JSON
+            frameNames.push(
+              'Untitled_Artwork-8.png',
+              'Untitled_Artwork-1.png',
+              'Untitled_Artwork-10.png',
+              'Untitled_Artwork-6.png',
+              'Untitled_Artwork-7.png',
+              'Untitled_Artwork-9.png',
+              'Untitled_Artwork-5.png',
+              'Untitled_Artwork-3.png',
+              'Untitled_Artwork-2.png',
+              'Untitled_Artwork-4.png'
+            );
+          } else {
+            // Default sequential frame naming
+            for (let i = 1; i <= animation.frames; i++) {
+              frameNames.push(`Untitled_Artwork-${i}.png`);
+            }
+          }
+          
+          this.scene.anims.create({
+            key: animKey,
+            frames: frameNames.map(frameName => ({
+              key: animation.key,
+              frame: frameName
+            })),
+            frameRate: animation.frameRate,
+            repeat: animation.repeat ? -1 : 0,
+          });
+        } else {
+          // Regular spritesheet animation
+          let startFrame = 0;
+          let endFrame = animation.frames - 1;
+          
+          // Special handling for cowboy animations
+          if (this.playerInfo.character === 'cowboy') {
+            if (state === 'walk' || state === 'run') {
+              startFrame = 1;
+              endFrame = Math.min(7, animation.frames - 1);
+            }
+          }
+
+          this.scene.anims.create({
+            key: animKey,
+            frames: this.scene.anims.generateFrameNumbers(animation.key, {
+              start: startFrame,
+              end: endFrame
+            }),
+            frameRate: animation.frameRate,
+            repeat: animation.repeat ? -1 : 0,
+          });
+        }
+      }
     }
   }
 
@@ -132,194 +229,116 @@ export class Player extends Phaser.GameObjects.Container {
    * Updates the sprite display based on character type and current state
    */
   private updateSprite(): void {
-    if (this.characterConfig.type === 'animation_sheets') {
+    if (hasAnimations(this.playerInfo.character)) {
       this.updateAnimatedSprite();
     } else {
-      this.updateStaticSprite();
-    }
-    
-    // Apply character-specific scaling
-    if (this.characterConfig.scale) {
-      this.sprite.setScale(this.characterConfig.scale);
+      // For non-animated characters, just handle flipping
+      this.sprite.setFlipX(this.playerInfo.direction === 'left');
     }
   }
 
   /**
-   * Updates animated sprites (like knight character)
+   * Updates animated sprites (like cowboy character)
    */
   private updateAnimatedSprite(): void {
-    const animConfig = this.characterConfig.animationConfig;
-    if (!animConfig) return;
-
-    // Check if character has rotation frames for directional facing
-    if (hasRotationFrames(this.playerInfo.character)) {
-      this.updateRotationSprite();
-      return;
-    }
-
-    const animationState = this.playerInfo.animationState || 'idle';
-    const animation = animConfig.animations[animationState];
+    const { character, direction, isMoving, isError } = this.playerInfo;
     
-    if (animation) {
-      const animKey = `${this.playerInfo.character}_${animationState}`;
+    // Handle error state first - override everything else
+    if (isError) {
+      const animKey = `${character}_stomp`;
       
-      // Check if animation exists, if not create it
-      if (!this.scene.anims.exists(animKey)) {
-        // Handle custom frame ranges for different characters
-        let startFrame = 0;
-        let endFrame = animation.frames - 1;
-        
-        // Frame handling for cowboy animations
-        if (animationState === 'idle') {
-          // Idle uses only frame 0
-          startFrame = 0;
-          endFrame = 0;
-        } else if (animationState === 'walk' || animationState === 'run') {
-          // Walk/run uses frames 1-7 (avoiding problematic frames and non-existent frames)
-          startFrame = 1;
-          endFrame = 7;
+      if (this.currentAnimation !== animKey) {
+        // Stop any current animation
+        if (this.sprite.anims.isPlaying) {
+          this.sprite.stop();
         }
         
-        this.scene.anims.create({
-          key: animKey,
-          frames: this.scene.anims.generateFrameNumbers(animation.key, { 
-            start: startFrame, 
-            end: endFrame 
-          }),
-          frameRate: animation.frameRate,
-          repeat: animation.repeat ? -1 : 0,
-        });
-      }
-      
-      // Play animation if it's different from current
-      if (this.currentAnimation !== animKey) {
         this.sprite.play(animKey);
         this.currentAnimation = animKey;
       }
       
-      // Handle directional flipping for left/right movement
-      this.updateSpriteFlipping();
+      // Face forward during error animation
+      this.sprite.setFlipX(false);
+      return;
     }
-  }
-
-  /**
-   * Updates rotation sprites for directional facing (like cowboy rotation)
-   */
-  private updateRotationSprite(): void {
-    const animConfig = this.characterConfig.animationConfig;
-    if (!animConfig) return;
-
-    const animationState = this.playerInfo.animationState || 'idle';
     
-    // For idle state, use rotation frames for directional facing
-    if (animationState === 'idle' || !this.playerInfo.isMoving) {
-      const rotationAnimKey = getRotationAnimationKey(this.playerInfo.character);
-      
-      // Create rotation animation if it doesn't exist
-      if (!this.scene.anims.exists(rotationAnimKey)) {
-        const rotateAnimation = animConfig.animations['rotate'];
-        if (rotateAnimation) {
-          this.scene.anims.create({
-            key: rotationAnimKey,
-            frames: this.scene.anims.generateFrameNumbers(rotateAnimation.key, { 
-              start: 0, 
-              end: rotateAnimation.frames - 1 
-            }),
-            frameRate: 1, // Static frames, no animation
-            repeat: 0,
-          });
+    if (!isMoving) {
+      // Handle idle state with directional atlas frames
+      if (this.characterConfig.idleAtlas) {
+        const idleFrameName = this.characterConfig.idleAtlas.frameMap[direction];
+        const idleAtlasKey = this.characterConfig.idleAtlas.key;
+        
+        // Only update if texture or frame has changed
+        if (this.sprite.texture.key !== idleAtlasKey || this.sprite.frame.name !== idleFrameName) {
+          this.sprite.stop();
+          this.sprite.setTexture(idleAtlasKey, idleFrameName);
+          this.currentAnimation = undefined;
         }
-      }
-      
-      // Set to the appropriate directional frame
-      const directionalFrame = getDirectionalFrame(this.playerInfo.character, this.playerInfo.direction);
-      if (directionalFrame !== null) {
-        // Stop any current animation and set static frame
-        this.sprite.stop();
-        this.sprite.setTexture(getRotationAnimationKey(this.playerInfo.character), directionalFrame);
+        // No flipping needed - we have directional frames
+        this.sprite.setFlipX(false);
+      } else if (hasRotationFrames(character)) {
+        // Fallback to rotation frames if no idle atlas
+        const directionalFrame = getDirectionalFrame(character, direction);
+        if (directionalFrame !== null) {
+          const rotationAnimKey = getRotationAnimationKey(character);
+          const frameName = `Untitled_Artwork-${directionalFrame + 1}.png`;
+          
+          if (this.sprite.texture.key !== rotationAnimKey || this.sprite.frame.name !== frameName) {
+            this.sprite.stop();
+            this.sprite.setTexture(rotationAnimKey, frameName);
+            this.currentAnimation = undefined;
+          }
+        }
       }
     } else {
-      // For walking/running, use the regular walk animation
-      const walkAnimation = animConfig.animations[animationState];
-      if (walkAnimation) {
-        const animKey = `${this.playerInfo.character}_${animationState}`;
-        
-        // Create walk animation if it doesn't exist
-        if (!this.scene.anims.exists(animKey)) {
-          let startFrame = 0;
-          let endFrame = walkAnimation.frames - 1;
-          
-          // Frame handling for walk/run animations
-          if (animationState === 'walk' || animationState === 'run') {
-            startFrame = 1;
-            endFrame = 7;
-          }
-          
-          this.scene.anims.create({
-            key: animKey,
-            frames: this.scene.anims.generateFrameNumbers(walkAnimation.key, { 
-              start: startFrame, 
-              end: endFrame 
-            }),
-            frameRate: walkAnimation.frameRate,
-            repeat: -1,
-          });
+      // Handle walking animations
+      const animKey = `${character}_walk`;
+      
+      if (this.currentAnimation !== animKey) {
+        // Stop any current animation to prevent frame blending
+        if (this.sprite.anims.isPlaying) {
+          this.sprite.stop();
         }
         
-        // Play walk animation if different from current
-        if (this.currentAnimation !== animKey) {
-          this.sprite.play(animKey);
-          this.currentAnimation = animKey;
-        }
+        this.sprite.play(animKey);
+        this.currentAnimation = animKey;
+      }
+      
+      // Handle directional flipping for walk animation
+      if (direction === 'left') {
+        this.sprite.setFlipX(true);
+      } else if (direction === 'right') {
+        this.sprite.setFlipX(false);
       }
     }
   }
 
-  /**
-   * Updates sprite flipping based on movement direction
-   */
-  private updateSpriteFlipping(): void {
-    if (this.playerInfo.direction === 'left') {
-      this.sprite.setFlipX(true); // Flip horizontally for left movement
-    } else if (this.playerInfo.direction === 'right') {
-      this.sprite.setFlipX(false); // Normal orientation for right movement
-    }
-    // For up/down, keep the current flip state (don't change)
-  }
-
-  /**
-   * Updates static sprites (like RPG character sheet)
-   */
-  private updateStaticSprite(): void {
-    const spritesheetConfig = this.characterConfig.spritesheetConfig;
-    if (!spritesheetConfig) return;
-
-    const directionIndex = spritesheetConfig.directions[this.playerInfo.direction];
-    const frameIndex = spritesheetConfig.characterIndex * spritesheetConfig.framesPerCharacter + directionIndex;
-    
-    this.sprite.setFrame(frameIndex);
-    
-    // Handle directional flipping for static sprites too
-    this.updateSpriteFlipping();
-  }
 
   public updatePosition(x: number, y: number): void {
     this.setPosition(x, y);
+    // Force a refresh to prevent ghosting
+    this.sprite.setPosition(0, 0);
   }
 
   public updateDirection(direction: Direction): void {
-    this.playerInfo.direction = direction;
-    this.updateSprite();
+    if (this.playerInfo.direction !== direction) {
+      this.playerInfo.direction = direction;
+      this.updateSprite();
+    }
   }
 
   public updateLevel(level: number): void {
-    this.playerInfo.level = level;
-    this.badge.setText(`L${level}`);
+    if (this.playerInfo.level !== level) {
+      this.playerInfo.level = level;
+      this.badge.setText(`L${level}`);
+    }
   }
 
   public updateName(name: string): void {
-    this.playerInfo.name = name;
-    this.nameplate.setText(name);
+    if (this.playerInfo.name !== name) {
+      this.playerInfo.name = name;
+      this.nameplate.setText(name);
+    }
   }
 
   /**
@@ -338,13 +357,7 @@ export class Player extends Phaser.GameObjects.Container {
   public updateMovementState(isMoving: boolean): void {
     if (this.playerInfo.isMoving !== isMoving) {
       this.playerInfo.isMoving = isMoving;
-      
-      // Update animation state based on movement
-      if (hasAnimations(this.playerInfo.character)) {
-        const newAnimationState = isMoving ? 'walk' : 'idle';
-        console.log(`🎭 ${this.playerInfo.character} animation state: ${this.playerInfo.animationState} → ${newAnimationState}`);
-        this.updateAnimationState(newAnimationState);
-      }
+      this.updateSprite();
     }
   }
 
@@ -383,11 +396,31 @@ export class Player extends Phaser.GameObjects.Container {
     this.nameplate.setColor(isCurrentPlayer ? '#00ff00' : '#ffffff');
   }
 
+  /**
+   * Triggers the error state with stomp animation
+   */
+  public setErrorState(isError: boolean, duration?: number): void {
+    if (this.playerInfo.isError !== isError) {
+      this.playerInfo.isError = isError;
+      this.updateSprite();
+      
+      // Automatically clear error state after duration (default 2 seconds)
+      if (isError && duration !== undefined) {
+        this.scene.time.delayedCall(duration, () => {
+          this.setErrorState(false);
+        });
+      }
+    }
+  }
+
+  /**
+   * Triggers the stomp animation for a specified duration
+   */
+  public playStompAnimation(duration: number = 2000): void {
+    this.setErrorState(true, duration);
+  }
+
   public destroy(): void {
-    // Clean up all child objects
-    this.sprite.destroy();
-    this.nameplate.destroy();
-    this.badge.destroy();
     super.destroy();
   }
 }
