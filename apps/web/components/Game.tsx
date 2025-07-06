@@ -7,15 +7,18 @@ import { Player, PlayerInfo } from '../lib/Player';
 import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
-import { CropSystem, CropType, CropData } from '../lib/CropSystem';
-import { CropContextMenu } from './CropContextMenu';
-import { CropInfo } from './CropInfo';
 import { UIStack } from './UIStack';
+import BuildingContextMenu from './BuildingContextMenu';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
 import { createCorralBuildingData, type CorralBuildingData } from './buildings/CorralBuilding';
 import { useUI, useAppStore } from '@/app/store';
+
+// Import Visual Novel Scenes
+import { CorralScene } from '../lib/scenes/CorralScene';
+import { OrchardScene } from '../lib/scenes/OrchardScene';
+import { WellScene } from '../lib/scenes/WellScene';
 
 interface GameState {
   players: Map<string, {
@@ -50,7 +53,6 @@ class MainScene extends Phaser.Scene {
   private cliffTiles: Phaser.GameObjects.Image[] = [];
   private terrainLayout: string[][] = [];
   private debugMode: boolean = false;
-  private cropSystem!: CropSystem;
   private worldId?: string;
   private isOwnWorld?: boolean;
   private address?: string;
@@ -63,7 +65,7 @@ class MainScene extends Phaser.Scene {
   
   // Building system properties
   private buildings: Map<string, CorralBuildingData> = new Map();
-  private buildingSprites: Map<string, Phaser.GameObjects.Image> = new Map();
+  private buildingSprites: Map<string, Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle> = new Map();
   private buildingHotspots: Map<string, Phaser.GameObjects.Zone> = new Map();
   private buildingEntranceIndicators: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private buildingPhysicsZones: Map<string, Phaser.GameObjects.Zone> = new Map();
@@ -129,12 +131,9 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // Add load event listeners for debugging
-    this.load.on('filecomplete', (key: string, type: string, data: any) => {
-    });
     
     this.load.on('loaderror', (file: any) => {
-      console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
+      console.error(`Failed to load: ${file.key} from ${file.url}`);
     });
     
     
@@ -167,15 +166,21 @@ class MainScene extends Phaser.Scene {
     this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
     
     // Load building sprites
-    this.load.image('corral_building', '/sprites/corral.png');
+    // this.load.image('corral_building', '/sprites/corral.png'); // Disabled - asset not available yet
     
-    // Initialize and preload crop system
-    this.cropSystem = new CropSystem(this);
-    this.cropSystem.preload();
+    
   }
 
   async create() {
+    
     // Log all loaded textures for debugging
+    const textureManager = this.textures;
+    
+    // Check if main tileset loaded
+    if (!textureManager.exists('cliffs_grass_tileset')) {
+      console.error('❌ CRITICAL: Main tileset not loaded!');
+    } else {
+    }
     
     // Setup camera system first
     this.setupCameraSystem();
@@ -192,8 +197,6 @@ class MainScene extends Phaser.Scene {
     // Setup development tools
     this.setupDevTools();
 
-    // Initialize crop system
-    this.cropSystem.create();
 
     // Create buildings
     this.createBuildings();
@@ -207,6 +210,7 @@ class MainScene extends Phaser.Scene {
     this.time.delayedCall(100, () => {
       this.connectToServer();
     });
+    
   }
 
   setupCameraSystem() {
@@ -232,7 +236,7 @@ class MainScene extends Phaser.Scene {
         width: 96,
         height: 64,
         color: 0x8B4513, // Brown
-        callback: this.showCorralModalCallback,
+        callback: () => this.transitionToScene('CorralScene'),
         name: 'Trading Corral',
         description: 'FLOW → FROTH'
       },
@@ -243,7 +247,7 @@ class MainScene extends Phaser.Scene {
         width: 80,
         height: 80,
         color: 0x90EE90, // Light green
-        callback: this.showOrchardModalCallback,
+        callback: () => this.transitionToScene('OrchardScene'),
         name: 'Sacred Orchard',
         description: 'FVIX → sFVIX'
       },
@@ -254,7 +258,7 @@ class MainScene extends Phaser.Scene {
         width: 64,
         height: 64,
         color: 0x87CEEB, // Sky blue
-        callback: this.showWellModalCallback,
+        callback: () => this.transitionToScene('WellScene'),
         name: 'Mystical Well',
         description: 'FROTH → FVIX'
       }
@@ -274,8 +278,10 @@ class MainScene extends Phaser.Scene {
       
       // Create building sprite (use sprite if available, fallback to rectangle)
       let building;
-      if (config.id === 'corral' && this.textures.exists('corral_building')) {
-        building = this.add.image(config.x, config.y, 'corral_building');
+      if (config.id === 'corral') {
+        // Create placeholder for corral building
+        building = this.add.rectangle(config.x, config.y, config.width, config.height, config.color);
+        building.setStrokeStyle(2, 0x654321);
         building.setDisplaySize(config.width, config.height);
       } else {
         // Fallback to placeholder rectangle
@@ -286,57 +292,32 @@ class MainScene extends Phaser.Scene {
       building.setData('buildingType', config.id);
       this.buildingSprites.set(config.id, building);
       
-      // Create entrance indicator (wireframe door)
-      const entranceBox = this.add.graphics();
-      entranceBox.lineStyle(2, 0xFFFF00, 1.0); // Yellow outline
-      entranceBox.strokeRect(
-        buildingData.entryZone.x,
-        buildingData.entryZone.y,
-        buildingData.entryZone.width,
-        buildingData.entryZone.height
-      );
-      entranceBox.fillStyle(0xFFFF00, 0.2); // Yellow fill
-      entranceBox.fillRect(
-        buildingData.entryZone.x,
-        buildingData.entryZone.y,
-        buildingData.entryZone.width,
-        buildingData.entryZone.height
-      );
-      entranceBox.setDepth(buildingData.depth + 1);
-      this.buildingEntranceIndicators.set(config.id, entranceBox);
-      
-      // Add building name labels (high contrast)
+      // Add building name labels (high contrast) 
       const nameLabel = this.add.text(config.x, config.y - config.height/2 - 25, config.name, {
-        fontSize: '14px',
+        fontSize: '16px',
         color: '#FFFFFF',
         fontFamily: 'Arial, sans-serif',
         stroke: '#000000',
-        strokeThickness: 3,
+        strokeThickness: 4,
         fontStyle: 'bold'
       }).setOrigin(0.5).setDepth(buildingData.depth + 2);
       
-      const descLabel = this.add.text(config.x, config.y - config.height/2 - 10, config.description, {
-        fontSize: '11px',
+      const descLabel = this.add.text(config.x, config.y - config.height/2 - 8, config.description, {
+        fontSize: '12px',
         color: '#FFFF00',
+        fontFamily: 'Arial, sans-serif',
+        stroke: '#000000',
+        strokeThickness: 3
+      }).setOrigin(0.5).setDepth(buildingData.depth + 2);
+      
+      // Add interaction instructions
+      const clickLabel = this.add.text(config.x, config.y + config.height/2 + 8, '🖱️ Left: Enter  🖱️ Right: Menu', {
+        fontSize: '9px',
+        color: '#87CEEB',
         fontFamily: 'Arial, sans-serif',
         stroke: '#000000',
         strokeThickness: 2
       }).setOrigin(0.5).setDepth(buildingData.depth + 2);
-      
-      // Create physics-based interaction zone for player collision
-      const physicsZone = this.add.zone(
-        buildingData.entryZone.x + buildingData.entryZone.width / 2,
-        buildingData.entryZone.y + buildingData.entryZone.height / 2,
-        buildingData.entryZone.width,
-        buildingData.entryZone.height
-      );
-      
-      // Enable physics on the zone
-      this.physics.add.existing(physicsZone, true);
-      physicsZone.setData('buildingType', config.id);
-      physicsZone.setData('callback', config.callback);
-      physicsZone.setData('name', config.name);
-      this.buildingPhysicsZones.set(config.id, physicsZone);
       
       // Keep the original clickable hotspot for backward compatibility
       const hotspot = this.add.zone(
@@ -350,37 +331,68 @@ class MainScene extends Phaser.Scene {
       hotspot.setData('buildingType', config.id);
       this.buildingHotspots.set(config.id, hotspot);
       
-      // Add click handler
-      hotspot.on('pointerdown', () => {
-        if (config.callback) {
-          console.log(`🏗️ ${config.name} clicked!`);
-          config.callback();
+      // Add right-click handler for context menu
+      hotspot.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (pointer.rightButtonDown()) {
+          // Trigger building context menu via event
+          this.events.emit('buildingRightClick', {
+            building: {
+              id: config.id,
+              name: config.name,
+              description: config.description,
+              type: config.id === 'corral' ? 'trading' : config.id === 'orchard' ? 'staking' : 'minting'
+            },
+            callback: config.callback,
+            x: pointer.x,
+            y: pointer.y
+          });
         } else {
-          console.log(`⚠️ No callback for ${config.name}`);
+          // Left click - direct enter
+          if (config.callback) {
+            config.callback();
+          } else {
+          }
         }
       });
       
-      // Add hover effects
+      // Add hover effects (button-like behavior)
       hotspot.on('pointerover', () => {
-        building.setScale(1.1); // Grow on hover
-        entranceBox.setAlpha(0.8);
-        nameLabel.setScale(1.2);
-        descLabel.setScale(1.1);
+        building.setScale(1.15); // Bigger growth on hover
+        
+        // Only apply tint if building is a sprite/image, not a rectangle
+        if (building.setTint) {
+          building.setTint(0xFFFFBB); // Slight yellow tint
+        } else {
+          // For rectangles, change fill color instead
+          building.setFillStyle(0xFFFFBB, 0.8);
+        }
+        
+        nameLabel.setScale(1.3);
+        descLabel.setScale(1.2);
+        clickLabel.setScale(1.3);
+        clickLabel.setTint(0x00FF00); // Green "Click to Enter"
         this.input.setDefaultCursor('pointer');
-        console.log(`👆 Hovering over ${config.name}`);
       });
       
       hotspot.on('pointerout', () => {
         building.setScale(1.0); // Return to normal
-        entranceBox.setAlpha(1.0);
+        
+        // Only clear tint if building supports it
+        if (building.clearTint) {
+          building.clearTint();
+        } else {
+          // For rectangles, restore original color
+          building.setFillStyle(config.color || 0x8B4513, 0.8);
+        }
+        
         nameLabel.setScale(1.0);
         descLabel.setScale(1.0);
+        clickLabel.setScale(1.0);
+        clickLabel.clearTint();
         this.input.setDefaultCursor('default');
       });
     });
     
-    console.log('🏗️ Placeholder buildings created and interactive hotspots set up');
-    console.log('📝 TODO: Replace rectangles with actual building sprites');
   }
 
   updateCameraFollow() {
@@ -402,24 +414,20 @@ class MainScene extends Phaser.Scene {
   setupDevTools() {
     if (typeof window !== 'undefined') {
       (window as any).debugMessage = () => {
-        console.log('🎮 Character selection handled server-side. Use server admin tools to reset characters.');
       };
       
       (window as any).toggleDebugMode = () => {
         this.debugMode = !this.debugMode;
-        console.log(`🔧 Debug mode: ${this.debugMode ? 'ON' : 'OFF'}`);
         this.renderDebugOverlay();
       };
       
       (window as any).printTerrainLayout = () => {
-        console.log('🗺️ Terrain Layout:');
         console.table(this.terrainLayout);
       };
       
       (window as any).editTile = (x: number, y: number, tileType: string) => {
         const result = TilemapEditor.editTile(this.terrainLayout, x, y, tileType);
         if (result.success) {
-          console.log(`✅ Tile at (${x}, ${y}) changed from ${result.oldTileType} to ${tileType}`);
           this.refreshTerrain();
         } else {
           console.error(`❌ Failed to edit tile: ${result.error}`);
@@ -431,7 +439,6 @@ class MainScene extends Phaser.Scene {
           this.terrainLayout, x, y, radius, 'cliff_corner', 'cliff_grass_transition'
         );
         if (result.success) {
-          console.log(`🏝️ Created island at (${x}, ${y}) with radius ${radius}, changed ${result.tilesChanged} tiles`);
           this.refreshTerrain();
         } else {
           console.error(`❌ Failed to create island: ${result.error}`);
@@ -440,8 +447,6 @@ class MainScene extends Phaser.Scene {
       
       (window as any).validateTerrain = () => {
         const validation = TilemapEditor.validateTerrain(this.terrainLayout);
-        console.log('🔍 Terrain Validation:');
-        console.log(`Valid: ${validation.isValid}`);
         if (validation.errors.length > 0) {
           console.error('Errors:', validation.errors);
         }
@@ -452,12 +457,9 @@ class MainScene extends Phaser.Scene {
       
       (window as any).exportTerrain = () => {
         const exported = TilemapEditor.exportTerrain(this.terrainLayout);
-        console.log('📤 Exported terrain:');
-        console.log(exported);
         // Copy to clipboard if available
         if (navigator.clipboard) {
           navigator.clipboard.writeText(exported);
-          console.log('✅ Copied to clipboard!');
         }
       };
       
@@ -466,89 +468,24 @@ class MainScene extends Phaser.Scene {
         if (currentDebug) {
           this.physics.world.debugGraphic.clear();
           (this.physics.world as any).debugGraphic = null;
-          console.log('🔧 Physics debug: OFF');
         } else {
           this.physics.world.createDebugGraphic();
-          console.log('🔧 Physics debug: ON - You can now see bounding boxes');
         }
       };
       
       (window as any).debugCharacters = () => {
-        console.log('🎭 Character Debugging Information:');
-        console.log('Available textures:', Object.keys(this.textures.list));
-        console.log('Character definitions:', CharacterDefinitions);
-        
-        // Check each character's assets
-        Object.entries(CharacterDefinitions).forEach(([name, config]) => {
-          console.log(`\n${name.toUpperCase()} Character:`);
-          console.log('  Config:', config);
-          
-          if (config.type === 'animation_sheets' && config.animationConfig) {
-            Object.entries(config.animationConfig.animations).forEach(([animName, anim]) => {
-              const exists = this.textures.exists(anim.key);
-              console.log(`  ${animName} (${anim.key}): ${exists ? '✅ LOADED' : '❌ MISSING'}`);
-              if (!exists) {
-                console.log(`    Expected path: ${anim.path}`);
-              }
-            });
-          }
-        });
-        
-        // Current player info
         if (this.currentPlayer) {
           const playerInfo = this.currentPlayer.getPlayerInfo();
-          console.log(`\nCurrent player character: ${playerInfo.character}`);
-          // Access private sprite property for debugging
-          const sprite = (this.currentPlayer as any).sprite;
-          console.log('Player sprite texture:', sprite?.texture?.key || 'NONE');
+          console.log(`Current player character: ${playerInfo.character}`);
         }
       };
 
-      // Advanced tilemap debugging
       (window as any).debugTilemap = () => {
-        console.log('🗺️ === TILEMAP DEBUG INFO ===');
-        
-        // Check tileset texture
-        const tilesetTexture = this.textures.get('cliffs_grass_tileset');
-        console.log('Tileset texture:', tilesetTexture);
-        console.log('Tileset dimensions:', tilesetTexture.source[0]?.width || 'UNKNOWN', 'x', tilesetTexture.source[0]?.height || 'UNKNOWN');
-        
-        // Check tile configuration
-        console.log('\nTile configurations:');
-        Object.entries(TilesetConfig.tiles).forEach(([name, config]) => {
-          const isValid = config.x >= 0 && config.y >= 0 && 
-                         config.x + config.width <= (tilesetTexture.source[0]?.width || 0) &&
-                         config.y + config.height <= (tilesetTexture.source[0]?.height || 0);
-          console.log(`  ${name}: ${isValid ? '✅' : '❌'} {x:${config.x}, y:${config.y}, w:${config.width}, h:${config.height}}`);
-        });
-        
-        // Check rendered tiles
-        console.log('\nRendered tiles in scene:');
         const tileObjects = this.children.list.filter(child => child.getData && child.getData('tileType'));
         console.log(`Total tile objects: ${tileObjects.length}`);
-        
-        if (tileObjects.length > 0) {
-          const firstTile = tileObjects[0] as Phaser.GameObjects.Image;
-          console.log('First tile:', {
-            position: { x: firstTile.x, y: firstTile.y },
-            displaySize: { width: firstTile.displayWidth, height: firstTile.displayHeight },
-            depth: firstTile.depth,
-            visible: firstTile.visible,
-            alpha: firstTile.alpha,
-            tileType: firstTile.getData('tileType')
-          });
-        }
-        
-        // Camera information
-        console.log('\nCamera info:');
-        console.log(`Camera scroll: (${this.cameras.main.scrollX}, ${this.cameras.main.scrollY})`);
-        console.log(`Camera bounds: ${this.cameras.main.getBounds()}`);
-        console.log(`World bounds: ${this.worldWidth}x${this.worldHeight}`);
       };
 
       (window as any).testTileVisibility = () => {
-        console.log('🧪 Testing tile visibility...');
-        
         // Remove existing test tiles
         this.children.list.filter(child => child.getData && child.getData('testTile')).forEach(tile => tile.destroy());
         
@@ -556,12 +493,10 @@ class MainScene extends Phaser.Scene {
         const testTile1 = this.add.rectangle(100, 100, 32, 32, 0xff0000);
         testTile1.setData('testTile', true);
         testTile1.setDepth(10);
-        console.log('Created red test tile at (100, 100)');
         
         const testTile2 = this.add.rectangle(200, 100, 32, 32, 0x00ff00);
         testTile2.setData('testTile', true);
         testTile2.setDepth(10);
-        console.log('Created green test tile at (200, 100)');
         
         // Test tileset texture rendering
         if (this.textures.exists('cliffs_grass_tileset')) {
@@ -569,7 +504,6 @@ class MainScene extends Phaser.Scene {
           testTilesetRender.setData('testTile', true);
           testTilesetRender.setDepth(10);
           testTilesetRender.setDisplaySize(64, 64);
-          console.log('Created raw tileset test image at (300, 100)');
           
           // Test with crop
           const testCroppedTile = this.add.image(400, 100, 'cliffs_grass_tileset');
@@ -577,14 +511,11 @@ class MainScene extends Phaser.Scene {
           testCroppedTile.setDepth(10);
           testCroppedTile.setDisplaySize(32, 32);
           testCroppedTile.setCrop(96, 80, 32, 32); // grass_main coordinates
-          console.log('Created cropped grass tile test at (400, 100)');
         }
         
-        console.log('✅ Test tiles created. Check the game for red, green, raw tileset, and cropped grass tiles.');
       };
       
       (window as any).debugTilemap = () => {
-        console.log('🗺️ Tilemap Debugging Information:');
         
         // Check tileset texture
         const texture = this.textures.get('cliffs_grass_tileset');
@@ -629,7 +560,6 @@ class MainScene extends Phaser.Scene {
       };
       
       (window as any).testTileVisibility = () => {
-        console.log('🔍 Testing tile visibility...');
         
         // Create a test tile without cropping
         const testTile1 = this.add.image(400, 300, 'cliffs_grass_tileset');
@@ -648,7 +578,6 @@ class MainScene extends Phaser.Scene {
       };
       
       (window as any).testBuildingVisibility = () => {
-        console.log('🏗️ Testing building visibility...');
         
         // Clear existing test buildings
         this.children.list.filter(child => child.getData && child.getData('testBuilding')).forEach(building => building.destroy());
@@ -658,36 +587,26 @@ class MainScene extends Phaser.Scene {
         testBuilding1.setStrokeStyle(4, 0xffffff);
         testBuilding1.setDepth(1000);
         testBuilding1.setData('testBuilding', true);
-        console.log('Created RED test building at (800, 400)');
         
         const testBuilding2 = this.add.rectangle(500, 600, 80, 80, 0x00ff00);
         testBuilding2.setStrokeStyle(4, 0xffffff);
         testBuilding2.setDepth(1000);
         testBuilding2.setData('testBuilding', true);
-        console.log('Created GREEN test building at (500, 600)');
         
         const testBuilding3 = this.add.rectangle(1200, 500, 64, 64, 0x0000ff);
         testBuilding3.setStrokeStyle(4, 0xffffff);
         testBuilding3.setDepth(1000);
         testBuilding3.setData('testBuilding', true);
-        console.log('Created BLUE test building at (1200, 500)');
         
-        // Test if corral sprite loads
-        if (this.textures.exists('corral_building')) {
-          const testCorral = this.add.image(600, 300, 'corral_building');
-          testCorral.setDisplaySize(96, 64);
-          testCorral.setDepth(1000);
-          testCorral.setData('testBuilding', true);
-          console.log('Created CORRAL SPRITE test at (600, 300)');
-        } else {
-          console.error('❌ corral_building texture not loaded!');
-        }
+        // Create test corral placeholder
+        const testCorral = this.add.rectangle(600, 300, 96, 64, 0x8B4513);
+        testCorral.setStrokeStyle(2, 0x654321);
+        testCorral.setDepth(1000);
+        testCorral.setData('testBuilding', true);
         
-        console.log('✅ Test buildings created. Check the game for colored rectangles and corral sprite.');
       };
       
       (window as any).debugAssets = () => {
-        console.log('🎨 === ASSET DEBUG INFO ===');
         
         // Check all loaded textures
         console.log('\nLoaded textures:');
@@ -700,7 +619,7 @@ class MainScene extends Phaser.Scene {
         
         // Check if building textures exist
         console.log('\nBuilding textures:');
-        console.log(`  corral_building: ${this.textures.exists('corral_building') ? '✅ LOADED' : '❌ MISSING'}`);
+        console.log(`  corral_building: ❌ DISABLED (asset not available)`);
         
         // Check scene objects
         console.log('\nScene objects:');
@@ -715,7 +634,6 @@ class MainScene extends Phaser.Scene {
       };
 
       (window as any).debugBuildings = () => {
-        console.log('🏗️ === BUILDING DEBUG INFO ===');
         
         console.log(`\\nBuilding data: ${this.buildings.size} buildings`);
         this.buildings.forEach((building, id) => {
@@ -741,7 +659,6 @@ class MainScene extends Phaser.Scene {
       };
 
       (window as any).testBuildingTrigger = (buildingId: string) => {
-        console.log(`🧪 Testing building trigger for: ${buildingId}`);
         this.triggerBuildingInteraction(buildingId);
       };
 
@@ -754,9 +671,33 @@ class MainScene extends Phaser.Scene {
           console.log(`❌ Building ${buildingId} not found or no current player`);
         }
       };
+
+      // Visual Novel Scene Testing Functions
+      (window as any).testCorralScene = () => {
+        this.scene.stop();
+        this.scene.start('CorralScene', { returnScene: 'MainScene', playerData: {} });
+      };
+
+      (window as any).testOrchardScene = () => {
+        this.scene.stop();
+        this.scene.start('OrchardScene', { returnScene: 'MainScene', playerData: {} });
+      };
+
+      (window as any).testWellScene = () => {
+        this.scene.stop();
+        this.scene.start('WellScene', { returnScene: 'MainScene', playerData: {} });
+      };
+
+      (window as any).returnToMainScene = () => {
+        this.scene.stop();
+        this.scene.start('MainScene');
+      };
+
+      (window as any).listAllScenes = () => {
+        console.log('📋 Available Scenes:');
+      };
       
       (window as any).debugPlayers = () => {
-        console.log('👤 === PLAYER DEBUG INFO ===');
         
         console.log(`\nTotal players: ${this.players.size}`);
         console.log(`Current player exists: ${!!this.currentPlayer}`);
@@ -780,7 +721,6 @@ class MainScene extends Phaser.Scene {
       };
       
       (window as any).createTestPlayer = () => {
-        console.log('👤 Creating test player...');
         
         // Create simple test player at center of screen
         const testPlayer = this.add.circle(400, 300, 16, 0xff0000);
@@ -797,30 +737,9 @@ class MainScene extends Phaser.Scene {
           strokeThickness: 2
         }).setOrigin(0.5).setDepth(1001);
         
-        console.log('✅ Test player created at center (400, 300)');
       };
       
-      console.log('🛠️ Dev tools available:');
-      console.log('  - resetMyCharacter(): Reset character selection');
-      console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
-      console.log('  - printTerrainLayout(): Print terrain layout to console');
-      console.log('  - editTile(x, y, tileType): Edit a single tile');
-      console.log('  - createIsland(x, y, radius): Create cliff island');
-      console.log('  - validateTerrain(): Check terrain for issues');
-      console.log('  - exportTerrain(): Export terrain to JSON');
-      console.log('  - debugCharacters(): Debug character loading issues');
-      console.log('  🔍 TILEMAP DEBUGGING:');
-      console.log('  - debugTilemap(): Complete tilemap diagnostic');
-      console.log('  - testTileVisibility(): Test basic tile rendering');
-      console.log('  🏗️ BUILDING DEBUGGING:');
-      console.log('  - testBuildingVisibility(): Create test building shapes');
-      console.log('  - debugAssets(): Check all loaded assets and textures');
-      console.log('  - debugBuildings(): Check building physics zones and interactions');
-      console.log('  - testBuildingTrigger(buildingId): Manually trigger building (corral, orchard, well)');
-      console.log('  - teleportToBuilding(buildingId): Teleport player to building entrance');
-      console.log('  👤 PLAYER DEBUGGING:');
-      console.log('  - debugPlayers(): Check player state and visibility');
-      console.log('  - createTestPlayer(): Create test player shape');
+      // Dev tools available in console
     }
   }
   
@@ -923,6 +842,105 @@ class MainScene extends Phaser.Scene {
     gridGraphics.strokePath();
   }
 
+  createRichTilemapWorld() {
+    // Generate terrain layout using existing utilities
+    const mapWidth = 50;  // 50 tiles wide
+    const mapHeight = 38; // 38 tiles tall
+    
+    // Import TilemapUtils at runtime
+    import('../lib/tilemap.config').then(({ TilemapUtils }) => {
+      // Use the EXISTING terrain generation system
+      this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
+      
+      // Apply advanced terrain features
+      this.enhanceTerrainWithAdvancedFeatures();
+      
+      // Create Phaser Tilemap from layout
+      this.createPhaserTilemapFromLayout();
+      
+      // Initialize collision system
+      this.initializeCollisionMap();
+    });
+  }
+
+  enhanceTerrainWithAdvancedFeatures() {
+    if (!this.terrainLayout) return;
+    
+    // Add cliff plateaus for visual interest
+    this.paintRectangularPlateau(this.terrainLayout, 10, 8, 6, 4);
+    this.paintRectangularPlateau(this.terrainLayout, 35, 12, 8, 5);
+    
+    // Add circular lake feature  
+    this.paintCircularLake(this.terrainLayout, 25, 25, 4);
+    
+    // Connect areas with natural paths
+    this.paintPath(this.terrainLayout, [
+      {x: 5, y: 20}, {x: 15, y: 20}, {x: 25, y: 15}, {x: 40, y: 18}
+    ]);
+    
+    // Add organic decorations and scattered features
+    this.scatterDecorations(this.terrainLayout);
+    this.paintScatteredFeatures(this.terrainLayout);
+  }
+
+  createPhaserTilemapFromLayout() {
+    if (!this.terrainLayout) return;
+    
+    // Import tilemap config at runtime
+    import('../lib/tilemap.config').then(({ TilemapUtils }) => {
+      // Create tilemap from the terrain layout
+      const tileSize = 32;
+      const mapWidth = this.terrainLayout[0].length;
+      const mapHeight = this.terrainLayout.length;
+      
+      // Create Phaser tilemap
+      const map = this.make.tilemap({
+        tileWidth: tileSize,
+        tileHeight: tileSize,
+        width: mapWidth,
+        height: mapHeight
+      });
+      
+      // Add tileset
+      const tileset = map.addTilesetImage('cliffs_grass_tileset', 'cliffs_grass_tileset', tileSize, tileSize);
+      
+      // Create layer and populate with terrain
+      const layer = map.createBlankLayer('terrain', tileset, 0, 0);
+      
+      // Populate tiles based on terrain layout
+      for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+          const tileType = this.terrainLayout[y][x];
+          const tileIndex = TilemapUtils.getTileIndexByName(tileType);
+          if (tileIndex >= 0) {
+            layer.putTileAt(tileIndex, x, y);
+          }
+        }
+      }
+      
+      // Set collision for cliff tiles
+      this.setupTilemapCollision(map, layer);
+      
+      // Update world dimensions
+      this.worldWidth = mapWidth * tileSize;
+      this.worldHeight = mapHeight * tileSize;
+      
+    });
+  }
+
+  setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
+    // Import tilemap config to get collision tiles
+    import('../lib/tilemap.config').then(({ TilemapUtils }) => {
+      const collisionTiles = TilemapUtils.getCollisionTileIndexes();
+      layer.setCollisionByExclusion(collisionTiles);
+      
+      // Store for player collision detection
+      this.tilemapLayer = layer;
+      
+    });
+  }
+
+
   createSimpleFarmBackground() {
     
     // Set world dimensions for a farm area
@@ -992,7 +1010,6 @@ class MainScene extends Phaser.Scene {
     // Store wall group for player collision detection
     this.invisibleWalls = walls;
     
-    console.log('🪵 Wooden fence boundaries created to keep players in world bounds');
   }
   
   private setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
@@ -1150,7 +1167,6 @@ class MainScene extends Phaser.Scene {
     const mapHeight = layout.length;
     const mapWidth = layout[0].length;
     
-    console.log(`🎨 Painting path connecting ${points.length} points`);
     
     // Connect each point to the next
     for (let i = 0; i < points.length - 1; i++) {
@@ -1190,14 +1206,12 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Path painted connecting all points`);
   }
 
   private scatterDecorations(layout: string[][]) {
     const mapHeight = layout.length;
     const mapWidth = layout[0].length;
     
-    console.log(`🎨 Scattering organic decorations across the world`);
     
     let decorationsPlaced = 0;
     
@@ -1218,14 +1232,12 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Scattered ${decorationsPlaced} organic decorations`);
   }
 
   private paintScatteredFeatures(layout: string[][]) {
     const mapHeight = layout.length;
     const mapWidth = layout[0].length;
     
-    console.log(`🎨 Adding scattered features with improved algorithms`);
     
     // Add a few small cliff outcrops for visual interest
     for (let i = 0; i < 5; i++) {
@@ -1244,7 +1256,6 @@ class MainScene extends Phaser.Scene {
       }
     }
     
-    console.log(`✅ Scattered features added with improved placement logic`);
   }
 
   // Old manual rendering methods removed - now using proper Phaser Tilemap system
@@ -1407,6 +1418,35 @@ class MainScene extends Phaser.Scene {
     this.user = user;
   }
 
+  /**
+   * Transition to a scene using the scene management system
+   */
+  transitionToScene(sceneKey: string) {
+    
+    // Activate scene transition system if not already done
+    if (!(window as any).phaserGameInstance) {
+      (window as any).phaserGameInstance = this.scene.manager.game;
+    }
+    
+    // Properly stop current scene before starting new one
+    this.scene.stop(); // Stop current scene first
+    
+    // Start the new scene
+    this.scene.start(sceneKey, { 
+      previousScene: 'MainScene',
+      playerId: this.sessionId 
+    });
+  }
+
+  /**
+   * Return to main farming scene from building scene  
+   */
+  returnToMainScene() {
+    this.scene.stop(); // Stop current scene first
+    this.scene.start('MainScene');
+  }
+
+
   async connectToServer() {
     try {
       // Try to detect the appropriate server URL
@@ -1457,34 +1497,18 @@ class MainScene extends Phaser.Scene {
 
       // Building collision detection is now set up immediately after player creation
 
-      // Listen for state changes
-      this.room.onStateChange((state) => {
-        console.log('State changed, players:', state.players);
-        
-        // Make sure scene is initialized before handling players
-        if (!this.scene || !this.scene.isActive()) {
-          console.log('Scene not ready yet, skipping state update');
-          return;
-        }
-        
-        // Handle all players in the current state
+      // KISS approach: Just use simple message listeners, no complex state
+      
+      // Wait for initial state, then add any existing players and load crops
+      this.room.onStateChange.once((state) => {
         if (state.players) {
-          // Clear existing players first
-          this.players.forEach((player, sessionId) => {
-            if (!state.players.has || !state.players.has(sessionId)) {
-              this.removePlayer(sessionId);
-            }
-          });
-          
-          // Add or update all current players
           state.players.forEach((player: any, sessionId: string) => {
-            if (this.players.has(sessionId)) {
-              this.updatePlayer(sessionId, player);
-            } else {
-              this.addPlayer(sessionId, player);
-            }
+            this.addPlayer(sessionId, player);
           });
         }
+        
+
+        // Crop listeners are set up above - no duplicates needed
       });
 
       // Listen for messages
@@ -1508,7 +1532,6 @@ class MainScene extends Phaser.Scene {
       });
 
       console.log('Connected to server!');
-      console.log('🎮 SERVER CONNECTION ESTABLISHED - Player should be created soon');
     } catch (error) {
       console.error('Failed to connect to server:', error);
       console.log('🚨 SERVER CONNECTION FAILED - Creating test player for debugging');
@@ -1520,7 +1543,6 @@ class MainScene extends Phaser.Scene {
   }
 
   createTestPlayerForDebugging() {
-    console.log('🧪 Creating test player for debugging purposes');
     
     // Create a simple test player at the center of the screen
     const testSessionId = 'debug-player';
@@ -1539,7 +1561,19 @@ class MainScene extends Phaser.Scene {
     // Add the test player
     this.addPlayer(testSessionId, testPlayer);
     
-    console.log('🧪 Test player created - should be visible at center');
+    // Create a mock room object so movement works
+    this.room = {
+      send: (type: string, data: any) => {
+        // Update the test player position locally for debugging
+        if (type === 'move') {
+          const player = this.players.get(testSessionId);
+          if (player) {
+            player.updatePosition(data.x, data.y);
+          }
+        }
+      }
+    } as any;
+    
   }
 
   addPlayer(sessionId: string, player: any) {
@@ -1562,12 +1596,10 @@ class MainScene extends Phaser.Scene {
       if (isCurrentPlayer) {
         player.x = 400; // Center X (800/2)
         player.y = 300; // Center Y (600/2)
-        console.log('🎯 Current player spawned at center:', player.x, player.y);
       }
       
       // All players are cowboys now - simplified character assignment
       const characterType: CharacterType = 'cowboy';
-      console.log(`🤠 Player ${player.name} assigned cowboy character`);
       
       // Create PlayerInfo object
       const playerInfo: PlayerInfo = {
@@ -1583,13 +1615,10 @@ class MainScene extends Phaser.Scene {
       };
       
       // Create Player instance
-      console.log('🎯 Creating Player instance at position:', player.x, player.y);
       const playerObject = new Player(this, player.x, player.y, playerInfo);
-      console.log('✅ Player instance created successfully');
       
       // Store reference
       this.players.set(sessionId, playerObject);
-      console.log('📝 Player stored in players map, total players:', this.players.size);
       
       if (isCurrentPlayer) {
         this.currentPlayer = playerObject;
@@ -1604,20 +1633,12 @@ class MainScene extends Phaser.Scene {
         // Set up wall collision to prevent player from leaving world bounds
         if (this.invisibleWalls) {
           this.physics.add.collider(this.currentPlayer, this.invisibleWalls);
-          console.log('🧱 Player collision with walls enabled');
         }
         
-        // Set up building interactions immediately after player physics is ready
-        this.setupBuildingCollisions();
+        // Building interactions use simple click-based approach (no physics collision needed)
         
         // Start camera following the current player
         this.updateCameraFollow();
-        console.log('📷 Camera now following current player');
-        console.log('🎮 Current player position:', this.currentPlayer.x, this.currentPlayer.y);
-        console.log('🎮 Current player visible:', this.currentPlayer.visible);
-        console.log('🎮 Current player alpha:', this.currentPlayer.alpha);
-        console.log('🎮 Current player depth:', this.currentPlayer.depth);
-        console.log('⚡ Physics enabled on current player');
       }
       
       console.log('Added player:', sessionId, player.name, 'with character:', characterType);
@@ -1658,121 +1679,19 @@ class MainScene extends Phaser.Scene {
   updatePlayerDirection(player: Player, direction: string) {
     try {
       player.updateDirection(direction as any);
-      console.log(`🧭 Updated player direction: ${direction}`);
     } catch (error) {
       console.error('Error updating player direction:', error);
     }
   }
 
-  /**
-   * Set up physics-based collision detection between player and buildings
-   */
-  setupBuildingCollisions() {
-    if (!this.currentPlayer) {
-      console.log('⚠️ Cannot setup building collisions - no current player');
-      return;
-    }
-
-    // Create physics colliders for each building
-    this.buildingPhysicsZones.forEach((zone, buildingId) => {
-      // Set up overlap detection (not collision - we want to trigger, not block)
-      this.physics.add.overlap(this.currentPlayer, zone, () => {
-        this.triggerBuildingInteraction(buildingId);
-      });
-    });
-
-    console.log('🏗️ Building collision detection set up for', this.buildingPhysicsZones.size, 'buildings');
-  }
-
-  /**
-   * Check for building interactions manually (fallback method)
-   */
-  checkBuildingInteractions() {
-    if (!this.currentPlayer) return;
-
-    let currentlyInAnyZone = false;
-    let currentZoneId: string | undefined;
-
-    // Check all building zones to see if player is currently in any
-    this.buildingPhysicsZones.forEach((zone, buildingId) => {
-      // Use physics body bounds for more accurate collision detection
-      const playerBody = this.currentPlayer.body as Phaser.Physics.Arcade.Body;
-      const zoneBody = zone.body as Phaser.Physics.Arcade.StaticBody;
-      
-      if (playerBody && zoneBody) {
-        // Get physics body bounds instead of sprite bounds
-        const playerBounds = new Phaser.Geom.Rectangle(
-          playerBody.x, playerBody.y, playerBody.width, playerBody.height
-        );
-        const zoneBounds = new Phaser.Geom.Rectangle(
-          zoneBody.x, zoneBody.y, zoneBody.width, zoneBody.height
-        );
-
-        // Check if player overlaps with building zone
-        if (Phaser.Geom.Rectangle.Overlaps(playerBounds, zoneBounds)) {
-          currentlyInAnyZone = true;
-          currentZoneId = buildingId;
-          this.triggerBuildingInteraction(buildingId);
-        }
-      }
-    });
-
-    // Reset toggle if player has left all building zones
-    if (!currentlyInAnyZone && this.lastTriggeredBuilding) {
-      console.log(`🚪 Left building: ${this.lastTriggeredBuilding}`);
-      this.lastTriggeredBuilding = undefined;
-    }
-  }
-
-  /**
-   * Trigger building interaction with deduplication toggle
-   */
-  triggerBuildingInteraction(buildingId: string) {
-    // Only trigger if we're not already in this building (deduplication)
-    if (this.lastTriggeredBuilding === buildingId) {
-      return; // Already inside this building, don't re-trigger
-    }
-
-    const zone = this.buildingPhysicsZones.get(buildingId);
-    if (!zone) return;
-
-    const callback = zone.getData('callback');
-    const name = zone.getData('name');
-
-    if (callback && typeof callback === 'function') {
-      console.log(`🚪 Entering ${name}!`);
-      callback();
-      
-      // Mark this building as currently active (toggle on)
-      this.lastTriggeredBuilding = buildingId;
-    } else {
-      // Only log warning once per building to prevent spam
-      if (!this.loggedMissingCallbacks) {
-        this.loggedMissingCallbacks = new Set();
-      }
-      
-      if (!this.loggedMissingCallbacks.has(buildingId)) {
-        console.log(`⚠️ No callback found for building: ${buildingId}`);
-        this.loggedMissingCallbacks.add(buildingId);
-      }
-      
-      // Still mark as triggered to prevent repeated warnings
-      this.lastTriggeredBuilding = buildingId;
-    }
-  }
+  // Building interactions now use simple click-based approach
+  // No collision detection needed - buildings work like buttons!
 
   update() {
     if (!this.room || !this.currentPlayer) return;
 
-    // Update crop system
-    if (this.cropSystem) {
-      this.cropSystem.update();
-    }
 
-    // Building interactions now use toggle-based deduplication instead of cooldowns
-
-    // Check for building interactions
-    this.checkBuildingInteractions();
+    // Building interactions now use simple click-based approach (no collision checking)
 
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
@@ -1780,7 +1699,6 @@ class MainScene extends Phaser.Scene {
     // Handle O key for stomp animation (only when chat is not active)
     if (!chatActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
       this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
-      console.log('🦶 Stomp animation triggered!');
     }
     
     // Don't process movement if chat is active
@@ -1840,11 +1758,17 @@ class MainScene extends Phaser.Scene {
       }
     }
 
-    // Send movement to server
+    // Update local player position and send movement to server
     if (moved) {
+      // Update local player position immediately for responsive controls
+      this.currentPlayer.updatePosition(newX, newY);
+      
+      // Send movement to server
       this.room.send('move', { x: newX, y: newY });
+      
       // Update camera to follow player
       this.updateCameraFollow();
+      
     }
   }
 
@@ -1869,56 +1793,6 @@ class MainScene extends Phaser.Scene {
     this.scene.stop();
   }
 
-  // Crop system methods for external access
-  getCropSystem(): CropSystem | null {
-    return this.cropSystem || null;
-  }
-
-  canPlantAt(x: number, y: number): boolean {
-    return this.cropSystem ? this.cropSystem.canPlantAt(x, y) : false;
-  }
-
-  getCropAt(x: number, y: number): { id: string; type: CropType; stage: string } | null {
-    if (!this.cropSystem) return null;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    return crop ? { id: crop.id, type: crop.type, stage: crop.stage } : null;
-  }
-
-  plantCrop(cropType: CropType, x: number, y: number): void {
-    if (this.cropSystem) {
-      this.cropSystem.plantCrop(x, y, cropType);
-    }
-  }
-
-  removeCropAtPosition(x: number, y: number): void {
-    if (!this.cropSystem) return;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    if (crop) {
-      this.cropSystem.removeCrop(crop.id);
-    }
-  }
-
-  harvestCropAtPosition(x: number, y: number): void {
-    if (!this.cropSystem) return;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    if (crop) {
-      this.cropSystem.harvestCrop(crop.id);
-    }
-  }
-
-  getTotalCrops(): number {
-    return this.cropSystem ? this.cropSystem.getAllCrops().length : 0;
-  }
-
-  getReadyCrops(): number {
-    if (!this.cropSystem) return 0;
-    return this.cropSystem.getAllCrops().filter(crop => crop.stage === 'ready').length;
-  }
-
-  getGrowingCrops(): number {
-    if (!this.cropSystem) return 0;
-    return this.cropSystem.getAllCrops().filter(crop => crop.stage !== 'ready').length;
-  }
 }
 
 interface GameProps {
@@ -1932,7 +1806,17 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
-  const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
+  const [buildingContextMenu, setBuildingContextMenu] = useState<{
+    building: {
+      id: string;
+      name: string;
+      description: string;
+      type: string;
+    };
+    callback: () => void;
+    x: number;
+    y: number;
+  } | null>(null);
   
   // Get user authentication info
   const { user } = usePrivy();
@@ -1949,13 +1833,16 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     const gameWidth = window.innerWidth;
     const gameHeight = window.innerHeight - BAR_HEIGHT;
     
+    console.log('📐 Game dimensions:', gameWidth, 'x', gameHeight);
+    console.log('📋 Game container element:', document.getElementById('game-container'));
+    
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
       width: gameWidth,
       height: gameHeight,
       parent: 'game-container',
       backgroundColor: '#87CEEB',
-      scene: MainScene,
+      scene: [MainScene, CorralScene, OrchardScene, WellScene],
       physics: {
         default: 'arcade',
         arcade: {
@@ -1964,10 +1851,10 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         }
       },
       scale: {
-        mode: Phaser.Scale.RESIZE,
+        mode: Phaser.Scale.NONE,
         parent: 'game-container',
-        width: '100%',
-        height: '100%'
+        width: gameWidth,
+        height: gameHeight
       },
       render: {
         pixelArt: false,
@@ -1978,7 +1865,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
     };
 
+    console.log('🔧 Creating Phaser game instance...');
     gameRef.current = new Phaser.Game(config);
+    
+    // Add game state debugging
+    gameRef.current.events.on('ready', () => {
+    });
+    
+    // Check if scenes are being added properly
 
     // Pass chat callback to scene - wait for scene to be ready
     setTimeout(() => {
@@ -2000,8 +1894,10 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         });
 
         // Set up crop click event listener
-        scene.events.on('cropClicked', (crop: CropData) => {
-          setSelectedCrop(crop);
+
+        // Set up building context menu event listener
+        scene.events.on('buildingRightClick', (data: any) => {
+          setBuildingContextMenu(data);
         });
       }
     }, 500);
@@ -2052,44 +1948,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     }
   };
 
-  // Crop system handlers
-  const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.plantCrop(cropType, x, y);
-    }
-  };
 
-  const handleRemoveCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.removeCropAtPosition(x, y);
-    }
-  };
-
-  const handleHarvestCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.harvestCropAtPosition(x, y);
-    }
-  };
-
-  const canPlantAt = (x: number, y: number): boolean => {
-    return sceneRef.current ? sceneRef.current.canPlantAt(x, y) : false;
-  };
-
-  const getCropAt = (x: number, y: number) => {
-    return sceneRef.current ? sceneRef.current.getCropAt(x, y) : null;
-  };
-
-  const getTotalCrops = (): number => {
-    return sceneRef.current ? sceneRef.current.getTotalCrops() : 0;
-  };
-
-  const getReadyCrops = (): number => {
-    return sceneRef.current ? sceneRef.current.getReadyCrops() : 0;
-  };
-
-  const getGrowingCrops = (): number => {
-    return sceneRef.current ? sceneRef.current.getGrowingCrops() : 0;
-  };
 
   const chatContainer = (
     <div className="chat-container">
@@ -2129,26 +1988,27 @@ function Game({ worldId, isOwnWorld }: GameProps) {
 
   return (
     <div className="game-wrapper">
-      <CropContextMenu
-        onPlantCrop={handlePlantCrop}
-        onRemoveCrop={handleRemoveCrop}
-        onHarvestCrop={handleHarvestCrop}
-        canPlantAt={canPlantAt}
-        getCropAt={getCropAt}
+      <BuildingContextMenu
+        building={buildingContextMenu?.building || null}
+        onEnter={() => {
+          if (buildingContextMenu?.callback) {
+            buildingContextMenu.callback();
+            setBuildingContextMenu(null);
+          }
+        }}
+        onInfo={() => {
+          // TODO: Show building info modal
+          setBuildingContextMenu(null);
+        }}
       >
         <div id="game-container" />
-      </CropContextMenu>
+      </BuildingContextMenu>
       
       {/* UI Stack with all left-side UI elements */}
       <UIStack
         chatContainer={chatContainer}
       />
 
-      {/* Crop Info Panel */}
-      <CropInfo 
-        crop={selectedCrop} 
-        onClose={() => setSelectedCrop(null)} 
-      />
 
       <style jsx>{`
         .game-wrapper {

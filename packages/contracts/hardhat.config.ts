@@ -155,6 +155,14 @@ const config: HardhatUserConfig = {
       accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
       chainId: 747474, // Your actual Saga chainlet chain ID
     },
+    // Arbitrum Sepolia for DeFiVault deployment
+    arbitrumSepolia: {
+      type: "http",
+      chainType: "l1",
+      url: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? "https://sepolia-rollup.arbitrum.io/rpc",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
+      chainId: 421614,
+    },
     base: {
       type: "http",
       chainType: "generic",

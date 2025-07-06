@@ -1,9 +1,9 @@
 import { useUI } from '@/app/store';
-import { BuildingInteractionScene } from './BuildingInteractionScene';
+import { InteractiveBuildingScene } from './InteractiveBuildingScene';
 
 /**
  * OrchardScene component for FVIX → sFVIX staking
- * Displays when user interacts with the Orchard building
+ * Full-screen interactive dialogue with the Orchard NPC
  */
 export function OrchardScene() {
   const { isOrchardModalOpen, hideOrchardModal, showStakeModal } = useUI();
@@ -17,40 +17,23 @@ export function OrchardScene() {
     hideOrchardModal();
   };
 
-  const sceneConfig = {
-    emoji: '🌳',
-    title: 'Sacred FVIX Orchard',
-    description: 'A serene grove where FVIX tokens grow into yield-bearing sFVIX',
-    backdropEmoji: '🌳',
-    backdropText: 'Sacred Orchard',
-    npcEmoji: '🧝‍♂️',
-    npcDialogue: '"Welcome to the Sacred Orchard, dear traveler! Here, your FVIX tokens can take root and flourish. Plant them in our staking vault and watch them grow into sFVIX - bearing fruit through yield rewards over time!"',
-    actionButtonText: '🌱 Stake FVIX → sFVIX',
-    leaveButtonText: '🚶‍♀️ Leave Orchard',
-    walletHint: 'Connect your wallet to start staking',
-    gradientFrom: 'from-green-100',
-    gradientTo: 'to-green-200',
-    borderColor: 'border-green-300',
-    buttonBg: 'bg-green-600',
-    buttonHoverBg: 'hover:bg-green-700',
-    infoPanelConfig: {
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-800',
-      title: '🌟 Staking Benefits:',
-      items: [
-        '• Earn yield rewards over time',
-        '• sFVIX represents your staked position',
-        '• Claim rewards anytime without unstaking'
-      ]
-    }
+  const npcConfig = {
+    npcName: 'Elder Thessa',
+    greeting: "Welcome to the Sacred Orchard, dear traveler! I am Elder Thessa, guardian of this mystical grove. Here, your FVIX tokens can take root and flourish into sFVIX, bearing fruit through yield rewards over time. Once you have sFVIX, you can plant them as volatility crops in the valley's fertile soil!",
+    backgroundColorHex: 0x228B22, // Forest green for orchard theme
+    actionChoiceText: 'I want to stake FVIX → sFVIX',
+    actionCallback: handleStakeClick,
+    infoChoiceText: 'Tell me about sFVIX planting',
+    infoDialogue: "Ah, the ancient art of volatility farming! Once you've staked FVIX into sFVIX here in my orchard, those sFVIX tokens can be planted as special crops in DeFi Valley. These aren't ordinary seeds - they're volatility plants that grow with the Flow network's market movements! Visit the Trading Corral when you have sFVIX tokens, and they can help you plant them as crops that earn real yields while you tend your digital farm.",
+    leaveText: '🚶‍♀️ Leave the sacred grove'
   };
 
   return (
-    <BuildingInteractionScene
+    <InteractiveBuildingScene
       isOpen={isOrchardModalOpen}
       onClose={handleClose}
-      onActionClick={handleStakeClick}
-      config={sceneConfig}
+      config={npcConfig}
+      sceneKey="orchard"
     />
   );
 }

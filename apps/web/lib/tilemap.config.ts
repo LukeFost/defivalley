@@ -222,4 +222,28 @@ export class TilemapUtils {
 
     return layout;
   }
+
+  /**
+   * Generate terrain (alias for generateTerrainLayout)
+   */
+  static generateTerrain(width: number, height: number): string[][] {
+    return TilemapUtils.generateTerrainLayout(width, height);
+  }
+
+  /**
+   * Generate collision map from terrain layout
+   */
+  static generateCollisionMap(layout: string[][]): boolean[][] {
+    const collisionMap: boolean[][] = [];
+    
+    for (let y = 0; y < layout.length; y++) {
+      collisionMap[y] = [];
+      for (let x = 0; x < layout[y].length; x++) {
+        const tileType = layout[y][x];
+        collisionMap[y][x] = TilemapUtils.hasCollision(tileType);
+      }
+    }
+    
+    return collisionMap;
+  }
 }

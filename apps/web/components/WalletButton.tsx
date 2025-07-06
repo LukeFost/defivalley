@@ -5,10 +5,10 @@ import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
 import { sagaChainlet, flowMainnet } from '../app/wagmi'
 import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
-import { useAppStore, useTransactions, usePlayerData, useConfig } from '../app/store'
+import { useAppStore, usePlayerData, useConfig } from '../app/store'
 import { NetworkSelector } from './NetworkSelector'
 import { Button } from '@/components/ui/button'
-import { Wallet, User, LogIn, Settings, LogOut, Gamepad2, BarChart3 } from 'lucide-react'
+import { Wallet, User, LogIn, Settings, LogOut, Gamepad2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,9 +27,6 @@ export function WalletButton() {
   const [isMounted, setIsMounted] = useState(false)
   
   // DeFi Valley state integration
-  const { active: activeTransactions } = useTransactions()
-  const showTransactionTracker = useAppStore((state) => state.ui.showTransactionTracker)
-  const toggleTransactionTracker = useAppStore((state) => state.toggleTransactionTracker)
   const showSettingsModal = useAppStore((state) => state.showSettingsModal)
   const { playerState, seedPositions, vaultPosition } = usePlayerData()
   const config = useConfig()
@@ -98,11 +95,6 @@ export function WalletButton() {
                 {harvestableSeeds}
               </div>
             )}
-            {activeTransactions.length > 0 && (
-              <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
-                {activeTransactions.length}
-              </div>
-            )}
           </Button>
         </DropdownMenuTrigger>
         
@@ -165,18 +157,6 @@ export function WalletButton() {
 
           <DropdownMenuSeparator />
 
-          {/* Transaction Tracker */}
-          <DropdownMenuItem onClick={() => toggleTransactionTracker()}>
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Transactions
-            {activeTransactions.length > 0 && (
-              <span className="ml-auto bg-blue-500 text-white rounded-full px-2 py-0.5 text-xs">
-                {activeTransactions.length}
-              </span>
-            )}
-          </DropdownMenuItem>
-          
-          <DropdownMenuSeparator />
 
           {/* Settings */}
           <DropdownMenuItem onClick={() => showSettingsModal()}>

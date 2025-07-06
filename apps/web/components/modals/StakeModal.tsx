@@ -81,7 +81,7 @@ export function StakeModal() {
     } else {
       setEstimatedShares(null);
     }
-  }, [fvixAmount, isValidAmount, isOnFlow, estimateShares, showUnstakeMode]);
+  }, [fvixAmount, isValidAmount, isOnFlow, showUnstakeMode]); // Removed estimateShares from dependency array
 
   const handleApprove = async () => {
     if (!address || !isValidAmount) return;

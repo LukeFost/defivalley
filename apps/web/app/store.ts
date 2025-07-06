@@ -52,90 +52,6 @@ export const makeStore = () => {
         immer((set, get) => ({
           ...initialState,
           
-          // Transaction management
-          addTransaction: (tx) => {
-            const id = `${tx.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const newTx = {
-              ...tx,
-              id,
-              startTime: Date.now(),
-              lastUpdated: Date.now(),
-              retryCount: 0
-            };
-            
-            set((state) => {
-              state.activeTransactions.push(newTx);
-            });
-            
-            return id;
-          },
-          
-          updateTransaction: (id, updates) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                Object.assign(tx, updates);
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          completeTransaction: (id) => {
-            set((state) => {
-              const txIndex = state.activeTransactions.findIndex(t => t.id === id);
-              if (txIndex !== -1) {
-                const tx = state.activeTransactions[txIndex];
-                tx.status = 'completed';
-                tx.lastUpdated = Date.now();
-                
-                // Move to history
-                state.transactionHistory.unshift(tx);
-                state.activeTransactions.splice(txIndex, 1);
-                
-                // Keep only last 50 transactions in history
-                if (state.transactionHistory.length > 50) {
-                  state.transactionHistory = state.transactionHistory.slice(0, 50);
-                }
-              }
-            });
-          },
-          
-          failTransaction: (id, error) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                tx.status = 'failed';
-                tx.error = error;
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          retryTransaction: (id) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                tx.retryCount += 1;
-                tx.status = 'preparing';
-                tx.error = undefined;
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          clearCompletedTransactions: () => {
-            set((state) => {
-              // Clear transaction history
-              state.transactionHistory = [];
-              
-              // Also clear any active transactions that are completed/failed
-              // This handles transactions that got stuck in active state
-              state.activeTransactions = state.activeTransactions.filter(
-                tx => tx.status !== 'completed' && tx.status !== 'failed'
-              );
-            });
-          },
-          
           // Game state management
           setPlayerState: (playerState) => {
             set((state) => {
@@ -210,6 +126,8 @@ export const makeStore = () => {
                   frothBalance: '0',
                   fvixBalance: '0',
                   sFvixBalance: '0',
+                  plantedAmount: '0',
+                  plantedSeedIds: [],
                   lastUpdated: Date.now(),
                   isCompleted: false
                 };
@@ -254,7 +172,22 @@ export const makeStore = () => {
                   quest.completedSteps.push('STAKED');
                 }
                 quest.sFvixBalance = sFvixBalance;
-                quest.isCompleted = true;
+                quest.lastUpdated = Date.now();
+              }
+            });
+          },
+
+          setPlanted: (walletAddress, plantedAmount, seedId) => {
+            set((state) => {
+              const quest = state.flowQuests[walletAddress];
+              if (quest) {
+                quest.currentStep = 'PLANTED';
+                if (!quest.completedSteps.includes('PLANTED')) {
+                  quest.completedSteps.push('PLANTED');
+                }
+                quest.plantedAmount = plantedAmount;
+                quest.plantedSeedIds.push(seedId);
+                quest.isCompleted = true; // Quest fully completed when planted
                 quest.lastUpdated = Date.now();
               }
             });
@@ -288,12 +221,6 @@ export const makeStore = () => {
           setPlantAmount: (amount) => {
             set((state) => {
               state.ui.plantAmount = amount;
-            });
-          },
-          
-          toggleTransactionTracker: () => {
-            set((state) => {
-              state.ui.showTransactionTracker = !state.ui.showTransactionTracker;
             });
           },
           
@@ -473,11 +400,13 @@ export const makeStore = () => {
         {
           name: 'defi-valley-storage',
           // Use the idiomatic one-liner for SSR-safe storage with BigInt serialization
-          storage: createJSONStorage(() =>
-            typeof window !== 'undefined' ? localStorage : createMemoryStorage()
+          storage: createJSONStorage(
+            () => typeof window !== 'undefined' ? localStorage : createMemoryStorage(),
+            {
+              serialize: bigIntSerializer.serialize,
+              deserialize: bigIntSerializer.deserialize,
+            }
           ),
-          serialize: bigIntSerializer.serialize,
-          deserialize: bigIntSerializer.deserialize,
           skipHydration: true, // Recommended to delay hydration until manual rehydration
           // Exclude transient UI state from persistence - modals should always start closed
           partialize: (state) => ({
@@ -487,7 +416,6 @@ export const makeStore = () => {
               showPlantModal: false,
               showHarvestModal: false,
               showSettingsModal: false,
-              showTransactionTracker: false,
               showCorralModal: false,
               showWellModal: false,
               showOrchardModal: false,
@@ -516,17 +444,6 @@ export const useAppStore = <T>(selector: (state: AppState & AppActions) => T) =>
 };
 
 // Export individual hooks for convenience (backward compatibility)
-export const useTransactions = () => useAppStore(state => ({
-  active: state.activeTransactions || [],
-  history: state.transactionHistory || [],
-  add: state.addTransaction,
-  update: state.updateTransaction,
-  complete: state.completeTransaction,
-  fail: state.failTransaction,
-  retry: state.retryTransaction,
-  clearCompleted: state.clearCompletedTransactions
-}));
-
 export const usePlayerData = () => useAppStore(state => ({
   playerState: state.playerState,
   seedPositions: state.seedPositions,
@@ -542,7 +459,6 @@ export const useUI = () => useAppStore(state => ({
   // UI state values (boolean flags for modal visibility)
   selectedSeedType: state.ui.selectedSeedType,
   plantAmount: state.ui.plantAmount,
-  showTransactionTracker: state.ui.showTransactionTracker,
   isPlantModalOpen: state.ui.showPlantModal,
   isHarvestModalOpen: state.ui.showHarvestModal,
   isSettingsModalOpen: state.ui.showSettingsModal,
@@ -559,7 +475,6 @@ export const useUI = () => useAppStore(state => ({
   // UI action functions
   setSelectedSeedType: state.setSelectedSeedType,
   setPlantAmount: state.setPlantAmount,
-  toggleTransactionTracker: state.toggleTransactionTracker,
   showPlantModal: state.showPlantModal,
   hidePlantModal: state.hidePlantModal,
   showHarvestModal: state.showHarvestModal,
@@ -607,4 +522,4 @@ export const useFlowQuest = () => useAppStore(state => ({
 }));
 
 // Export types for backward compatibility
-export type { SeedType, CrossChainTx, TxStatus, Notification, QuestStep, FlowQuest } from './store-types';
+export type { SeedType, Notification, QuestStep, FlowQuest } from './store-types';

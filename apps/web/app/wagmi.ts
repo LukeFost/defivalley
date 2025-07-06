@@ -81,9 +81,11 @@ export const config = createConfig({
   chains: [sagaChainlet, arbitrumSepolia, flowMainnet],
   connectors: [
     injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '',
-    }),
+    ...(typeof window !== 'undefined' ? [
+      walletConnect({
+        projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '',
+      })
+    ] : []),
   ],
   transports: {
     [sagaChainlet.id]: http(),

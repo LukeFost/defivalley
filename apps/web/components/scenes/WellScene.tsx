@@ -1,9 +1,9 @@
 import { useUI } from '@/app/store';
-import { BuildingInteractionScene } from './BuildingInteractionScene';
+import { InteractiveBuildingScene } from './InteractiveBuildingScene';
 
 /**
  * WellScene component for FROTH → FVIX minting
- * Displays when user interacts with the Well building
+ * Full-screen interactive dialogue with the Well NPC
  */
 export function WellScene() {
   const { isWellModalOpen, hideWellModal, showMintModal } = useUI();
@@ -17,39 +17,23 @@ export function WellScene() {
     hideWellModal();
   };
 
-  const sceneConfig = {
-    emoji: '🪣',
-    title: 'Ancient FVIX Well',
-    description: 'A mystical well where FROTH transforms into powerful FVIX tokens',
-    backdropEmoji: '⛲',
-    backdropText: 'Mystical Well',
-    npcEmoji: '🧙‍♀️',
-    npcDialogue: '"Ah, a seeker of the ancient art! This well has flowed with magical energies for centuries. Bring forth your FROTH, and I shall help you mint the precious FVIX tokens. Remember, the minimum offering is 10,000 FROTH!"',
-    actionButtonText: '⚡ Mint FVIX with FROTH',
-    leaveButtonText: '🚶 Leave Well',
-    walletHint: 'Connect your wallet to begin minting',
-    gradientFrom: 'from-blue-100',
-    gradientTo: 'to-blue-200',
-    borderColor: 'border-blue-300',
-    buttonBg: 'bg-blue-600',
-    buttonHoverBg: 'hover:bg-blue-700',
-    infoPanelConfig: {
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-800',
-      title: '💡 Minting Requirements:',
-      items: [
-        '• Minimum 10,000 FROTH tokens',
-        '• FROTH must be approved for the FVIX contract'
-      ]
-    }
+  const npcConfig = {
+    npcName: 'Sorceress Lyralei',
+    greeting: "Ah, a seeker of the ancient art! I am Sorceress Lyralei, keeper of this mystical well. For centuries, these waters have flowed with magical energies that can transform FROTH into the precious FVIX tokens. The ritual requires focus, patience, and a minimum offering of 10,000 FROTH to awaken the well's power.",
+    backgroundColorHex: 0x4169E1, // Royal blue for mystical theme
+    actionChoiceText: 'I want to mint FVIX with FROTH',
+    actionCallback: handleMintClick,
+    infoChoiceText: 'Tell me about the minting ritual',
+    infoDialogue: "The minting ritual is both ancient and precise! You must bring at least 10,000 FROTH tokens as an offering to the well. First, you'll need to approve your FROTH for the FVIX contract - this grants permission for the magical transformation. Then, the well will convert your FROTH into FVIX at the sacred exchange rate. Are you prepared to begin the ritual?",
+    leaveText: '🚶 Step away from the well'
   };
 
   return (
-    <BuildingInteractionScene
+    <InteractiveBuildingScene
       isOpen={isWellModalOpen}
       onClose={handleClose}
-      onActionClick={handleMintClick}
-      config={sceneConfig}
+      config={npcConfig}
+      sceneKey="well"
     />
   );
 }

@@ -406,6 +406,13 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Updates the current player status (alias for highlight method)
+   */
+  public updateCurrentPlayerStatus(isCurrentPlayer: boolean): void {
+    this.highlight(isCurrentPlayer);
+  }
+
+  /**
    * Triggers the error state with stomp animation
    */
   public setErrorState(isError: boolean, duration?: number): void {

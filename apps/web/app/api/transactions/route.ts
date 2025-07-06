@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { databaseService, Transaction } from '../../../lib/db';
 
-interface TransactionData {
-  id: string;
-  player_id: string;
-  type: 'plant_seed' | 'harvest_seed' | 'claim_yield';
-  status: 'preparing' | 'wallet_confirm' | 'saga_pending' | 'axelar_processing' | 'arbitrum_pending' | 'completed' | 'failed';
-  saga_tx_hash?: string;
-  arbitrum_tx_hash?: string;
-  axelar_tx_id?: string;
-  axelar_tx_hash?: string;
-  start_time: number;
-  last_updated: number;
-  estimated_completion_time?: number;
-  error_message?: string;
-  retry_count: number;
-  seed_type?: number;
-  seed_id?: number;
-  amount?: string;
-  gas_estimate?: string;
-}
+// Use the Transaction type from DatabaseService directly
+type TransactionData = Transaction;
 
 // GET /api/transactions - Get player transactions
 export async function GET(request: NextRequest) {
@@ -38,42 +22,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid player ID format' }, { status: 400 });
     }
 
-    // Mock response for now - replace with actual database call
-    const mockTransactions: TransactionData[] = [
-      {
-        id: 'tx_001',
-        player_id: playerId,
-        type: 'plant_seed',
-        status: 'completed',
-        saga_tx_hash: '0x123...',
-        arbitrum_tx_hash: '0x456...',
-        start_time: Date.now() - 300000,
-        last_updated: Date.now() - 60000,
-        retry_count: 0,
-        seed_type: 0,
-        amount: '100000000',
-      },
-      {
-        id: 'tx_002',
-        player_id: playerId,
-        type: 'harvest_seed',
-        status: 'saga_pending',
-        saga_tx_hash: '0x789...',
-        start_time: Date.now() - 120000,
-        last_updated: Date.now() - 30000,
-        retry_count: 0,
-        seed_id: 1,
-      }
-    ];
+    // Get transactions from database based on activeOnly flag
+    let transactions: TransactionData[];
+    
+    if (activeOnly) {
+      transactions = databaseService.getActiveTransactions(playerId);
+    } else {
+      transactions = databaseService.getPlayerTransactions(playerId, limit, offset);
+    }
 
-    const filteredTransactions = activeOnly 
-      ? mockTransactions.filter(tx => !['completed', 'failed'].includes(tx.status))
-      : mockTransactions;
+    // For activeOnly, we still need to apply pagination
+    const paginatedTransactions = activeOnly 
+      ? transactions.slice(offset, offset + limit)
+      : transactions;
+
+    // Get total count for pagination info
+    const totalTransactions = activeOnly 
+      ? databaseService.getActiveTransactions(playerId).length
+      : databaseService.getPlayerTransactions(playerId, 10000, 0).length; // Large limit to get total
 
     return NextResponse.json({
-      transactions: filteredTransactions.slice(offset, offset + limit),
-      total: filteredTransactions.length,
-      hasMore: offset + limit < filteredTransactions.length
+      transactions: paginatedTransactions,
+      total: totalTransactions,
+      hasMore: offset + limit < totalTransactions
     });
 
   } catch (error) {
@@ -106,13 +77,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid transaction status' }, { status: 400 });
     }
 
-    // For now, just return the transaction as saved
-    // In real implementation, save to database
-    const savedTransaction = {
-      ...transaction,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    // Save transaction to database
+    const savedTransaction = databaseService.saveTransaction(transaction);
 
     return NextResponse.json({ 
       transaction: savedTransaction,
@@ -140,13 +106,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid transaction status' }, { status: 400 });
     }
 
-    // For now, just return the updated transaction
-    // In real implementation, update in database
-    const updatedTransaction = {
-      id,
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
+    // Update transaction in database
+    const updatedTransaction = databaseService.updateTransaction(id, updates);
+
+    if (!updatedTransaction) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ 
       transaction: updatedTransaction,

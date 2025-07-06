@@ -66,6 +66,17 @@ export function QuestBookHUD() {
       actionText: 'Stake Tokens',
       building: 'Orchard',
       buildingAction: () => showOrchardModal()
+    },
+    {
+      id: 'plant',
+      title: 'Plant sFVIX Seeds 🌱',
+      description: 'Plant sFVIX as volatility crops in DeFi Valley',
+      status: quest?.currentStep === 'PLANTED' || quest?.completedSteps.includes('PLANTED') ? 'completed' :
+              quest?.completedSteps.includes('STAKED') ? 'available' : 'locked',
+      action: () => showSwapModal(), // Use swap modal for complete flow
+      actionText: 'Plant Seeds',
+      building: 'Farm',
+      buildingAction: () => showSwapModal()
     }
   ];
   

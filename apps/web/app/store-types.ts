@@ -43,7 +43,7 @@ export interface VaultPosition {
 }
 
 // Quest Book types
-export type QuestStep = 'NOT_STARTED' | 'SWAPPED' | 'MINTED' | 'STAKED';
+export type QuestStep = 'NOT_STARTED' | 'SWAPPED' | 'MINTED' | 'STAKED' | 'PLANTED';
 
 export interface FlowQuest {
   id: string;
@@ -53,6 +53,8 @@ export interface FlowQuest {
   frothBalance: string; // Formatted balance for display
   fvixBalance: string;  // Formatted balance for display
   sFvixBalance: string; // Formatted balance for display
+  plantedAmount: string; // Amount of sFVIX planted
+  plantedSeedIds: number[]; // Array of planted seed IDs
   lastUpdated: number;
   isCompleted: boolean;
 }
@@ -127,6 +129,7 @@ export interface AppActions {
   setSwapped: (walletAddress: `0x${string}`, frothBalance: string) => void;
   setMinted: (walletAddress: `0x${string}`, fvixBalance: string) => void;
   setStaked: (walletAddress: `0x${string}`, sFvixBalance: string) => void;
+  setPlanted: (walletAddress: `0x${string}`, plantedAmount: string, seedId: number) => void;
   updateQuestBalances: (walletAddress: `0x${string}`, balances: { froth?: string; fvix?: string; sFvix?: string }) => void;
   resetQuest: (walletAddress: `0x${string}`) => void;
   
