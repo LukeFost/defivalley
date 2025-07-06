@@ -37,7 +37,7 @@ export const FLOW_DEFI_CONFIG = {
     stakingToken: FLOW_TOKENS.FVIX,
     rewardToken: FLOW_TOKENS.SFVIX,
     stakingContract: FLOW_TOKENS.SFVIX, // ERC4626 vault
-    minimumStake: BigInt("1000000000000000000"), // 1 FVIX minimum
+    minimumStake: BigInt("0"), // No minimum for testing
   },
   
   // PumpFlow meme coin configuration

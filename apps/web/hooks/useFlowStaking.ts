@@ -8,7 +8,7 @@ import {
   useWaitForTransactionReceipt,
   useChainId,
 } from "wagmi";
-import { parseUnits, type Address } from "viem";
+import { parseUnits, formatUnits, type Address } from "viem";
 import { FLOW_TOKENS, FLOW_DEFI_CONFIG } from "@/constants/flow-tokens";
 
 // ERC20 ABI for FVIX token
@@ -114,6 +114,13 @@ const erc4626Abi = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "minimumDeposit",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 const FVIX_ADDRESS = FLOW_TOKENS.FVIX;
@@ -173,6 +180,14 @@ export function useFlowStaking() {
     address: SFVIX_ADDRESS,
     abi: erc4626Abi,
     functionName: "totalSupply",
+    chainId: chainId,
+  });
+
+  // Read minimum deposit from the contract
+  const { data: minimumDeposit } = useReadContract({
+    address: SFVIX_ADDRESS,
+    abi: erc4626Abi,
+    functionName: "minimumDeposit",
     chainId: chainId,
   });
 
@@ -256,9 +271,9 @@ export function useFlowStaking() {
       return;
     }
 
-    // Check minimum stake amount
-    if (amount < FLOW_DEFI_CONFIG.SFVIX_STAKING.minimumStake) {
-      setError(`Minimum stake is ${FLOW_DEFI_CONFIG.SFVIX_STAKING.minimumStake / BigInt(10**18)} FVIX`);
+    // Check minimum stake amount from contract
+    if (minimumDeposit && amount < minimumDeposit) {
+      setError(`Minimum stake amount is ${formatUnits(minimumDeposit, 18)} FVIX.`);
       return;
     }
 
@@ -400,6 +415,7 @@ export function useFlowStaking() {
     // Vault data
     totalAssets,
     totalSupply,
+    minimumDeposit,
     calculateAPY,
     previewDeposit,
     previewRedeem,

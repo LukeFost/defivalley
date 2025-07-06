@@ -113,9 +113,10 @@ export class PepeBuilding extends Phaser.GameObjects.Container {
   }
   
   public getCollisionBounds(): Phaser.Geom.Rectangle {
-    const width = this.buildingSprite.displayWidth * 0.8;
-    const height = this.buildingSprite.displayHeight * 0.8;
-    return new Phaser.Geom.Rectangle(this.x - width / 2, this.y - height / 2, width, height);
+    // Use original sprite size (before 1.2x scaling) for collision bounds
+    const originalWidth = this.buildingSprite.width * 0.8;
+    const originalHeight = this.buildingSprite.height * 0.8;
+    return new Phaser.Geom.Rectangle(this.x - originalWidth / 2, this.y - originalHeight / 2, originalWidth, originalHeight);
   }
 
   public checkCollision(x: number, y: number): boolean {

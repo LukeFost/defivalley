@@ -75,8 +75,8 @@ class MainScene extends Phaser.Scene {
   private currentChainId?: number;
   
   // Camera system properties
-  private worldWidth: number = 2500; // Increased from 2000 to allow walking further right
-  private worldHeight: number = 2000; // Increased from 1500 to allow walking higher
+  private worldWidth: number = 5000; // Massively increased for huge exploration area
+  private worldHeight: number = 4000; // Massively increased for huge exploration area
   private cameraLerpFactor: number = 0.1; // Smooth camera following
   
   // Simple background approach with invisible walls
@@ -1496,7 +1496,7 @@ class MainScene extends Phaser.Scene {
         this.lastDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      const potentialY = Math.min(this.worldHeight - 20, newY + speed);
+      const potentialY = newY + speed;
       // Check collision before moving using new tile-based system
       if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;

@@ -26,6 +26,7 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
     isApproving,
     isDepositing,
     calculateAPY,
+    minimumDeposit,
     error,
     refetchBalance,
     refetchStakedBalance
@@ -38,6 +39,9 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
       return 0n;
     }
   }, [amount]);
+
+  // Check if the amount is valid
+  const isAmountInvalid = amount && minimumDeposit ? depositAmountBigInt < minimumDeposit : false;
 
   // Refresh balances when modal opens
   useEffect(() => {
@@ -65,6 +69,14 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
     }
   };
 
+  // Handler for the Max button
+  const handleSetMax = () => {
+    if (fvixBalance) {
+      // formatUnits converts the bigint balance to a readable string
+      setAmount(formatUnits(fvixBalance, 18));
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -83,8 +95,45 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
           <div className="p-4 border rounded-lg">
             <h4 className="font-semibold mb-2">Stake FVIX</h4>
             <Label htmlFor="stake-amount">Amount to Stake</Label>
-            <Input id="stake-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.0" />
-            <Button onClick={handleDeposit} disabled={isApproving || isDepositing || !amount} className="mt-2 w-full">
+            
+            {/* Wrap the Input component to position the Max button inside it */}
+            <div className="relative">
+              <Input
+                id="stake-amount"
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0.0"
+                min="0"
+                step="any"
+                className="pr-16" // Add padding to make room for the button
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 h-8 -translate-y-1/2 px-3"
+                onClick={handleSetMax}
+              >
+                Max
+              </Button>
+            </div>
+            
+            {/* Display the minimum staking amount */}
+            {minimumDeposit && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Minimum to stake: {formatUnits(minimumDeposit, 18)} FVIX
+              </p>
+            )}
+
+            {/* Show an error message if the amount is too low */}
+            {amount && minimumDeposit && depositAmountBigInt < minimumDeposit && (
+              <p className="text-red-500 text-xs mt-1">
+                Amount is below the minimum required for staking.
+              </p>
+            )}
+            
+            <Button onClick={handleDeposit} disabled={isApproving || isDepositing || !amount || (minimumDeposit && depositAmountBigInt < minimumDeposit)} className="mt-2 w-full">
               {(isApproving || isDepositing) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {approvalNeeded ? 'Approve FVIX' : 'Stake Now'}
             </Button>
