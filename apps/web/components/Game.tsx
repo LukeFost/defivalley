@@ -10,7 +10,7 @@ import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
-import { CropStats } from './CropStats';
+import { UIStack } from './UIStack';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
@@ -1601,6 +1601,42 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     return sceneRef.current ? sceneRef.current.getGrowingCrops() : 0;
   };
 
+  const chatContainer = (
+    <div className="chat-container">
+      <div className="chat-messages">
+        {chatMessages.slice(-5).map((msg, index) => (
+          <div key={index} className="chat-message">
+            <span className="chat-name">{msg.name}:</span>
+            <span className="chat-text">{msg.message}</span>
+          </div>
+        ))}
+      </div>
+      
+      {showChat && (
+        <form onSubmit={handleChatSubmit} className="chat-input-form">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Type your message..."
+            className="chat-input"
+            autoFocus
+            onBlur={() => {
+              // Small delay to allow form submission to process
+              setTimeout(() => setShowChat(false), 100);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowChat(false);
+                setChatInput('');
+              }
+            }}
+          />
+        </form>
+      )}
+    </div>
+  );
+
   return (
     <div className="game-wrapper">
       <CropContextMenu
@@ -1613,52 +1649,18 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         <div id="game-container" />
       </CropContextMenu>
       
-      {/* Chat UI */}
-      <div className="chat-container">
-        <div className="chat-messages">
-          {chatMessages.slice(-5).map((msg, index) => (
-            <div key={index} className="chat-message">
-              <span className="chat-name">{msg.name}:</span>
-              <span className="chat-text">{msg.message}</span>
-            </div>
-          ))}
-        </div>
-        
-        {showChat && (
-          <form onSubmit={handleChatSubmit} className="chat-input-form">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Type your message..."
-              className="chat-input"
-              autoFocus
-              onBlur={() => {
-                // Small delay to allow form submission to process
-                setTimeout(() => setShowChat(false), 100);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setShowChat(false);
-                  setChatInput('');
-                }
-              }}
-            />
-          </form>
-        )}
-      </div>
+      {/* UI Stack with all left-side UI elements */}
+      <UIStack
+        getTotalCrops={getTotalCrops}
+        getReadyCrops={getReadyCrops}
+        getGrowingCrops={getGrowingCrops}
+        chatContainer={chatContainer}
+      />
 
       {/* Crop Info Panel */}
       <CropInfo 
         crop={selectedCrop} 
         onClose={() => setSelectedCrop(null)} 
-      />
-
-      {/* Crop Statistics Panel */}
-      <CropStats 
-        getTotalCrops={getTotalCrops}
-        getReadyCrops={getReadyCrops}
-        getGrowingCrops={getGrowingCrops}
       />
 
       <style jsx>{`
@@ -1677,24 +1679,23 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         }
 
         .chat-container {
-          position: fixed;
-          top: 280px;
-          left: 16px;
-          width: 300px;
+          position: relative;
+          width: 100%;
           max-height: 200px;
           pointer-events: none;
           z-index: 10;
+          padding: 12px;
         }
 
         .chat-messages {
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(255, 255, 255, 0.1);
           border-radius: 8px;
           padding: 10px;
           margin-bottom: 10px;
           max-height: 150px;
           overflow-y: auto;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .chat-message {
@@ -1721,19 +1722,23 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         .chat-input {
           width: 100%;
           padding: 8px 12px;
-          border: none;
+          border: 1px solid rgba(255, 255, 255, 0.3);
           border-radius: 6px;
-          background: rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(135, 206, 235, 0.3);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-input::placeholder {
+          color: rgba(255, 255, 255, 0.6);
         }
 
         .chat-input:focus {
           outline: none;
-          background: white;
-          border-color: #87CEEB;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(135, 206, 235, 0.2);
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.5);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>
