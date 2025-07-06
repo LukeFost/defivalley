@@ -1,0 +1,141 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WalletButton Component > connected state > should match snapshot for connected state > wallet-button-connected 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > disconnected state > should match snapshot for disconnected state > wallet-button-disconnected 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > loading state > should match snapshot for loading state > wallet-button-loading 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+>
+  <button
+    disabled=""
+  >
+    <div
+      class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"
+    />
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > visual regression tests > should match snapshot for different network states > arbitrum-network 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > visual regression tests > should match snapshot for different network states > flow-network 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > visual regression tests > should match snapshot for different network states > saga-network 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > visual regression tests > should match snapshot for different user states > user-with-email 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;
+
+exports[`WalletButton Component > visual regression tests > should match snapshot for different user states > user-without-email 1`] = `
+<div
+  class="fixed top-4 right-4 z-[1000]"
+  data-testid="wallet-button-unauthenticated"
+>
+  <button
+    class="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2"
+    data-testid="connect-button"
+  >
+    <svg
+      class="w-4 h-4 mr-2"
+      data-testid="login-icon"
+    />
+    Connect & Play
+  </button>
+</div>
+`;

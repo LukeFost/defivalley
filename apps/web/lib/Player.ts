@@ -35,6 +35,7 @@ export class Player extends Phaser.GameObjects.Container {
 
   constructor(scene: Phaser.Scene, x: number, y: number, playerInfo: PlayerInfo) {
     super(scene, x, y);
+    console.log('🎭 Player constructor called for:', playerInfo.name, 'at position:', x, y);
     
     this.playerInfo = {
       ...playerInfo,
@@ -45,17 +46,25 @@ export class Player extends Phaser.GameObjects.Container {
     
     // Get character configuration
     this.characterConfig = getCharacterConfig(this.playerInfo.character);
+    console.log('⚙️ Character config loaded:', this.characterConfig.key);
     
     // Create sprite based on character type
+    console.log('🎨 Creating character sprite...');
     this.sprite = this.createCharacterSprite(scene);
+    console.log('✅ Character sprite created:', this.sprite.texture.key);
+    
+    console.log('📝 Creating nameplate...');
     this.nameplate = this.createNameplate(scene);
+    console.log('🏷️ Creating badge...');
     this.badge = this.createBadge(scene);
     
     // Add elements to container
     this.add([this.sprite, this.nameplate, this.badge]);
+    console.log('📦 Elements added to container');
     
     // Add container to scene
     scene.add.existing(this);
+    console.log('🎬 Container added to scene');
     
     // Set initial position
     this.setPosition(x, y);

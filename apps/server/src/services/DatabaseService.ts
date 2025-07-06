@@ -27,6 +27,28 @@ export interface Crop {
   updated_at: string;
 }
 
+export interface Transaction {
+  id: string;
+  player_id: string;
+  type: 'plant_seed' | 'harvest_seed' | 'claim_yield';
+  status: 'preparing' | 'wallet_confirm' | 'saga_pending' | 'axelar_processing' | 'arbitrum_pending' | 'completed' | 'failed';
+  saga_tx_hash?: string;
+  arbitrum_tx_hash?: string;
+  axelar_tx_id?: string;
+  axelar_tx_hash?: string;
+  start_time: number;
+  last_updated: number;
+  estimated_completion_time?: number;
+  error_message?: string;
+  retry_count: number;
+  seed_type?: number;
+  seed_id?: number;
+  amount?: string;
+  gas_estimate?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export class DatabaseService {
   public db: Database.Database;
   private migrationService: MigrationService;
@@ -341,6 +363,175 @@ export class DatabaseService {
     } catch (error) {
       console.error(`❌ Error getting crops for player ${playerId}:`, error);
       return [];
+    }
+  }
+
+  /**
+   * Transaction Management Methods
+   */
+
+  /**
+   * Save a transaction to the database
+   */
+  saveTransaction(transaction: Omit<Transaction, 'created_at' | 'updated_at'>): Transaction {
+    try {
+      const insertStmt = this.db.prepare(`
+        INSERT INTO transactions (
+          id, player_id, type, status, saga_tx_hash, arbitrum_tx_hash, 
+          axelar_tx_id, axelar_tx_hash, start_time, last_updated, 
+          estimated_completion_time, error_message, retry_count, 
+          seed_type, seed_id, amount, gas_estimate, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `);
+      
+      insertStmt.run(
+        transaction.id,
+        transaction.player_id,
+        transaction.type,
+        transaction.status,
+        transaction.saga_tx_hash || null,
+        transaction.arbitrum_tx_hash || null,
+        transaction.axelar_tx_id || null,
+        transaction.axelar_tx_hash || null,
+        transaction.start_time,
+        transaction.last_updated,
+        transaction.estimated_completion_time || null,
+        transaction.error_message || null,
+        transaction.retry_count,
+        transaction.seed_type || null,
+        transaction.seed_id || null,
+        transaction.amount || null,
+        transaction.gas_estimate || null
+      );
+
+      // Return the saved transaction
+      return this.getTransaction(transaction.id)!;
+    } catch (error) {
+      console.error(`❌ Error saving transaction ${transaction.id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing transaction
+   */
+  updateTransaction(id: string, updates: Partial<Omit<Transaction, 'id' | 'created_at' | 'updated_at'>>): Transaction | null {
+    try {
+      const updateFields: string[] = [];
+      const values: any[] = [];
+
+      Object.entries(updates).forEach(([key, value]) => {
+        updateFields.push(`${key} = ?`);
+        values.push(value);
+      });
+
+      if (updateFields.length === 0) {
+        return this.getTransaction(id);
+      }
+
+      updateFields.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(id);
+
+      const updateStmt = this.db.prepare(`
+        UPDATE transactions 
+        SET ${updateFields.join(', ')}
+        WHERE id = ?
+      `);
+      
+      updateStmt.run(...values);
+      return this.getTransaction(id);
+    } catch (error) {
+      console.error(`❌ Error updating transaction ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a transaction by ID
+   */
+  getTransaction(id: string): Transaction | null {
+    try {
+      const selectStmt = this.db.prepare('SELECT * FROM transactions WHERE id = ?');
+      return selectStmt.get(id) as Transaction | null;
+    } catch (error) {
+      console.error(`❌ Error getting transaction ${id}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all transactions for a player with pagination
+   */
+  getPlayerTransactions(playerId: string, limit: number = 50, offset: number = 0): Transaction[] {
+    try {
+      const selectStmt = this.db.prepare(`
+        SELECT * FROM transactions 
+        WHERE player_id = ? 
+        ORDER BY start_time DESC 
+        LIMIT ? OFFSET ?
+      `);
+      return selectStmt.all(playerId, limit, offset) as Transaction[];
+    } catch (error) {
+      console.error(`❌ Error getting transactions for player ${playerId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get active (non-completed/failed) transactions for a player
+   */
+  getActiveTransactions(playerId: string): Transaction[] {
+    try {
+      const selectStmt = this.db.prepare(`
+        SELECT * FROM transactions 
+        WHERE player_id = ? AND status NOT IN ('completed', 'failed')
+        ORDER BY start_time DESC
+      `);
+      return selectStmt.all(playerId) as Transaction[];
+    } catch (error) {
+      console.error(`❌ Error getting active transactions for player ${playerId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get transactions by status across all players (for monitoring)
+   */
+  getTransactionsByStatus(status: string, limit: number = 100): Transaction[] {
+    try {
+      const selectStmt = this.db.prepare(`
+        SELECT * FROM transactions 
+        WHERE status = ? 
+        ORDER BY last_updated DESC 
+        LIMIT ?
+      `);
+      return selectStmt.all(status, limit) as Transaction[];
+    } catch (error) {
+      console.error(`❌ Error getting transactions by status ${status}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Clean up old completed/failed transactions (keep last 100 per player)
+   */
+  cleanupOldTransactions(): number {
+    try {
+      const deleteStmt = this.db.prepare(`
+        DELETE FROM transactions 
+        WHERE status IN ('completed', 'failed') 
+        AND id NOT IN (
+          SELECT id FROM transactions 
+          WHERE status IN ('completed', 'failed') 
+          ORDER BY start_time DESC 
+          LIMIT 100
+        )
+      `);
+      const result = deleteStmt.run();
+      return result.changes;
+    } catch (error) {
+      console.error('❌ Error cleaning up old transactions:', error);
+      return 0;
     }
   }
 

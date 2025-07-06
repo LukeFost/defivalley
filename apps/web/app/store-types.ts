@@ -85,6 +85,21 @@ export interface VaultPosition {
   availableYield: bigint;
 }
 
+// Quest Book types
+export type QuestStep = 'NOT_STARTED' | 'SWAPPED' | 'MINTED' | 'STAKED';
+
+export interface FlowQuest {
+  id: string;
+  walletAddress: `0x${string}`;
+  currentStep: QuestStep;
+  completedSteps: QuestStep[];
+  frothBalance: string; // Formatted balance for display
+  fvixBalance: string;  // Formatted balance for display
+  sFvixBalance: string; // Formatted balance for display
+  lastUpdated: number;
+  isCompleted: boolean;
+}
+
 // UI State
 export interface UIState {
   selectedSeedType: number;
@@ -94,6 +109,15 @@ export interface UIState {
   showHarvestModal: boolean;
   showSettingsModal: boolean;
   notifications: Notification[];
+  // Flow Quest UI state
+  showCorralModal: boolean;
+  showWellModal: boolean;
+  showOrchardModal: boolean;
+  questBookExpanded: boolean;
+  // Flow Transaction modals
+  showSwapModal: boolean;
+  showMintModal: boolean;
+  showStakeModal: boolean;
 }
 
 export interface Notification {
@@ -116,6 +140,9 @@ export interface AppState {
   seedPositions: SeedPosition[];
   vaultPosition: VaultPosition | null;
   seedTypes: SeedType[];
+  
+  // Flow Quest data
+  flowQuests: Record<`0x${string}`, FlowQuest>; // Keyed by wallet address
   
   // UI state
   ui: UIState;
@@ -149,6 +176,14 @@ export interface AppActions {
   setVaultPosition: (position: VaultPosition) => void;
   setSeedTypes: (types: SeedType[]) => void;
   
+  // Flow Quest actions
+  initializeQuest: (walletAddress: `0x${string}`) => void;
+  setSwapped: (walletAddress: `0x${string}`, frothBalance: string) => void;
+  setMinted: (walletAddress: `0x${string}`, fvixBalance: string) => void;
+  setStaked: (walletAddress: `0x${string}`, sFvixBalance: string) => void;
+  updateQuestBalances: (walletAddress: `0x${string}`, balances: { froth?: string; fvix?: string; sFvix?: string }) => void;
+  resetQuest: (walletAddress: `0x${string}`) => void;
+  
   // UI actions
   setSelectedSeedType: (type: number) => void;
   setPlantAmount: (amount: string) => void;
@@ -159,6 +194,21 @@ export interface AppActions {
   hideHarvestModal: () => void;
   showSettingsModal: () => void;
   hideSettingsModal: () => void;
+  // Flow Quest UI actions
+  showCorralModal: () => void;
+  hideCorralModal: () => void;
+  showWellModal: () => void;
+  hideWellModal: () => void;
+  showOrchardModal: () => void;
+  hideOrchardModal: () => void;
+  toggleQuestBook: () => void;
+  // Flow Transaction modal actions
+  showSwapModal: () => void;
+  hideSwapModal: () => void;
+  showMintModal: () => void;
+  hideMintModal: () => void;
+  showStakeModal: () => void;
+  hideStakeModal: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -205,6 +255,7 @@ export const initialState: AppState = {
       apy: 5
     }
   ],
+  flowQuests: {}, // Empty by default
   ui: {
     selectedSeedType: 1,
     plantAmount: '',
@@ -212,7 +263,14 @@ export const initialState: AppState = {
     showPlantModal: false,
     showHarvestModal: false,
     showSettingsModal: false,
-    notifications: []
+    notifications: [],
+    showCorralModal: false,
+    showWellModal: false,
+    showOrchardModal: false,
+    questBookExpanded: false,
+    showSwapModal: false,
+    showMintModal: false,
+    showStakeModal: false
   },
   config: {
     sagaChainId: 2751669528484000,

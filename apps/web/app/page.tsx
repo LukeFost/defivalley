@@ -3,13 +3,20 @@
 import { useState } from 'react';
 import GameWrapper from '@/components/GameWrapper';
 import WorldBrowser from '@/components/WorldBrowser';
-import { Auth } from '@/components/Auth';
+import { WalletButton } from '@/components/WalletButton';
 import PlantSeedDialog from '@/components/PlantSeedDialog';
 import SettingsDialog from '@/components/SettingsDialog';
 import TransactionTracker from '@/components/TransactionTracker';
 import Notifications from '@/components/Notifications';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { CorralScene } from '@/components/scenes/CorralScene';
+import { OrchardScene } from '@/components/scenes/OrchardScene';
+import { WellScene } from '@/components/scenes/WellScene';
+import { SwapModal } from '@/components/modals/SwapModal';
+import { MintModal } from '@/components/modals/MintModal';
+import { StakeModal } from '@/components/modals/StakeModal';
+import { QuestBookHUD } from '@/components/QuestBookHUD';
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<'browser' | 'game'>('browser');
@@ -33,10 +40,8 @@ export default function Home() {
     return (
       <div className="min-h-screen">
         <WorldBrowser onEnterWorld={handleEnterWorld} />
-        {/* Auth component for world browser */}
-        <div className="fixed top-4 right-4 z-50">
-          <Auth />
-        </div>
+        {/* Wallet connection for world browser */}
+        <WalletButton />
         {/* Global components that work across views */}
         <PlantSeedDialog />
         <SettingsDialog />
@@ -93,8 +98,8 @@ export default function Home() {
           ✕
         </button>
         
-        {/* Auth component and other UI elements */}
-        <Auth />
+        {/* Wallet connection and other UI elements */}
+        <WalletButton />
         <div className="overlay-content">
           <h2>Farm Controls</h2>
           <p>🎮 WASD: Move</p>
@@ -271,6 +276,17 @@ export default function Home() {
       <PlantSeedDialog />
       <SettingsDialog />
       <TransactionTracker />
+      
+      {/* Building Scene Components */}
+      <CorralScene />
+      <OrchardScene />
+      <WellScene />
+      <SwapModal />
+      <MintModal />
+      <StakeModal />
+      
+      {/* Flow Quest Book HUD */}
+      <QuestBookHUD />
       
       {/* Global Notification System */}
       <Notifications />

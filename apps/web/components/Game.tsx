@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
@@ -14,6 +14,8 @@ import { UIStack } from './UIStack';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
+import { createCorralBuildingData, type CorralBuildingData } from './buildings/CorralBuilding';
+import { useUI, useAppStore } from '@/app/store';
 
 interface GameState {
   players: Map<string, {
@@ -59,6 +61,15 @@ class MainScene extends Phaser.Scene {
   private worldHeight: number = 1200; // Will be updated based on map size
   private cameraLerpFactor: number = 0.1; // Smooth camera following
   
+  // Building system properties
+  private buildings: Map<string, CorralBuildingData> = new Map();
+  private buildingSprites: Map<string, Phaser.GameObjects.Image> = new Map();
+  private buildingHotspots: Map<string, Phaser.GameObjects.Zone> = new Map();
+  private buildingEntranceIndicators: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private showCorralModalCallback?: () => void;
+  private showOrchardModalCallback?: () => void;
+  private showWellModalCallback?: () => void;
+  
   // Simple background approach with invisible walls
   private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
   
@@ -102,8 +113,16 @@ class MainScene extends Phaser.Scene {
     return solidTiles.includes(tileType);
   }
 
-  init(data: { chatCallback?: (message: ChatMessage) => void }) {
+  init(data: { 
+    chatCallback?: (message: ChatMessage) => void;
+    showCorralModal?: () => void;
+    showOrchardModal?: () => void;
+    showWellModal?: () => void;
+  }) {
     this.chatCallback = data.chatCallback;
+    this.showCorralModalCallback = data.showCorralModal;
+    this.showOrchardModalCallback = data.showOrchardModal;
+    this.showWellModalCallback = data.showWellModal;
   }
 
   preload() {
@@ -144,6 +163,9 @@ class MainScene extends Phaser.Scene {
     // Load the tileset for world decoration
     this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
     
+    // Load building sprites
+    this.load.image('corral_building', '/sprites/corral.png');
+    
     // Initialize and preload crop system
     this.cropSystem = new CropSystem(this);
     this.cropSystem.preload();
@@ -170,6 +192,9 @@ class MainScene extends Phaser.Scene {
     // Initialize crop system
     this.cropSystem.create();
 
+    // Create buildings
+    this.createBuildings();
+
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
@@ -190,6 +215,156 @@ class MainScene extends Phaser.Scene {
     
   }
 
+  createBuildings() {
+    // TODO: Replace placeholder rectangles with actual building sprites
+    // TODO: Load proper building assets for corral, orchard, and well
+    // TODO: Implement proper sprite scaling and positioning
+    
+    // Building configurations with placeholder rectangles for immediate visibility
+    const buildingConfigs = [
+      {
+        id: 'corral',
+        x: 800,
+        y: 400,
+        width: 96,
+        height: 64,
+        color: 0x8B4513, // Brown
+        callback: this.showCorralModalCallback,
+        name: 'Trading Corral',
+        description: 'FLOW → FROTH'
+      },
+      {
+        id: 'orchard',
+        x: 500,
+        y: 600,
+        width: 80,
+        height: 80,
+        color: 0x90EE90, // Light green
+        callback: this.showOrchardModalCallback,
+        name: 'Sacred Orchard',
+        description: 'FVIX → sFVIX'
+      },
+      {
+        id: 'well',
+        x: 1200,
+        y: 500,
+        width: 64,
+        height: 64,
+        color: 0x87CEEB, // Sky blue
+        callback: this.showWellModalCallback,
+        name: 'Mystical Well',
+        description: 'FROTH → FVIX'
+      }
+    ];
+    
+    buildingConfigs.forEach(config => {
+      // Create building data for hotspot positioning
+      const buildingData = createCorralBuildingData({
+        x: config.x,
+        y: config.y,
+        width: config.width,
+        height: config.height,
+        onClick: config.callback
+      });
+      
+      this.buildings.set(config.id, buildingData);
+      
+      // Create building sprite (use sprite if available, fallback to rectangle)
+      let building;
+      if (config.id === 'corral' && this.textures.exists('corral_building')) {
+        building = this.add.image(config.x, config.y, 'corral_building');
+        building.setDisplaySize(config.width, config.height);
+      } else {
+        // Fallback to placeholder rectangle
+        building = this.add.rectangle(config.x, config.y, config.width, config.height, config.color);
+        building.setStrokeStyle(3, 0xFFFFFF, 0.8);
+      }
+      building.setDepth(buildingData.depth);
+      building.setData('buildingType', config.id);
+      this.buildingSprites.set(config.id, building);
+      
+      // Create entrance indicator (wireframe door)
+      const entranceBox = this.add.graphics();
+      entranceBox.lineStyle(2, 0xFFFF00, 1.0); // Yellow outline
+      entranceBox.strokeRect(
+        buildingData.entryZone.x,
+        buildingData.entryZone.y,
+        buildingData.entryZone.width,
+        buildingData.entryZone.height
+      );
+      entranceBox.fillStyle(0xFFFF00, 0.2); // Yellow fill
+      entranceBox.fillRect(
+        buildingData.entryZone.x,
+        buildingData.entryZone.y,
+        buildingData.entryZone.width,
+        buildingData.entryZone.height
+      );
+      entranceBox.setDepth(buildingData.depth + 1);
+      this.buildingEntranceIndicators.set(config.id, entranceBox);
+      
+      // Add building name labels (high contrast)
+      const nameLabel = this.add.text(config.x, config.y - config.height/2 - 25, config.name, {
+        fontSize: '14px',
+        color: '#FFFFFF',
+        fontFamily: 'Arial, sans-serif',
+        stroke: '#000000',
+        strokeThickness: 3,
+        fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(buildingData.depth + 2);
+      
+      const descLabel = this.add.text(config.x, config.y - config.height/2 - 10, config.description, {
+        fontSize: '11px',
+        color: '#FFFF00',
+        fontFamily: 'Arial, sans-serif',
+        stroke: '#000000',
+        strokeThickness: 2
+      }).setOrigin(0.5).setDepth(buildingData.depth + 2);
+      
+      // Create large interactive hotspot zone (easier to click)
+      const hotspot = this.add.zone(
+        config.x,
+        config.y,
+        config.width + 20, // Slightly larger than building
+        config.height + 20
+      );
+      
+      hotspot.setInteractive();
+      hotspot.setData('buildingType', config.id);
+      this.buildingHotspots.set(config.id, hotspot);
+      
+      // Add click handler
+      hotspot.on('pointerdown', () => {
+        if (config.callback) {
+          console.log(`🏗️ ${config.name} clicked!`);
+          config.callback();
+        } else {
+          console.log(`⚠️ No callback for ${config.name}`);
+        }
+      });
+      
+      // Add hover effects
+      hotspot.on('pointerover', () => {
+        building.setScale(1.1); // Grow on hover
+        entranceBox.setAlpha(0.8);
+        nameLabel.setScale(1.2);
+        descLabel.setScale(1.1);
+        this.input.setDefaultCursor('pointer');
+        console.log(`👆 Hovering over ${config.name}`);
+      });
+      
+      hotspot.on('pointerout', () => {
+        building.setScale(1.0); // Return to normal
+        entranceBox.setAlpha(1.0);
+        nameLabel.setScale(1.0);
+        descLabel.setScale(1.0);
+        this.input.setDefaultCursor('default');
+      });
+    });
+    
+    console.log('🏗️ Placeholder buildings created and interactive hotspots set up');
+    console.log('📝 TODO: Replace rectangles with actual building sprites');
+  }
+
   updateCameraFollow() {
     // Follow the current player smoothly
     if (this.currentPlayer) {
@@ -202,39 +377,14 @@ class MainScene extends Phaser.Scene {
   }
 
 
-  // Safe localStorage access for SSR
-  private static safeLocalStorage = {
-    getItem: (key: string): string | null => {
-      if (typeof window === 'undefined') return null;
-      return localStorage.getItem(key);
-    },
-    setItem: (key: string, value: string): void => {
-      if (typeof window === 'undefined') return;
-      localStorage.setItem(key, value);
-    },
-    removeItem: (key: string): void => {
-      if (typeof window === 'undefined') return;
-      localStorage.removeItem(key);
-    }
-  };
-
-  // Utility function to reset a player's character selection
-  static resetPlayerCharacter(playerAddress: string) {
-    const storageKey = `defi-valley-character-${playerAddress}`;
-    MainScene.safeLocalStorage.removeItem(storageKey);
-  }
+  // Character selection is now handled server-side through game room state
+  // No need for localStorage utilities
 
   // Add this to window for easy console access during development
   setupDevTools() {
     if (typeof window !== 'undefined') {
-      (window as any).resetMyCharacter = () => {
-        // Get current player address from the scene
-        const currentPlayer = this.currentPlayer;
-        if (currentPlayer) {
-          const playerAddress = 'current-player'; // This would be replaced with actual address
-          MainScene.resetPlayerCharacter(playerAddress);
-          console.log('🎮 Character reset! Reload the page to get a new character.');
-        }
+      (window as any).debugMessage = () => {
+        console.log('🎮 Character selection handled server-side. Use server admin tools to reset characters.');
       };
       
       (window as any).toggleDebugMode = () => {
@@ -479,6 +629,118 @@ class MainScene extends Phaser.Scene {
         console.log('Created cropped test tile at center-right (should be green)');
       };
       
+      (window as any).testBuildingVisibility = () => {
+        console.log('🏗️ Testing building visibility...');
+        
+        // Clear existing test buildings
+        this.children.list.filter(child => child.getData && child.getData('testBuilding')).forEach(building => building.destroy());
+        
+        // Create simple colored rectangles as test buildings
+        const testBuilding1 = this.add.rectangle(800, 400, 96, 64, 0xff0000);
+        testBuilding1.setStrokeStyle(4, 0xffffff);
+        testBuilding1.setDepth(1000);
+        testBuilding1.setData('testBuilding', true);
+        console.log('Created RED test building at (800, 400)');
+        
+        const testBuilding2 = this.add.rectangle(500, 600, 80, 80, 0x00ff00);
+        testBuilding2.setStrokeStyle(4, 0xffffff);
+        testBuilding2.setDepth(1000);
+        testBuilding2.setData('testBuilding', true);
+        console.log('Created GREEN test building at (500, 600)');
+        
+        const testBuilding3 = this.add.rectangle(1200, 500, 64, 64, 0x0000ff);
+        testBuilding3.setStrokeStyle(4, 0xffffff);
+        testBuilding3.setDepth(1000);
+        testBuilding3.setData('testBuilding', true);
+        console.log('Created BLUE test building at (1200, 500)');
+        
+        // Test if corral sprite loads
+        if (this.textures.exists('corral_building')) {
+          const testCorral = this.add.image(600, 300, 'corral_building');
+          testCorral.setDisplaySize(96, 64);
+          testCorral.setDepth(1000);
+          testCorral.setData('testBuilding', true);
+          console.log('Created CORRAL SPRITE test at (600, 300)');
+        } else {
+          console.error('❌ corral_building texture not loaded!');
+        }
+        
+        console.log('✅ Test buildings created. Check the game for colored rectangles and corral sprite.');
+      };
+      
+      (window as any).debugAssets = () => {
+        console.log('🎨 === ASSET DEBUG INFO ===');
+        
+        // Check all loaded textures
+        console.log('\nLoaded textures:');
+        const textures = Object.keys(this.textures.list);
+        textures.forEach(key => {
+          const texture = this.textures.get(key);
+          const source = texture.source[0];
+          console.log(`  ${key}: ${source ? source.width + 'x' + source.height : 'NO SOURCE'}`);
+        });
+        
+        // Check if building textures exist
+        console.log('\nBuilding textures:');
+        console.log(`  corral_building: ${this.textures.exists('corral_building') ? '✅ LOADED' : '❌ MISSING'}`);
+        
+        // Check scene objects
+        console.log('\nScene objects:');
+        console.log(`  Total children: ${this.children.list.length}`);
+        console.log(`  Visible children: ${this.children.list.filter(c => (c as any).visible !== false).length}`);
+        
+        // Check camera
+        console.log('\nCamera info:');
+        console.log(`  Camera position: (${this.cameras.main.scrollX}, ${this.cameras.main.scrollY})`);
+        console.log(`  Camera zoom: ${this.cameras.main.zoom}`);
+        console.log(`  World bounds: ${this.worldWidth}x${this.worldHeight}`);
+      };
+      
+      (window as any).debugPlayers = () => {
+        console.log('👤 === PLAYER DEBUG INFO ===');
+        
+        console.log(`\nTotal players: ${this.players.size}`);
+        console.log(`Current player exists: ${!!this.currentPlayer}`);
+        
+        if (this.currentPlayer) {
+          const info = this.currentPlayer.getPlayerInfo();
+          console.log(`Current player position: (${info.x}, ${info.y})`);
+          console.log(`Current player character: ${info.character}`);
+          console.log(`Current player visible: ${(this.currentPlayer as any).visible}`);
+        }
+        
+        // List all players
+        this.players.forEach((player, sessionId) => {
+          const info = player.getPlayerInfo();
+          console.log(`Player ${sessionId}: ${info.name} at (${info.x}, ${info.y}) - ${info.character}`);
+        });
+        
+        // Check if we're connected to server
+        console.log(`\nServer connection: ${this.room ? 'CONNECTED' : 'DISCONNECTED'}`);
+        console.log(`Session ID: ${this.sessionId || 'NONE'}`);
+      };
+      
+      (window as any).createTestPlayer = () => {
+        console.log('👤 Creating test player...');
+        
+        // Create simple test player at center of screen
+        const testPlayer = this.add.circle(400, 300, 16, 0xff0000);
+        testPlayer.setStrokeStyle(4, 0xffffff);
+        testPlayer.setDepth(1000);
+        testPlayer.setData('testPlayer', true);
+        
+        // Add player name
+        const nameLabel = this.add.text(400, 280, 'TEST PLAYER', {
+          fontSize: '12px',
+          color: '#FFFFFF',
+          fontFamily: 'Arial, sans-serif',
+          stroke: '#000000',
+          strokeThickness: 2
+        }).setOrigin(0.5).setDepth(1001);
+        
+        console.log('✅ Test player created at center (400, 300)');
+      };
+      
       console.log('🛠️ Dev tools available:');
       console.log('  - resetMyCharacter(): Reset character selection');
       console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
@@ -491,6 +753,12 @@ class MainScene extends Phaser.Scene {
       console.log('  🔍 TILEMAP DEBUGGING:');
       console.log('  - debugTilemap(): Complete tilemap diagnostic');
       console.log('  - testTileVisibility(): Test basic tile rendering');
+      console.log('  🏗️ BUILDING DEBUGGING:');
+      console.log('  - testBuildingVisibility(): Create test building shapes');
+      console.log('  - debugAssets(): Check all loaded assets and textures');
+      console.log('  👤 PLAYER DEBUGGING:');
+      console.log('  - debugPlayers(): Check player state and visibility');
+      console.log('  - createTestPlayer(): Create test player shape');
     }
   }
   
@@ -1059,18 +1327,7 @@ class MainScene extends Phaser.Scene {
     // Create minimal UI with only essential elements
     const uiContainer = this.add.container(0, 0);
     
-    // Simple controls info at bottom
-    const controlsBg = this.add.rectangle(120, 580, 220, 30, 0x000000, 0.6);
-    controlsBg.setStrokeStyle(1, 0x90EE90, 0.3);
-    controlsBg.setScrollFactor(0); // Pin to camera
-    
-    const controls = this.add.text(120, 580, '🎮 WASD: Move  💬 Enter: Chat', {
-      fontSize: '12px',
-      color: '#FFFFFF',
-      fontFamily: 'Arial, sans-serif'
-    });
-    controls.setOrigin(0.5);
-    controls.setScrollFactor(0); // Pin to camera
+    // UI is now handled by React components - no in-game text needed
   }
 
   setWorldConfiguration(worldId?: string, isOwnWorld?: boolean) {
@@ -1182,9 +1439,38 @@ class MainScene extends Phaser.Scene {
       });
 
       console.log('Connected to server!');
+      console.log('🎮 SERVER CONNECTION ESTABLISHED - Player should be created soon');
     } catch (error) {
       console.error('Failed to connect to server:', error);
+      console.log('🚨 SERVER CONNECTION FAILED - Creating test player for debugging');
+      // Create a test player for debugging when server is unavailable
+      this.time.delayedCall(1000, () => {
+        this.createTestPlayerForDebugging();
+      });
     }
+  }
+
+  createTestPlayerForDebugging() {
+    console.log('🧪 Creating test player for debugging purposes');
+    
+    // Create a simple test player at the center of the screen
+    const testSessionId = 'debug-player';
+    const testPlayer = {
+      id: testSessionId,
+      name: 'Debug Player',
+      x: 400,
+      y: 300,
+      level: 1,
+      xp: 0
+    };
+    
+    // Set this as the session ID so it becomes current player
+    this.sessionId = testSessionId;
+    
+    // Add the test player
+    this.addPlayer(testSessionId, testPlayer);
+    
+    console.log('🧪 Test player created - should be visible at center');
   }
 
   addPlayer(sessionId: string, player: any) {
@@ -1228,16 +1514,23 @@ class MainScene extends Phaser.Scene {
       };
       
       // Create Player instance
+      console.log('🎯 Creating Player instance at position:', player.x, player.y);
       const playerObject = new Player(this, player.x, player.y, playerInfo);
+      console.log('✅ Player instance created successfully');
       
       // Store reference
       this.players.set(sessionId, playerObject);
+      console.log('📝 Player stored in players map, total players:', this.players.size);
       
       if (isCurrentPlayer) {
         this.currentPlayer = playerObject;
         // Start camera following the current player
         this.updateCameraFollow();
         console.log('📷 Camera now following current player');
+        console.log('🎮 Current player position:', this.currentPlayer.x, this.currentPlayer.y);
+        console.log('🎮 Current player visible:', this.currentPlayer.visible);
+        console.log('🎮 Current player alpha:', this.currentPlayer.alpha);
+        console.log('🎮 Current player depth:', this.currentPlayer.depth);
       }
       
       console.log('Added player:', sessionId, player.name, 'with character:', characterType);
@@ -1455,6 +1748,11 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   // Get user authentication info
   const { user } = usePrivy();
   const { address } = useAccount();
+  
+  // Get stable modal functions from store to prevent infinite re-renders
+  const showCorralModal = useAppStore(state => state.showCorralModal);
+  const showOrchardModal = useAppStore(state => state.showOrchardModal);
+  const showWellModal = useAppStore(state => state.showWellModal);
 
   useEffect(() => {
     // Calculate dimensions based on viewport minus bottom bar
@@ -1506,7 +1804,10 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         scene.init({
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
-          }
+          },
+          showCorralModal,
+          showOrchardModal,
+          showWellModal
         });
 
         // Set up crop click event listener
@@ -1651,9 +1952,6 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       
       {/* UI Stack with all left-side UI elements */}
       <UIStack
-        getTotalCrops={getTotalCrops}
-        getReadyCrops={getReadyCrops}
-        getGrowingCrops={getGrowingCrops}
         chatContainer={chatContainer}
       />
 

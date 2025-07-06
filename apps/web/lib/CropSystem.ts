@@ -117,7 +117,7 @@ export class CropSystem {
   
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.loadCropsFromStorage();
+    // Server-side state will be loaded through game room state synchronization
   }
 
   preload() {
@@ -153,7 +153,7 @@ export class CropSystem {
 
     this.crops.set(cropId, cropData);
     this.createCropSprite(cropData);
-    this.saveCropsToStorage();
+    // Crop state persisted server-side through game room
     
     console.log(`🌱 Planted ${cropType} at (${x}, ${y})`);
     return cropId;
@@ -175,7 +175,7 @@ export class CropSystem {
 
     // Remove from data
     this.crops.delete(cropId);
-    this.saveCropsToStorage();
+    // Crop state persisted server-side through game room
     
     console.log(`🗑️ Removed crop ${cropId}`);
     return true;
@@ -258,7 +258,7 @@ export class CropSystem {
     });
 
     if (updated) {
-      this.saveCropsToStorage();
+      // Crop state persisted server-side through game room
     }
   }
 
@@ -387,32 +387,22 @@ export class CropSystem {
   }
 
   /**
-   * Save crops to localStorage
+   * Load crops from server state
+   * Called when game room state is synchronized
    */
-  private saveCropsToStorage() {
-    if (typeof window === 'undefined') return;
-    
-    const cropsData = Array.from(this.crops.values());
-    localStorage.setItem('defi-valley-crops', JSON.stringify(cropsData));
+  loadCropsFromServer(cropsData: CropData[]) {
+    this.crops.clear();
+    cropsData.forEach((crop) => {
+      this.crops.set(crop.id, crop);
+      this.createCropSprite(crop);
+    });
   }
 
   /**
-   * Load crops from localStorage
+   * Get current crops data for server synchronization
    */
-  private loadCropsFromStorage() {
-    if (typeof window === 'undefined') return;
-    
-    const savedCrops = localStorage.getItem('defi-valley-crops');
-    if (savedCrops) {
-      try {
-        const cropsData: CropData[] = JSON.parse(savedCrops);
-        cropsData.forEach((crop) => {
-          this.crops.set(crop.id, crop);
-        });
-      } catch (error) {
-        console.error('Error loading crops from storage:', error);
-      }
-    }
+  getCropsData(): CropData[] {
+    return Array.from(this.crops.values());
   }
 
   /**
@@ -471,6 +461,6 @@ export class CropSystem {
     crops.forEach((crop) => {
       this.removeCrop(crop.id);
     });
-    localStorage.removeItem('defi-valley-crops');
+    // Crop clearing handled through server state
   }
 }

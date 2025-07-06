@@ -197,6 +197,87 @@ export const makeStore = () => {
             });
           },
           
+          // Flow Quest management
+          initializeQuest: (walletAddress) => {
+            set((state) => {
+              if (!state.flowQuests[walletAddress]) {
+                const questId = `quest_${walletAddress}_${Date.now()}`;
+                state.flowQuests[walletAddress] = {
+                  id: questId,
+                  walletAddress,
+                  currentStep: 'NOT_STARTED',
+                  completedSteps: [],
+                  frothBalance: '0',
+                  fvixBalance: '0',
+                  sFvixBalance: '0',
+                  lastUpdated: Date.now(),
+                  isCompleted: false
+                };
+              }
+            });
+          },
+          
+          setSwapped: (walletAddress, frothBalance) => {
+            set((state) => {
+              const quest = state.flowQuests[walletAddress];
+              if (quest) {
+                quest.currentStep = 'SWAPPED';
+                if (!quest.completedSteps.includes('SWAPPED')) {
+                  quest.completedSteps.push('SWAPPED');
+                }
+                quest.frothBalance = frothBalance;
+                quest.lastUpdated = Date.now();
+              }
+            });
+          },
+          
+          setMinted: (walletAddress, fvixBalance) => {
+            set((state) => {
+              const quest = state.flowQuests[walletAddress];
+              if (quest) {
+                quest.currentStep = 'MINTED';
+                if (!quest.completedSteps.includes('MINTED')) {
+                  quest.completedSteps.push('MINTED');
+                }
+                quest.fvixBalance = fvixBalance;
+                quest.lastUpdated = Date.now();
+              }
+            });
+          },
+          
+          setStaked: (walletAddress, sFvixBalance) => {
+            set((state) => {
+              const quest = state.flowQuests[walletAddress];
+              if (quest) {
+                quest.currentStep = 'STAKED';
+                if (!quest.completedSteps.includes('STAKED')) {
+                  quest.completedSteps.push('STAKED');
+                }
+                quest.sFvixBalance = sFvixBalance;
+                quest.isCompleted = true;
+                quest.lastUpdated = Date.now();
+              }
+            });
+          },
+          
+          updateQuestBalances: (walletAddress, balances) => {
+            set((state) => {
+              const quest = state.flowQuests[walletAddress];
+              if (quest) {
+                if (balances.froth !== undefined) quest.frothBalance = balances.froth;
+                if (balances.fvix !== undefined) quest.fvixBalance = balances.fvix;
+                if (balances.sFvix !== undefined) quest.sFvixBalance = balances.sFvix;
+                quest.lastUpdated = Date.now();
+              }
+            });
+          },
+          
+          resetQuest: (walletAddress) => {
+            set((state) => {
+              delete state.flowQuests[walletAddress];
+            });
+          },
+          
           // UI actions
           setSelectedSeedType: (type) => {
             set((state) => {
@@ -250,6 +331,86 @@ export const makeStore = () => {
           hideSettingsModal: () => {
             set((state) => {
               state.ui.showSettingsModal = false;
+            });
+          },
+          
+          // Flow Quest UI actions
+          showCorralModal: () => {
+            set((state) => {
+              state.ui.showCorralModal = true;
+            });
+          },
+          
+          hideCorralModal: () => {
+            set((state) => {
+              state.ui.showCorralModal = false;
+            });
+          },
+          
+          showWellModal: () => {
+            set((state) => {
+              state.ui.showWellModal = true;
+            });
+          },
+          
+          hideWellModal: () => {
+            set((state) => {
+              state.ui.showWellModal = false;
+            });
+          },
+          
+          showOrchardModal: () => {
+            set((state) => {
+              state.ui.showOrchardModal = true;
+            });
+          },
+          
+          hideOrchardModal: () => {
+            set((state) => {
+              state.ui.showOrchardModal = false;
+            });
+          },
+          
+          toggleQuestBook: () => {
+            set((state) => {
+              state.ui.questBookExpanded = !state.ui.questBookExpanded;
+            });
+          },
+          
+          // Flow Transaction modal actions
+          showSwapModal: () => {
+            set((state) => {
+              state.ui.showSwapModal = true;
+            });
+          },
+          
+          hideSwapModal: () => {
+            set((state) => {
+              state.ui.showSwapModal = false;
+            });
+          },
+          
+          showMintModal: () => {
+            set((state) => {
+              state.ui.showMintModal = true;
+            });
+          },
+          
+          hideMintModal: () => {
+            set((state) => {
+              state.ui.showMintModal = false;
+            });
+          },
+          
+          showStakeModal: () => {
+            set((state) => {
+              state.ui.showStakeModal = true;
+            });
+          },
+          
+          hideStakeModal: () => {
+            set((state) => {
+              state.ui.showStakeModal = false;
             });
           },
           
@@ -327,6 +488,12 @@ export const makeStore = () => {
               showHarvestModal: false,
               showSettingsModal: false,
               showTransactionTracker: false,
+              showCorralModal: false,
+              showWellModal: false,
+              showOrchardModal: false,
+              showSwapModal: false,
+              showMintModal: false,
+              showStakeModal: false,
             }
           }),
         }
@@ -380,6 +547,15 @@ export const useUI = () => useAppStore(state => ({
   isHarvestModalOpen: state.ui.showHarvestModal,
   isSettingsModalOpen: state.ui.showSettingsModal,
   notifications: state.ui.notifications,
+  // Flow Quest UI state
+  isCorralModalOpen: state.ui.showCorralModal,
+  isWellModalOpen: state.ui.showWellModal,
+  isOrchardModalOpen: state.ui.showOrchardModal,
+  questBookExpanded: state.ui.questBookExpanded,
+  // Flow Transaction modal state
+  isSwapModalOpen: state.ui.showSwapModal,
+  isMintModalOpen: state.ui.showMintModal,
+  isStakeModalOpen: state.ui.showStakeModal,
   // UI action functions
   setSelectedSeedType: state.setSelectedSeedType,
   setPlantAmount: state.setPlantAmount,
@@ -390,6 +566,21 @@ export const useUI = () => useAppStore(state => ({
   hideHarvestModal: state.hideHarvestModal,
   showSettingsModal: state.showSettingsModal,
   hideSettingsModal: state.hideSettingsModal,
+  // Flow Quest UI actions
+  showCorralModal: state.showCorralModal,
+  hideCorralModal: state.hideCorralModal,
+  showWellModal: state.showWellModal,
+  hideWellModal: state.hideWellModal,
+  showOrchardModal: state.showOrchardModal,
+  hideOrchardModal: state.hideOrchardModal,
+  toggleQuestBook: state.toggleQuestBook,
+  // Flow Transaction modal actions
+  showSwapModal: state.showSwapModal,
+  hideSwapModal: state.hideSwapModal,
+  showMintModal: state.showMintModal,
+  hideMintModal: state.hideMintModal,
+  showStakeModal: state.showStakeModal,
+  hideStakeModal: state.hideStakeModal,
   addNotification: state.addNotification,
   removeNotification: state.removeNotification,
   clearNotifications: state.clearNotifications
@@ -397,5 +588,23 @@ export const useUI = () => useAppStore(state => ({
 
 export const useConfig = () => useAppStore(state => state.config);
 
+// QuestBook convenience hook
+export const useFlowQuest = () => useAppStore(state => ({
+  quests: state.flowQuests,
+  initializeQuest: state.initializeQuest,
+  setSwapped: state.setSwapped,
+  setMinted: state.setMinted,
+  setStaked: state.setStaked,
+  updateQuestBalances: state.updateQuestBalances,
+  resetQuest: state.resetQuest,
+  // Helper to get quest for current wallet
+  getQuest: (walletAddress: `0x${string}`) => state.flowQuests[walletAddress],
+  // Helper to check completion status
+  isStepCompleted: (walletAddress: `0x${string}`, step: any) => {
+    const quest = state.flowQuests[walletAddress];
+    return quest?.completedSteps.includes(step) || false;
+  }
+}));
+
 // Export types for backward compatibility
-export type { SeedType, CrossChainTx, TxStatus, Notification } from './store-types';
+export type { SeedType, CrossChainTx, TxStatus, Notification, QuestStep, FlowQuest } from './store-types';
