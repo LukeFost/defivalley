@@ -8,9 +8,14 @@ import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+import { BankBuilding } from '../lib/BankBuilding';
+import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { UIStack } from './UIStack';
+import { MorphoDepositModal } from './MorphoDepositModal';
+import { MarketplaceModal } from './MarketplaceModal';
+import { ConnectWalletButton } from './ConnectWalletButton';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
@@ -49,14 +54,16 @@ class MainScene extends Phaser.Scene {
   private terrainLayout: string[][] = [];
   private debugMode: boolean = false;
   private cropSystem!: CropSystem;
+  private bankBuilding!: BankBuilding;
+  private marketplaceBuilding!: MarketplaceBuilding;
   private worldId?: string;
   private isOwnWorld?: boolean;
   private address?: string;
   private user?: any;
   
   // Camera system properties
-  private worldWidth: number = 1600; // Will be updated based on map size
-  private worldHeight: number = 1200; // Will be updated based on map size
+  private worldWidth: number = 2500; // Increased from 2000 to allow walking further right
+  private worldHeight: number = 2000; // Increased from 1500 to allow walking higher
   private cameraLerpFactor: number = 0.1; // Smooth camera following
   
   // Simple background approach with invisible walls
@@ -88,8 +95,9 @@ class MainScene extends Phaser.Scene {
     
     // Update world size based on map dimensions
     const tileSize = 32; // Standard tile size
-    this.worldWidth = this.mapLayout[0].length * tileSize;
-    this.worldHeight = this.mapLayout.length * tileSize;
+    // Don't override the manually set world dimensions
+    // this.worldWidth = this.mapLayout[0].length * tileSize;
+    // this.worldHeight = this.mapLayout.length * tileSize;
     
   }
   
@@ -144,6 +152,12 @@ class MainScene extends Phaser.Scene {
     // Load the tileset for world decoration
     this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
     
+    // Load bank building sprite
+    this.load.image('bank', '/bank.png');
+    
+    // Load marketplace building sprite
+    this.load.image('market', '/market.png');
+    
     // Initialize and preload crop system
     this.cropSystem = new CropSystem(this);
     this.cropSystem.preload();
@@ -154,6 +168,9 @@ class MainScene extends Phaser.Scene {
     
     // Setup camera system first
     this.setupCameraSystem();
+    
+    // Set physics world bounds to match our expanded world
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     
     // Create a beautiful farming world background
     this.createFarmingWorld();
@@ -169,6 +186,12 @@ class MainScene extends Phaser.Scene {
 
     // Initialize crop system
     this.cropSystem.create();
+
+    // Create bank building in the lower right area
+    this.bankBuilding = new BankBuilding(this, 1000, 600);
+    
+    // Create marketplace building much higher above the bank
+    this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
 
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -1047,6 +1070,24 @@ class MainScene extends Phaser.Scene {
       }
     }
     
+    // Check collision with bank building
+    if (this.bankBuilding) {
+      for (const corner of corners) {
+        if (this.bankBuilding.checkCollision(corner.x, corner.y)) {
+          return true;
+        }
+      }
+    }
+    
+    // Check collision with marketplace building
+    if (this.marketplaceBuilding) {
+      for (const corner of corners) {
+        if (this.marketplaceBuilding.checkCollision(corner.x, corner.y)) {
+          return true;
+        }
+      }
+    }
+    
     return false;
   }
   
@@ -1292,6 +1333,18 @@ class MainScene extends Phaser.Scene {
       this.cropSystem.update();
     }
 
+    // Update bank building interaction
+    if (this.bankBuilding && this.currentPlayer) {
+      this.bankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
+      this.bankBuilding.checkInteraction();
+    }
+    
+    // Update marketplace building interaction
+    if (this.marketplaceBuilding && this.currentPlayer) {
+      this.marketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
+      this.marketplaceBuilding.checkInteraction();
+    }
+
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
@@ -1451,6 +1504,8 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
+  const [showMorphoModal, setShowMorphoModal] = useState(false);
+  const [showMarketplaceModal, setShowMarketplaceModal] = useState(false);
   
   // Get user authentication info
   const { user } = usePrivy();
@@ -1512,6 +1567,18 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         // Set up crop click event listener
         scene.events.on('cropClicked', (crop: CropData) => {
           setSelectedCrop(crop);
+        });
+        
+        // Set up bank interaction event listener
+        scene.events.on('bankInteraction', () => {
+          console.log('🏦 Opening Morpho deposit modal');
+          setShowMorphoModal(true);
+        });
+        
+        // Set up marketplace interaction event listener
+        scene.events.on('marketplaceInteraction', () => {
+          console.log('🏪 Opening marketplace modal');
+          setShowMarketplaceModal(true);
         });
       }
     }, 500);
@@ -1639,6 +1706,8 @@ function Game({ worldId, isOwnWorld }: GameProps) {
 
   return (
     <div className="game-wrapper">
+      <ConnectWalletButton />
+      
       <CropContextMenu
         onPlantCrop={handlePlantCrop}
         onRemoveCrop={handleRemoveCrop}
@@ -1661,6 +1730,18 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       <CropInfo 
         crop={selectedCrop} 
         onClose={() => setSelectedCrop(null)} 
+      />
+
+      {/* Morpho Deposit Modal */}
+      <MorphoDepositModal
+        isOpen={showMorphoModal}
+        onClose={() => setShowMorphoModal(false)}
+      />
+
+      {/* Marketplace Modal */}
+      <MarketplaceModal
+        isOpen={showMarketplaceModal}
+        onClose={() => setShowMarketplaceModal(false)}
       />
 
       <style jsx>{`
