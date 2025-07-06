@@ -125,7 +125,14 @@ export const makeStore = () => {
           
           clearCompletedTransactions: () => {
             set((state) => {
+              // Clear transaction history
               state.transactionHistory = [];
+              
+              // Also clear any active transactions that are completed/failed
+              // This handles transactions that got stuck in active state
+              state.activeTransactions = state.activeTransactions.filter(
+                tx => tx.status !== 'completed' && tx.status !== 'failed'
+              );
             });
           },
           
@@ -210,24 +217,16 @@ export const makeStore = () => {
           },
           
           showPlantModal: () => {
-            console.log('🌱 [STORE] showPlantModal action called');
-            console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
             set((state) => {
               state.ui.showPlantModal = true;
-              console.log('🌱 [STORE] Setting showPlantModal to true');
             });
-            console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
           },
           
           hidePlantModal: () => {
-            console.log('🌱 [STORE] hidePlantModal action called');
-            console.log('🌱 [STORE] Previous showPlantModal state:', get().ui.showPlantModal);
             set((state) => {
               state.ui.showPlantModal = false;
               state.ui.plantAmount = '';
-              console.log('🌱 [STORE] Setting showPlantModal to false');
             });
-            console.log('🌱 [STORE] New showPlantModal state:', get().ui.showPlantModal);
           },
           
           showHarvestModal: () => {
@@ -357,7 +356,8 @@ export const useTransactions = () => useAppStore(state => ({
   update: state.updateTransaction,
   complete: state.completeTransaction,
   fail: state.failTransaction,
-  retry: state.retryTransaction
+  retry: state.retryTransaction,
+  clearCompleted: state.clearCompletedTransactions
 }));
 
 export const usePlayerData = () => useAppStore(state => ({

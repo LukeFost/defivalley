@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+import { ethers } from "hardhat";
 
 async function main() {
   console.log("🔍 Checking contract state...");
@@ -29,4 +29,3 @@ async function main() {
 }
 
 main().catch(console.error);
-EOF < /dev/null

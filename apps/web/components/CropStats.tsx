@@ -32,7 +32,7 @@ export function CropStats({ getTotalCrops, getReadyCrops, getGrowingCrops }: Cro
   }, [getTotalCrops, getReadyCrops, getGrowingCrops]);
 
   return (
-    <div className="fixed top-4 left-4 bg-white rounded-lg shadow-lg p-3 min-w-[200px] border border-gray-200 z-[1000]">
+    <>
       <h3 className="text-lg font-semibold text-green-600 mb-2 flex items-center">
         🌾 Farm Statistics
       </h3>
@@ -65,6 +65,6 @@ export function CropStats({ getTotalCrops, getReadyCrops, getGrowingCrops }: Cro
       <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
         Right-click to plant • Click crops for info
       </div>
-    </div>
+    </>
   );
 }

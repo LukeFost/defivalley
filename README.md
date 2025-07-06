@@ -18,12 +18,12 @@ DeFi Valley is a multiplayer farming game that transforms complex DeFi yield far
 
 ### Technical Innovation Stack
 - **Frontend**: Next.js 15 + Phaser 3 + TypeScript
-- **Game Server**: Colyseus multiplayer framework
-- **Auth**: Privy Web3 authentication with embedded wallets
+- **Game Server**: Colyseus multiplayer framework with secure authentication
+- **Auth**: Privy Web3 authentication with embedded wallets + secure session management
 - **Smart Contracts**: Hardhat 3 Alpha + Solidity 0.8.28
 - **Cross-Chain**: Axelar General Message Passing (GMP)
 - **DeFi Integration**: EulerSwap yield farming on Arbitrum
-- **Security**: OpenZeppelin + custom circuit breakers
+- **Security**: OpenZeppelin + custom circuit breakers + rate limiting + input validation
 
 ### Live Demo
 🚀 **Try it now**: [Insert your deployed URL here]
@@ -36,11 +36,14 @@ DeFi Valley is a multiplayer farming game that transforms complex DeFi yield far
 
 - **🌾 Beautiful Farming World**: Professional cozy farming environment with layered backgrounds, animated trees, and organized farm plots
 - **🎮 Real-Time Multiplayer**: Live player movement, chat, and farming with smooth character animations and directional sprites
+- **🏠 Personal Farm Worlds**: Each player has their own persistent farm world with visitor system
+- **🌍 World Browser**: Discover and visit other players' farms with search and pagination
 - **🌱 Visual Seed Planting**: Interactive farming plots where USDC deposits become visual crops that grow over time
 - **⚡ Gas-Free Gaming**: Built on Saga Chainlets for seamless, zero-cost gameplay interactions
 - **🔗 Cross-Chain Magic**: Invisible Axelar GMP integration - plant on Saga, earn yield on Arbitrum
 - **💬 Elegant Chat System**: Real-time messaging with farming-themed UI and proper input handling
 - **🎨 Professional Polish**: Smooth animations, proper sprite scaling, farming badges, and cozy atmosphere
+- **🔒 Enterprise Security**: Rate limiting, input validation, secure authentication, and permission-based actions
 
 ### Architecture
 
@@ -156,8 +159,51 @@ npx hardhat run scripts/deploy.ts --network arbitrumSepolia
 - **Object-oriented**: Player class encapsulates visual elements and behavior
 - **Type-safe**: Full TypeScript coverage for character types and directions
 - **Performance optimized**: Eliminated runtime image processing for faster loading
+- **Secure Authentication**: Player IDs tied to wallet addresses, not session IDs
 
 See [Character System Documentation](docs/CHARACTER_SYSTEM.md) for detailed architecture.
+
+### API Endpoints
+
+#### Get Active Worlds
+```http
+GET /api/worlds?page=1&limit=20&search=player_name
+```
+Returns paginated list of active farm worlds with search functionality.
+
+**Response:**
+```json
+{
+  "worlds": [
+    {
+      "playerId": "0x123...",
+      "playerName": "FarmOwner",
+      "cropCount": 5,
+      "lastActivity": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+```
+
+#### Check World Exists
+```http
+GET /api/worlds/:worldId/exists
+```
+Validates if a world exists. Input validation prevents SQL injection.
+
+**Response:**
+```json
+{
+  "exists": true,
+  "worldId": "validated_world_id"
+}
+```
 
 ### Build Commands
 
@@ -222,6 +268,15 @@ cd apps/server && pnpm dev  # Game server on port 2567
 3. For network play, share your IP address (check server logs)
 4. Use debug client: http://[YOUR_IP]:2567/test.html
 
+**Permission Errors**
+- Only farm owners can plant/harvest crops in their world
+- Visitors have read-only access to other players' farms
+- Check console for authentication errors
+
+**API Rate Limiting**
+- API endpoints limited to 100 requests per 15 minutes per IP
+- If rate limited, wait before retrying
+
 #### Development Tips
 - Use browser developer tools to debug WebSocket connections
 - Server logs show player connections and disconnections
@@ -268,8 +323,17 @@ pnpm exec turbo link
 ### Repository Security Status
 - ✅ **No sensitive data committed** - All private keys and API keys are excluded
 - ✅ **Clean git history** - No secrets have ever been committed
-- ✅ **Proper .gitignore** - All sensitive files are properly excluded
+- ✅ **Proper .gitignore** - All sensitive files and database files excluded
 - ✅ **Safe for public viewing** - Ready for hackathon judges and community
+
+### Security Features Implemented
+- **Input Validation**: All user inputs validated to prevent SQL injection
+- **Rate Limiting**: API endpoints protected against DoS attacks (100 req/15min)
+- **Authentication**: Secure player ID system based on wallet addresses
+- **Permission System**: Only farm owners can modify their own farms
+- **Session Management**: Secure token-based sessions with expiration
+- **Database Security**: Parameterized queries and transaction safety
+- **Error Handling**: Proper error propagation without exposing internals
 
 ### For Developers
 To get full functionality:

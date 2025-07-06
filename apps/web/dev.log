@@ -1,0 +1,464 @@
+
+> web@0.1.0 dev /Users/lukefoster/Documents/Development/defivalley/apps/web
+> next dev --port 3000 "--port" "3333"
+
+   ▲ Next.js 15.3.0
+   - Local:        http://localhost:3333
+   - Network:      http://172.31.50.134:3333
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1896ms
+ ○ Compiling / ...
+ ✓ Compiled / in 8.7s (11754 modules)
+[DEPRECATED] `getStorage`, `serialize` and `deserialize` options are deprecated. Use `storage` option instead.
+[ReferenceError: indexedDB is not defined]
+ ⨯ unhandledRejection: [ReferenceError: indexedDB is not defined]
+ ⨯ unhandledRejection:  [ReferenceError: indexedDB is not defined]
+ GET / 200 in 9386ms
+ ✓ Compiled in 1164ms (5665 modules)
+ ✓ Compiled in 382ms (5679 modules)
+ ✓ Compiled in 428ms (5679 modules)
+ ⨯ ./components/Game.tsx
+Error:   [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:273:1]
+ [2m270[0m |   createFarmingWorld() {
+ [2m271[0m |     // Create clean, minimal background
+ [2m272[0m |     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+ [2m273[0m | <<<<<<< HEAD
+     : [35;1m^^^^^^^[0m
+ [2m274[0m |     const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
+ [2m275[0m | =======
+ [2m276[0m |     
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:275:1]
+ [2m272[0m |     const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+ [2m273[0m | <<<<<<< HEAD
+ [2m274[0m |     const ground = this.add.rectangle(400, 500, 800, 200, 0x8FBC8F, 0.4);
+ [2m275[0m | =======
+     : [35;1m^^^^^^^[0m
+ [2m276[0m |     
+ [2m277[0m |     // Create tilemap-based terrain
+ [2m278[0m |     this.createTilemapTerrain();
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:279:1]
+ [2m276[0m |     
+ [2m277[0m |     // Create tilemap-based terrain
+ [2m278[0m |     this.createTilemapTerrain();
+ [2m279[0m | >>>>>>> feature/world-decoration-cliffs
+     : [35;1m^^^^^^^[0m
+ [2m280[0m |     
+ [2m281[0m |     // Add minimal visual structure without clutter
+ [2m282[0m |     this.createMinimalStructure();
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:302:1]
+ [2m299[0m |     gridGraphics.strokePath();
+ [2m300[0m |   }
+ [2m301[0m | 
+ [2m302[0m | <<<<<<< HEAD
+     : [35;1m^^^^^^^[0m
+ [2m303[0m |   // Method removed - no decorations needed for clean UI
+ [2m304[0m | =======
+ [2m305[0m |   createTilemapTerrain() {
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:304:1]
+ [2m301[0m | 
+ [2m302[0m | <<<<<<< HEAD
+ [2m303[0m |   // Method removed - no decorations needed for clean UI
+ [2m304[0m | =======
+     : [35;1m^^^^^^^[0m
+ [2m305[0m |   createTilemapTerrain() {
+ [2m306[0m |     // Create a tilemap with natural terrain using the LPC cliffs grass tileset
+ [2m307[0m |     const tileSize = TilesetConfig.image.tileSize;
+     `----
+  [31mx[0m Merge conflict marker encountered.
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Game.tsx[0m:525:1]
+ [2m522[0m |     
+ [2m523[0m |     return false;
+ [2m524[0m |   }
+ [2m525[0m | >>>>>>> feature/world-decoration-cliffs
+     : [35;1m^^^^^^^[0m
+ [2m526[0m | 
+ [2m527[0m |   createUI() {
+ [2m528[0m |     // Create minimal UI with only essential elements
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
+ ✓ Compiled in 395ms (5679 modules)
+ ✓ Compiled in 1169ms (5686 modules)
+ ✓ Compiled in 1080ms (5665 modules)
+ ⨯ ./components/Game.tsx:11:1
+Module not found: Can't resolve './CropContextMenu'
+   9 | import { TilemapEditor } from '../lib/tilemap.editor';
+  10 | import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+> 11 | import { CropContextMenu } from './CropContextMenu';
+     | ^
+  12 | import { CropInfo } from './CropInfo';
+  13 | import { CropStats } from './CropStats';
+  14 |
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/GameWrapper.tsx
+ ⨯ ./components/CropContextMenu.tsx:4:1
+Module not found: Can't resolve '@/components/ui/context-menu'
+  2 |
+  3 | import { useState, useEffect, useCallback } from 'react';
+> 4 | import {
+    | ^
+  5 |   ContextMenu,
+  6 |   ContextMenuContent,
+  7 |   ContextMenuItem,
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
+ ⨯ ./components/CropContextMenu.tsx:4:1
+Module not found: Can't resolve '@/components/ui/context-menu'
+  2 |
+  3 | import { useState, useEffect, useCallback } from 'react';
+> 4 | import {
+    | ^
+  5 |   ContextMenu,
+  6 |   ContextMenuContent,
+  7 |   ContextMenuItem,
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./components/Game.tsx
+./components/GameWrapper.tsx
+ ✓ Compiled in 1277ms (5716 modules)
+ ✓ Compiled in 374ms (5698 modules)
+ ✓ Compiled in 1092ms (5698 modules)
+ ✓ Compiled in 335ms (5698 modules)
+ ✓ Compiled in 399ms (5698 modules)
+ ✓ Compiled in 379ms (5698 modules)
+ ✓ Compiled in 416ms (5698 modules)
+ ✓ Compiled in 484ms (5698 modules)
+ ✓ Compiled in 378ms (5698 modules)
+ ✓ Compiled in 969ms (5698 modules)
+ ✓ Compiled in 353ms (5698 modules)
+ ✓ Compiled in 408ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 383ms (5698 modules)
+ ✓ Compiled in 404ms (5698 modules)
+ ✓ Compiled in 393ms (5698 modules)
+ ✓ Compiled in 427ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 412ms (5698 modules)
+ ✓ Compiled in 431ms (5698 modules)
+ ✓ Compiled in 494ms (5698 modules)
+ ✓ Compiled in 510ms (5698 modules)
+ ✓ Compiled in 1513ms (5698 modules)
+ ✓ Compiled in 402ms (5698 modules)
+ ✓ Compiled in 441ms (5698 modules)
+ ✓ Compiled in 2.4s (5698 modules)
+ ✓ Compiled in 637ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 394ms (5698 modules)
+ ✓ Compiled in 1170ms (5698 modules)
+ ✓ Compiled in 737ms (5698 modules)
+ ✓ Compiled in 640ms (5698 modules)
+ ✓ Compiled in 439ms (5698 modules)
+ ✓ Compiled in 443ms (5698 modules)
+ ✓ Compiled in 421ms (5698 modules)
+ ✓ Compiled in 692ms (5698 modules)
+ ✓ Compiled in 521ms (5698 modules)
+ ✓ Compiled in 458ms (5698 modules)
+ ✓ Compiled in 453ms (5698 modules)
+ ✓ Compiled in 477ms (5698 modules)
+ ✓ Compiled in 450ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 458ms (5698 modules)
+ ✓ Compiled in 463ms (5698 modules)
+ ✓ Compiled in 521ms (5698 modules)
+ ✓ Compiled in 912ms (5698 modules)
+ ✓ Compiled in 516ms (5698 modules)
+ ✓ Compiled in 427ms (5698 modules)
+ ✓ Compiled in 466ms (5698 modules)
+ ✓ Compiled in 480ms (5698 modules)
+ ✓ Compiled in 518ms (5698 modules)
+ ✓ Compiled in 448ms (5698 modules)
+ ✓ Compiled in 490ms (5698 modules)
+ ✓ Compiled in 455ms (5698 modules)
+ ✓ Compiled in 534ms (5698 modules)
+ ✓ Compiled in 456ms (5698 modules)
+ ✓ Compiled in 531ms (5698 modules)
+ ✓ Compiled in 456ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 530ms (5698 modules)
+ ✓ Compiled in 485ms (5698 modules)
+ ✓ Compiled in 489ms (5698 modules)
+ ✓ Compiled in 517ms (5698 modules)
+ ✓ Compiled in 496ms (5698 modules)
+ ✓ Compiled in 485ms (5698 modules)
+ ✓ Compiled in 928ms (5698 modules)
+ ✓ Compiled in 476ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 570ms (5698 modules)
+ ✓ Compiled in 502ms (5698 modules)
+ ✓ Compiled in 566ms (5698 modules)
+ ✓ Compiled in 579ms (5698 modules)
+ ✓ Compiled in 580ms (5698 modules)
+ ✓ Compiled in 533ms (5698 modules)
+ ✓ Compiled in 948ms (5698 modules)
+ ✓ Compiled in 497ms (5698 modules)
+ ✓ Compiled in 483ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 536ms (5698 modules)
+ ✓ Compiled in 500ms (5698 modules)
+ ✓ Compiled in 497ms (5698 modules)
+ ✓ Compiled in 515ms (5698 modules)
+ ✓ Compiled in 509ms (5698 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/lukefoster/Documents/Development/defivalley/apps/web/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 589ms (5698 modules)
+ ✓ Compiled in 452ms (5698 modules)
+ ✓ Compiled in 492ms (5698 modules)
+ ✓ Compiled in 611ms (5698 modules)
+ ✓ Compiled in 502ms (5698 modules)
+ ✓ Compiled in 2.7s (5716 modules)
+ ✓ Compiled in 416ms (5698 modules)
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Unexpected token `Drawer`. Expected jsx identifier
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:361:1]
+ [2m358[0m |   )
+ [2m359[0m | 
+ [2m360[0m |   return (
+ [2m361[0m |     <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+     : [35;1m     ^^^^^^[0m
+ [2m362[0m |       {/* Floating trigger button */}
+ [2m363[0m |       <FloatingTrigger />
+ [2m364[0m |       
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Expected ';', got 'jsx'
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:377:1]
+ [2m374[0m |     </Drawer>
+ [2m375[0m |   )
+ [2m376[0m | 
+ [2m377[0m |       <style jsx>{`
+     : [35;1m             ^^^[0m
+ [2m378[0m |         .floating-trigger {
+ [2m379[0m |           position: fixed;
+ [2m380[0m |           top: 20px;
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ⨯ ./components/Auth.tsx
+Error:   [31mx[0m Expected ';', got 'jsx'
+     ,-[[36;1;4m/Users/lukefoster/Documents/Development/defivalley/apps/web/components/Auth.tsx[0m:377:1]
+ [2m374[0m |     </Drawer>
+ [2m375[0m |   )
+ [2m376[0m | 
+ [2m377[0m |       <style jsx>{`
+     : [35;1m             ^^^[0m
+ [2m378[0m |         .floating-trigger {
+ [2m379[0m |           position: fixed;
+ [2m380[0m |           top: 20px;
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/Auth.tsx
+ ✓ Compiled in 562ms (5700 modules)
+ ✓ Compiled in 426ms (5700 modules)
+ ✓ Compiled in 392ms (5700 modules)
+ ✓ Compiled in 497ms (5718 modules)
+ ✓ Compiled in 348ms (5700 modules)
+ ✓ Compiled in 1023ms (5718 modules)
+ ✓ Compiled in 459ms (5700 modules)
+ ✓ Compiled in 434ms (5700 modules)
+ ✓ Compiled in 471ms (5700 modules)
+ ✓ Compiled in 412ms (5700 modules)
+ ✓ Compiled in 409ms (5700 modules)
+ ✓ Compiled in 418ms (5700 modules)
+ ✓ Compiled in 471ms (5700 modules)
+ ✓ Compiled in 412ms (5700 modules)
+ ✓ Compiled in 417ms (5700 modules)
+ ✓ Compiled in 424ms (5700 modules)
+ ✓ Compiled in 474ms (5700 modules)
+ ✓ Compiled in 419ms (5700 modules)
+ ✓ Compiled in 411ms (5700 modules)
+ ✓ Compiled in 631ms (5700 modules)
+ ✓ Compiled in 499ms (5700 modules)
+ ✓ Compiled in 609ms (5700 modules)
+ ✓ Compiled in 497ms (5700 modules)
+ ✓ Compiled in 480ms (5700 modules)
+ ✓ Compiled in 508ms (5700 modules)
+ ✓ Compiled in 450ms (5700 modules)
+ ✓ Compiled in 489ms (5700 modules)
+ ✓ Compiled in 474ms (5700 modules)
+ ✓ Compiled in 856ms (5700 modules)
+ ✓ Compiled in 442ms (5700 modules)
+ ✓ Compiled in 494ms (5700 modules)
+ ✓ Compiled in 554ms (5700 modules)
+ ✓ Compiled in 483ms (5700 modules)
+ ✓ Compiled in 494ms (5700 modules)
+ ✓ Compiled in 479ms (5700 modules)
+ ✓ Compiled in 497ms (5700 modules)
+ ✓ Compiled in 607ms (5700 modules)
+ ✓ Compiled in 2.3s (5700 modules)
+ ✓ Compiled in 501ms (5700 modules)
+ ✓ Compiled in 568ms (5700 modules)
+ ✓ Compiled in 524ms (5700 modules)
+ ✓ Compiled in 553ms (5700 modules)
+ ✓ Compiled in 660ms (5700 modules)
+ ✓ Compiled in 498ms (5700 modules)
+ ✓ Compiled in 733ms (5700 modules)
+ ✓ Compiled in 634ms (5700 modules)
+ ✓ Compiled in 525ms (5700 modules)
+ ✓ Compiled in 1093ms (5700 modules)
+ ✓ Compiled in 508ms (5700 modules)
+ ✓ Compiled in 510ms (5700 modules)
+ ✓ Compiled in 639ms (5700 modules)
+ ✓ Compiled in 572ms (5700 modules)
+ ✓ Compiled in 492ms (5700 modules)
+ ✓ Compiled in 520ms (5700 modules)
+ ✓ Compiled in 512ms (5700 modules)
+ ✓ Compiled in 670ms (5700 modules)
+ ✓ Compiled in 458ms (5700 modules)
+ ✓ Compiled in 672ms (5700 modules)
+ ✓ Compiled in 497ms (5700 modules)
+ ✓ Compiled in 912ms (5700 modules)
+ ✓ Compiled in 375ms (5700 modules)
+ ✓ Compiled in 390ms (5700 modules)
+ ✓ Compiled in 378ms (5700 modules)
+ ✓ Compiled in 405ms (5700 modules)
+ ✓ Compiled in 406ms (5700 modules)
+ ✓ Compiled in 399ms (5700 modules)
+ ✓ Compiled in 359ms (5700 modules)
+ ✓ Compiled in 384ms (5700 modules)
+ ✓ Compiled in 400ms (5700 modules)
+ ✓ Compiled in 401ms (5700 modules)
+ ✓ Compiled in 985ms (5700 modules)
+ ✓ Compiled in 332ms (5700 modules)
+ ✓ Compiled in 344ms (5700 modules)
+ ✓ Compiled in 380ms (5700 modules)
+ ✓ Compiled in 475ms (5718 modules)
+ ✓ Compiled in 1168ms (5700 modules)
+ ✓ Compiled in 425ms (5700 modules)
+ ✓ Compiled in 417ms (5700 modules)
+ ✓ Compiled in 384ms (5700 modules)
+ ✓ Compiled in 441ms (5700 modules)
+ ✓ Compiled in 368ms (5700 modules)
+ ✓ Compiled in 400ms (5700 modules)
+ ✓ Compiled in 504ms (5700 modules)
+ ✓ Compiled in 1031ms (5700 modules)
+ ✓ Compiled in 2.1s (5700 modules)
+ ✓ Compiled in 409ms (5700 modules)
+ ✓ Compiled in 405ms (5700 modules)
+ ✓ Compiled in 563ms (5700 modules)
+ ✓ Compiled in 402ms (5700 modules)
+ ✓ Compiled in 385ms (5700 modules)
+ ✓ Compiled in 420ms (5700 modules)
+ ✓ Compiled in 409ms (5700 modules)
+ ✓ Compiled in 465ms (5700 modules)
+ ✓ Compiled in 551ms (5700 modules)
+ ✓ Compiled in 476ms (5700 modules)
+ ✓ Compiled in 360ms (5700 modules)
+ ✓ Compiled in 494ms (5700 modules)
+ ✓ Compiled in 519ms (5700 modules)
+ ✓ Compiled in 401ms (5700 modules)
+ ✓ Compiled in 561ms (5700 modules)
+ ✓ Compiled in 436ms (5700 modules)
+ ✓ Compiled in 422ms (5700 modules)
+ ✓ Compiled in 451ms (5700 modules)
+ ✓ Compiled in 984ms (5700 modules)

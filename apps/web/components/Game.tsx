@@ -4,13 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { Client, Room } from 'colyseus.js';
 import { Player, PlayerInfo } from '../lib/Player';
-import { CharacterConfig, CharacterType, CharacterDefinitions } from '../lib/character.config';
+import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
-import { CropStats } from './CropStats';
+import { UIStack } from './UIStack';
+import { RoomOptions } from '../types/colyseus.types';
+import { usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
 
 interface GameState {
   players: Map<string, {
@@ -38,16 +41,65 @@ class MainScene extends Phaser.Scene {
   private currentPlayer!: Player;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
+  private oKey!: Phaser.Input.Keyboard.Key;
   private sessionId!: string;
   private chatCallback?: (message: ChatMessage) => void;
-  private lastDirection: string = 'down'; // Track player direction for sprite animation
-  private cliffTiles: Phaser.GameObjects.Image[] = []; // Store cliff tiles for collision detection
-  private terrainLayout: string[][] = []; // Store terrain layout for collision detection
-  private debugMode: boolean = false; // Toggle for debug visualization
-  private cropSystem!: CropSystem; // Crop management system
+  private lastDirection: string = 'down';
+  private cliffTiles: Phaser.GameObjects.Image[] = [];
+  private terrainLayout: string[][] = [];
+  private debugMode: boolean = false;
+  private cropSystem!: CropSystem;
+  private worldId?: string;
+  private isOwnWorld?: boolean;
+  private address?: string;
+  private user?: any;
+  
+  // Camera system properties
+  private worldWidth: number = 1600; // Will be updated based on map size
+  private worldHeight: number = 1200; // Will be updated based on map size
+  private cameraLerpFactor: number = 0.1; // Smooth camera following
+  
+  // Simple background approach with invisible walls
+  private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
+  
+  // Legacy tilemap properties (kept for backward compatibility)
+  private mapLayout: string[][] = [];
+  private collisionMap: boolean[][] = [];
 
   constructor() {
     super({ key: 'MainScene' });
+    // Collision map will be initialized after terrain generation
+  }
+  
+  private initializeCollisionMap() {
+    // Initialize collision map based on dynamically generated tile types
+    if (this.mapLayout.length === 0) {
+      return;
+    }
+    
+    for (let y = 0; y < this.mapLayout.length; y++) {
+      this.collisionMap[y] = [];
+      for (let x = 0; x < this.mapLayout[y].length; x++) {
+        const tileType = this.mapLayout[y][x];
+        // Set collision based on tile type
+        this.collisionMap[y][x] = this.isTileSolid(tileType);
+      }
+    }
+    
+    // Update world size based on map dimensions
+    const tileSize = 32; // Standard tile size
+    this.worldWidth = this.mapLayout[0].length * tileSize;
+    this.worldHeight = this.mapLayout.length * tileSize;
+    
+  }
+  
+  private isTileSolid(tileType: string): boolean {
+    // Define which tiles are solid (impassable)
+    const solidTiles = [
+      'cliff_tall_1', 'cliff_tall_2', 'cliff_thin', 'cliff_round', 
+      'cliff_large', 'cliff_small', 'rocks_brown', 'rocks_dark'
+    ];
+    return solidTiles.includes(tileType);
   }
 
   init(data: { chatCallback?: (message: ChatMessage) => void }) {
@@ -55,21 +107,38 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load the character sprite sheet
-    this.load.spritesheet(CharacterConfig.player.key, CharacterConfig.player.path, {
-      frameWidth: CharacterConfig.player.frameWidth,
-      frameHeight: CharacterConfig.player.frameHeight
+    // Add load event listeners for debugging
+    this.load.on('filecomplete', (key: string, type: string, data: any) => {
     });
     
-    // Load knight animation sheets
-    this.load.spritesheet('knight_idle', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Idle.png', {
-      frameWidth: 120,
-      frameHeight: 80
+    this.load.on('loaderror', (file: any) => {
+      console.error(`❌ Failed to load: ${file.key} from ${file.url}`);
     });
     
-    this.load.spritesheet('knight_run', '/sprites/FreeKnight_v1/Colour1/Outline/120x80_PNGSheets/_Run.png', {
-      frameWidth: 120,
-      frameHeight: 80
+    
+    // Load all character animation sheets dynamically from CharacterDefinitions
+    Object.entries(CharacterDefinitions).forEach(([characterName, character]) => {
+      // Load idle atlas if present
+      if (character.idleAtlas) {
+        this.load.atlas(character.idleAtlas.key, character.idleAtlas.path, character.idleAtlas.atlasPath);
+      }
+      
+      // Load animation sheets
+      if (character.type === 'animation_sheets' && character.animationConfig) {
+        Object.entries(character.animationConfig.animations).forEach(([animName, animation]) => {
+          // Check if this is an atlas or a regular spritesheet
+          if (animation.atlasPath) {
+            // Load as atlas (Texture Packer format)
+            this.load.atlas(animation.key, animation.path, animation.atlasPath);
+          } else {
+            // Load as regular spritesheet
+            this.load.spritesheet(animation.key, animation.path, {
+              frameWidth: character.frameWidth,
+              frameHeight: character.frameHeight
+            });
+          }
+        });
+      }
     });
     
     // Load the tileset for world decoration
@@ -81,6 +150,11 @@ class MainScene extends Phaser.Scene {
   }
 
   async create() {
+    // Log all loaded textures for debugging
+    
+    // Setup camera system first
+    this.setupCameraSystem();
+    
     // Create a beautiful farming world background
     this.createFarmingWorld();
     
@@ -99,6 +173,7 @@ class MainScene extends Phaser.Scene {
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
+    this.oKey = this.input.keyboard!.addKey('O');
 
     // Connect to Colyseus after scene is fully ready
     this.time.delayedCall(100, () => {
@@ -106,9 +181,24 @@ class MainScene extends Phaser.Scene {
     });
   }
 
+  setupCameraSystem() {
+    // Set world bounds for the camera
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    
+    // Enable smooth camera following
+    this.cameras.main.setLerp(this.cameraLerpFactor);
+    
+  }
+
+  updateCameraFollow() {
+    // Follow the current player smoothly
+    if (this.currentPlayer) {
+      this.cameras.main.startFollow(this.currentPlayer, true, this.cameraLerpFactor, this.cameraLerpFactor);
+    }
+  }
+
   createCharacterAnimations() {
     // Character sprite sheet is now loaded directly as a spritesheet
-    console.log('Character sprite sheet loaded with transparent background');
   }
 
 
@@ -132,7 +222,6 @@ class MainScene extends Phaser.Scene {
   static resetPlayerCharacter(playerAddress: string) {
     const storageKey = `defi-valley-character-${playerAddress}`;
     MainScene.safeLocalStorage.removeItem(storageKey);
-    console.log(`🔄 Reset character selection for player ${playerAddress}`);
   }
 
   // Add this to window for easy console access during development
@@ -204,6 +293,192 @@ class MainScene extends Phaser.Scene {
         }
       };
       
+      (window as any).togglePhysicsDebug = () => {
+        const currentDebug = this.physics.world.debugGraphic;
+        if (currentDebug) {
+          this.physics.world.debugGraphic.clear();
+          (this.physics.world as any).debugGraphic = null;
+          console.log('🔧 Physics debug: OFF');
+        } else {
+          this.physics.world.createDebugGraphic();
+          console.log('🔧 Physics debug: ON - You can now see bounding boxes');
+        }
+      };
+      
+      (window as any).debugCharacters = () => {
+        console.log('🎭 Character Debugging Information:');
+        console.log('Available textures:', Object.keys(this.textures.list));
+        console.log('Character definitions:', CharacterDefinitions);
+        
+        // Check each character's assets
+        Object.entries(CharacterDefinitions).forEach(([name, config]) => {
+          console.log(`\n${name.toUpperCase()} Character:`);
+          console.log('  Config:', config);
+          
+          if (config.type === 'animation_sheets' && config.animationConfig) {
+            Object.entries(config.animationConfig.animations).forEach(([animName, anim]) => {
+              const exists = this.textures.exists(anim.key);
+              console.log(`  ${animName} (${anim.key}): ${exists ? '✅ LOADED' : '❌ MISSING'}`);
+              if (!exists) {
+                console.log(`    Expected path: ${anim.path}`);
+              }
+            });
+          }
+        });
+        
+        // Current player info
+        if (this.currentPlayer) {
+          const playerInfo = this.currentPlayer.getPlayerInfo();
+          console.log(`\nCurrent player character: ${playerInfo.character}`);
+          // Access private sprite property for debugging
+          const sprite = (this.currentPlayer as any).sprite;
+          console.log('Player sprite texture:', sprite?.texture?.key || 'NONE');
+        }
+      };
+
+      // Advanced tilemap debugging
+      (window as any).debugTilemap = () => {
+        console.log('🗺️ === TILEMAP DEBUG INFO ===');
+        
+        // Check tileset texture
+        const tilesetTexture = this.textures.get('cliffs_grass_tileset');
+        console.log('Tileset texture:', tilesetTexture);
+        console.log('Tileset dimensions:', tilesetTexture.source[0]?.width || 'UNKNOWN', 'x', tilesetTexture.source[0]?.height || 'UNKNOWN');
+        
+        // Check tile configuration
+        console.log('\nTile configurations:');
+        Object.entries(TilesetConfig.tiles).forEach(([name, config]) => {
+          const isValid = config.x >= 0 && config.y >= 0 && 
+                         config.x + config.width <= (tilesetTexture.source[0]?.width || 0) &&
+                         config.y + config.height <= (tilesetTexture.source[0]?.height || 0);
+          console.log(`  ${name}: ${isValid ? '✅' : '❌'} {x:${config.x}, y:${config.y}, w:${config.width}, h:${config.height}}`);
+        });
+        
+        // Check rendered tiles
+        console.log('\nRendered tiles in scene:');
+        const tileObjects = this.children.list.filter(child => child.getData && child.getData('tileType'));
+        console.log(`Total tile objects: ${tileObjects.length}`);
+        
+        if (tileObjects.length > 0) {
+          const firstTile = tileObjects[0] as Phaser.GameObjects.Image;
+          console.log('First tile:', {
+            position: { x: firstTile.x, y: firstTile.y },
+            displaySize: { width: firstTile.displayWidth, height: firstTile.displayHeight },
+            depth: firstTile.depth,
+            visible: firstTile.visible,
+            alpha: firstTile.alpha,
+            tileType: firstTile.getData('tileType')
+          });
+        }
+        
+        // Camera information
+        console.log('\nCamera info:');
+        console.log(`Camera scroll: (${this.cameras.main.scrollX}, ${this.cameras.main.scrollY})`);
+        console.log(`Camera bounds: ${this.cameras.main.getBounds()}`);
+        console.log(`World bounds: ${this.worldWidth}x${this.worldHeight}`);
+      };
+
+      (window as any).testTileVisibility = () => {
+        console.log('🧪 Testing tile visibility...');
+        
+        // Remove existing test tiles
+        this.children.list.filter(child => child.getData && child.getData('testTile')).forEach(tile => tile.destroy());
+        
+        // Create simple colored test tiles
+        const testTile1 = this.add.rectangle(100, 100, 32, 32, 0xff0000);
+        testTile1.setData('testTile', true);
+        testTile1.setDepth(10);
+        console.log('Created red test tile at (100, 100)');
+        
+        const testTile2 = this.add.rectangle(200, 100, 32, 32, 0x00ff00);
+        testTile2.setData('testTile', true);
+        testTile2.setDepth(10);
+        console.log('Created green test tile at (200, 100)');
+        
+        // Test tileset texture rendering
+        if (this.textures.exists('cliffs_grass_tileset')) {
+          const testTilesetRender = this.add.image(300, 100, 'cliffs_grass_tileset');
+          testTilesetRender.setData('testTile', true);
+          testTilesetRender.setDepth(10);
+          testTilesetRender.setDisplaySize(64, 64);
+          console.log('Created raw tileset test image at (300, 100)');
+          
+          // Test with crop
+          const testCroppedTile = this.add.image(400, 100, 'cliffs_grass_tileset');
+          testCroppedTile.setData('testTile', true);
+          testCroppedTile.setDepth(10);
+          testCroppedTile.setDisplaySize(32, 32);
+          testCroppedTile.setCrop(96, 80, 32, 32); // grass_main coordinates
+          console.log('Created cropped grass tile test at (400, 100)');
+        }
+        
+        console.log('✅ Test tiles created. Check the game for red, green, raw tileset, and cropped grass tiles.');
+      };
+      
+      (window as any).debugTilemap = () => {
+        console.log('🗺️ Tilemap Debugging Information:');
+        
+        // Check tileset texture
+        const texture = this.textures.get('cliffs_grass_tileset');
+        console.log('Tileset texture:', texture);
+        console.log('Tileset dimensions:', texture.source[0].width, 'x', texture.source[0].height);
+        
+        // Check rendered tiles
+        const tiles = this.children.list.filter(child => child.getData && child.getData('tileType'));
+        console.log('Total rendered tiles:', tiles.length);
+        console.log('Visible tiles:', tiles.filter(t => (t as any).visible).length);
+        console.log('Tiles with alpha > 0:', tiles.filter(t => (t as any).alpha > 0).length);
+        
+        // Sample tile details
+        if (tiles.length > 0) {
+          const sampleTile = tiles[0] as any;
+          console.log('\nSample tile details:');
+          console.log('  Position:', sampleTile.x, sampleTile.y);
+          console.log('  Texture:', sampleTile.texture.key);
+          console.log('  Crop frame:', sampleTile.frame.cutX, sampleTile.frame.cutY, sampleTile.frame.cutWidth, sampleTile.frame.cutHeight);
+          console.log('  Display size:', sampleTile.displayWidth, sampleTile.displayHeight);
+          console.log('  Visible:', sampleTile.visible);
+          console.log('  Alpha:', sampleTile.alpha);
+          console.log('  Depth:', sampleTile.depth);
+          console.log('  Tint:', sampleTile.tintTopLeft);
+        }
+        
+        // Check camera
+        const camera = this.cameras.main;
+        console.log('\nCamera details:');
+        console.log('  Position:', camera.x, camera.y);
+        console.log('  Scroll:', camera.scrollX, camera.scrollY);
+        console.log('  Zoom:', camera.zoom);
+        console.log('  World view:', camera.worldView);
+        
+        // Check if tiles are in camera view
+        const tilesInView = tiles.filter(tile => {
+          const bounds = (tile as any).getBounds();
+          return (camera.worldView as any).contains(bounds.x, bounds.y) || 
+                 (camera.worldView as any).intersects(bounds);
+        });
+        console.log('  Tiles in camera view:', tilesInView.length);
+      };
+      
+      (window as any).testTileVisibility = () => {
+        console.log('🔍 Testing tile visibility...');
+        
+        // Create a test tile without cropping
+        const testTile1 = this.add.image(400, 300, 'cliffs_grass_tileset');
+        testTile1.setDisplaySize(64, 64);
+        testTile1.setDepth(1000);
+        testTile1.setTint(0xff0000); // Red tint for visibility
+        console.log('Created uncropped test tile at center (should be red)');
+        
+        // Create a test tile with a simple crop
+        const testTile2 = this.add.image(500, 300, 'cliffs_grass_tileset');
+        testTile2.setDisplaySize(64, 64);
+        testTile2.setDepth(1000);
+        testTile2.setCrop(0, 0, 32, 32); // Crop top-left 32x32
+        testTile2.setTint(0x00ff00); // Green tint for visibility
+        console.log('Created cropped test tile at center-right (should be green)');
+      };
+      
       console.log('🛠️ Dev tools available:');
       console.log('  - resetMyCharacter(): Reset character selection');
       console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
@@ -212,6 +487,58 @@ class MainScene extends Phaser.Scene {
       console.log('  - createIsland(x, y, radius): Create cliff island');
       console.log('  - validateTerrain(): Check terrain for issues');
       console.log('  - exportTerrain(): Export terrain to JSON');
+      console.log('  - debugCharacters(): Debug character loading issues');
+      console.log('  🔍 TILEMAP DEBUGGING:');
+      console.log('  - debugTilemap(): Complete tilemap diagnostic');
+      console.log('  - testTileVisibility(): Test basic tile rendering');
+    }
+  }
+  
+  renderDebugOverlay() {
+    // Remove existing debug graphics
+    const existingDebug = this.children.getByName('debug-overlay');
+    if (existingDebug) {
+      existingDebug.destroy();
+    }
+    
+    if (!this.debugMode) return;
+    
+    // Create debug graphics
+    const debugGraphics = this.add.graphics();
+    debugGraphics.setName('debug-overlay');
+    debugGraphics.setDepth(1000); // Render on top
+    
+    const tileSize = TilesetConfig.image.tileSize;
+    
+    // Draw grid and tile information
+    for (let y = 0; y < this.terrainLayout.length; y++) {
+      for (let x = 0; x < this.terrainLayout[y].length; x++) {
+        const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+        const tileType = this.terrainLayout[y][x];
+        const hasCollision = TilemapUtils.hasCollision(tileType);
+        
+        // Draw tile border
+        debugGraphics.lineStyle(1, hasCollision ? 0xff0000 : 0x00ff00, 0.5);
+        debugGraphics.strokeRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+        
+        // Color code tiles
+        if (hasCollision) {
+          debugGraphics.fillStyle(0xff0000, 0.2);
+        } else {
+          debugGraphics.fillStyle(0x00ff00, 0.1);
+        }
+        debugGraphics.fillRect(
+          worldPos.x - tileSize/2, 
+          worldPos.y - tileSize/2, 
+          tileSize, 
+          tileSize
+        );
+      }
     }
   }
   
@@ -290,15 +617,38 @@ class MainScene extends Phaser.Scene {
     console.log('🔄 Terrain refreshed successfully');
   }
 
+  refreshTerrain() {
+    // Remove existing terrain tiles
+    this.children.each((child) => {
+      if (child.getData('tileType')) {
+        child.destroy();
+      }
+    });
+    
+    // Clear cliff tiles array
+    this.cliffTiles = [];
+    
+    // Recreate terrain from updated layout
+    const tileSize = TilesetConfig.image.tileSize;
+    const mapWidth = this.terrainLayout[0].length;
+    const mapHeight = this.terrainLayout.length;
+    
+    // TODO: Implement createTilesFromLayout method for terrain refresh
+    // this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+    
+    // Update debug overlay if active
+    if (this.debugMode) {
+      this.renderDebugOverlay();
+    }
+    
+  }
+
   createFarmingWorld() {
-    // Create clean, minimal background
-    const sky = this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+    // Use simple farm background with invisible walls (fast hackathon approach)
+    this.createSimpleFarmBackground();
     
-    // Create tilemap-based terrain (replaces the simple ground rectangle)
-    this.createTilemapTerrain();
-    
-    // Add minimal visual structure without clutter
-    this.createMinimalStructure();
+    // No additional overlays needed - simple and fast!
   }
 
   createMinimalStructure() {
@@ -307,109 +657,337 @@ class MainScene extends Phaser.Scene {
     gridGraphics.lineStyle(1, 0x90EE90, 0.2);
     
     // Add subtle grid lines for spatial reference
-    for (let i = 0; i < 800; i += 100) {
+    for (let i = 0; i < 1600; i += 100) {
       gridGraphics.moveTo(i, 0);
-      gridGraphics.lineTo(i, 600);
+      gridGraphics.lineTo(i, 900);
     }
-    for (let j = 0; j < 600; j += 100) {
+    for (let j = 0; j < 900; j += 100) {
       gridGraphics.moveTo(0, j);
-      gridGraphics.lineTo(800, j);
+      gridGraphics.lineTo(1600, j);
     }
     gridGraphics.strokePath();
   }
 
-  createTilemapTerrain() {
-    // Create a tilemap with natural terrain using the LPC cliffs grass tileset
-    const tileSize = TilesetConfig.image.tileSize;
-    const mapWidth = Math.ceil(800 / tileSize); // 25 tiles
-    const mapHeight = Math.ceil(600 / tileSize); // 19 tiles
+  createSimpleFarmBackground() {
     
-    // Generate natural terrain layout
-    this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
+    // Set world dimensions for a farm area
+    this.worldWidth = 1600;
+    this.worldHeight = 1200;
     
-    // Create tiles based on the terrain layout
-    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    // Create simple farm background using graphics
+    this.createFarmBackgroundGraphics();
     
-    // Add decorative elements
-    this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
+    // Create invisible collision walls for farm boundaries and obstacles
+    this.createInvisibleWalls();
+    
+  }
+  
+  createFarmBackgroundGraphics() {
+    // Create ultra-simple grass background
+    const grassBackground = this.add.graphics();
+    grassBackground.setDepth(-10); // Behind everything
+    
+    // Simple grass field (nice green)
+    grassBackground.fillStyle(0x4A7C59, 1); // Forest green
+    grassBackground.fillRect(0, 0, this.worldWidth, this.worldHeight);
+    
+    // Add minimal texture with subtle darker green patches
+    grassBackground.fillStyle(0x355E3B, 0.2); // Very subtle darker green
+    for (let i = 0; i < 20; i++) {
+      const x = Math.random() * this.worldWidth;
+      const y = Math.random() * this.worldHeight;
+      const size = 30 + Math.random() * 60;
+      grassBackground.fillCircle(x, y, size);
+    }
+    
+  }
+  
+  createInvisibleWalls() {
+    
+    // Create static physics group for invisible walls
+    const walls = this.physics.add.staticGroup();
+    
+    // Just basic border walls to keep players in bounds
+    const wallThickness = 32;
+    
+    // Top wall
+    const topWall = this.add.rectangle(this.worldWidth / 2, -wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    this.physics.add.existing(topWall, true);
+    walls.add(topWall);
+    
+    // Bottom wall  
+    const bottomWall = this.add.rectangle(this.worldWidth / 2, this.worldHeight + wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    this.physics.add.existing(bottomWall, true);
+    walls.add(bottomWall);
+    
+    // Left wall
+    const leftWall = this.add.rectangle(-wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    this.physics.add.existing(leftWall, true);
+    walls.add(leftWall);
+    
+    // Right wall
+    const rightWall = this.add.rectangle(this.worldWidth + wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    this.physics.add.existing(rightWall, true);
+    walls.add(rightWall);
+    
+    // Store wall group for player collision detection
+    this.invisibleWalls = walls;
+    
+  }
+  
+  private setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
+    // Set collision for specific tile indices that represent solid objects
+    const solidTileIndices: number[] = [];
+    
+    // Get indices for all solid tile types
+    Object.entries(TilesetConfig.tiles).forEach(([tileName, config]) => {
+      if (config.collision && config.index !== undefined) {
+        solidTileIndices.push(config.index);
+      }
+    });
+    
+    if (solidTileIndices.length > 0) {
+      layer.setCollision(solidTileIndices);
+    }
   }
 
-  createTilesFromLayout(tileSize: number, mapWidth: number, mapHeight: number) {
-    // Create tiles based on the generated terrain layout
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        const tileType = this.terrainLayout[y][x];
-        const tileConfig = TilesetConfig.tiles[tileType];
-        
-        if (tileConfig) {
-          const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
-          
-          const tile = this.add.image(worldPos.x, worldPos.y, 'cliffs_grass_tileset');
-          tile.setOrigin(0.5, 0.5);
-          tile.setDisplaySize(tileSize, tileSize);
-          
-          // Apply tile-specific styling
-          this.applyTileStyle(tile, tileType);
-          
-          // Store collision tiles
-          if (tileConfig.collision) {
-            this.cliffTiles.push(tile);
-          }
-          
-          // Add tile data for debugging
-          tile.setData('tileType', tileType);
-          tile.setData('tilePos', { x, y });
+  // Painter Functions for Procedural World Generation
+
+  private createBaseLayer(baseTile: string, width: number, height: number): string[][] {
+    
+    const layout: string[][] = [];
+    
+    // Create a foundation of variety - 80% main grass, 20% variant grass
+    for (let y = 0; y < height; y++) {
+      layout[y] = [];
+      for (let x = 0; x < width; x++) {
+        if (Math.random() > 0.8) {
+          // 20% chance: Use grass variants for natural variation
+          const variants = ['grass_pure', 'grass_with_cliff_base'];
+          layout[y][x] = variants[Math.floor(Math.random() * variants.length)];
+        } else {
+          // 80% chance: Use main grass tile
+          layout[y][x] = baseTile;
         }
       }
     }
+    
+    return layout;
   }
 
-  applyTileStyle(tile: Phaser.GameObjects.Image, tileType: string) {
-    // Apply visual styling based on tile type
-    switch (tileType) {
-      case 'cliff_top':
-        tile.setTint(0x8B4513); // Brown for cliff tops
-        tile.setAlpha(0.8);
-        break;
-      case 'cliff_face':
-        tile.setTint(0x654321); // Darker brown for cliff faces
-        tile.setAlpha(0.9);
-        break;
-      case 'cliff_corner':
-        tile.setTint(0x5D4037); // Corner cliff coloring
-        tile.setAlpha(0.85);
-        break;
-      case 'cliff_large':
-        tile.setTint(0x8B4513); // Brown for large cliff formations
-        tile.setAlpha(0.7);
-        break;
-      case 'grass_full':
-        tile.setTint(0x90EE90); // Green for grass
-        tile.setAlpha(0.3);
-        break;
-      case 'grass_sparse':
-        tile.setTint(0x228B22); // Darker green for sparse grass
-        tile.setAlpha(0.4);
-        break;
-      case 'cliff_grass_transition':
-      case 'grass_cliff_transition':
-        tile.setTint(0x6B8E23); // Olive green for transitions
-        tile.setAlpha(0.5);
-        // Add gentle animation to transition tiles
-        this.tweens.add({
-          targets: tile,
-          alpha: 0.3,
-          duration: 3000 + Math.random() * 2000,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-        break;
-      default:
-        tile.setTint(0xFFFFFF); // Default white tint
-        tile.setAlpha(0.5);
+  private paintBorders(layout: string[][]) {
+    const height = layout.length;
+    const width = layout[0].length;
+    
+    // Paint top and bottom borders with cliffs
+    for (let x = 0; x < width; x++) {
+      layout[0][x] = x % 2 === 0 ? 'cliff_tall_1' : 'cliff_tall_2'; // Top border - alternating cliffs
+      layout[height - 1][x] = 'cliff_small'; // Bottom border - smaller cliffs
     }
+    
+    // Paint left and right borders with cliff transitions
+    for (let y = 1; y < height - 1; y++) {
+      layout[y][0] = 'grass_cliff_left'; // Left border - grass with cliff edge
+      layout[y][width - 1] = 'grass_cliff_right'; // Right border - grass with cliff edge
+    }
+    
+    // Paint corner cliffs for structural integrity
+    layout[0][0] = 'cliff_large';
+    layout[0][width - 1] = 'cliff_large';
+    layout[height - 1][0] = 'cliff_round';
+    layout[height - 1][width - 1] = 'cliff_round';
   }
+
+  private paintRectangularPlateau(layout: string[][], x: number, y: number, width: number, height: number) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    // Ensure plateau fits within map bounds
+    const endX = Math.min(x + width, mapWidth);
+    const endY = Math.min(y + height, mapHeight);
+    
+    // STEP 1: Border First - Trace the outline with correct cliff tiles
+    for (let py = y; py < endY; py++) {
+      for (let px = x; px < endX; px++) {
+        const isTopEdge = (py === y);
+        const isBottomEdge = (py === endY - 1);
+        const isLeftEdge = (px === x);
+        const isRightEdge = (px === endX - 1);
+        const isCorner = (isTopEdge || isBottomEdge) && (isLeftEdge || isRightEdge);
+        const isEdge = isTopEdge || isBottomEdge || isLeftEdge || isRightEdge;
+        
+        if (isEdge) {
+          if (isCorner) {
+            // Corners get large cliff formations
+            layout[py][px] = 'cliff_large';
+          } else if (isBottomEdge) {
+            // Bottom edge: cliff face tiles
+            layout[py][px] = 'cliff_tall_1';
+          } else if (isTopEdge) {
+            // Top edge: grass-to-cliff-top transition
+            layout[py][px] = 'grass_cliff_bottom';
+          } else {
+            // Side edges: vertical cliff sides
+            layout[py][px] = isLeftEdge ? 'cliff_tall_2' : 'cliff_thin';
+          }
+        }
+      }
+    }
+    
+    // STEP 2: Fill Second - Fill the interior with different ground texture
+    for (let py = y + 1; py < endY - 1; py++) {
+      for (let px = x + 1; px < endX - 1; px++) {
+        // Interior filled with dirt/elevated ground texture
+        layout[py][px] = 'grass_with_cliff_base'; // Acts as "dirt_ground" equivalent
+      }
+    }
+    
+  }
+
+  private paintCircularLake(layout: string[][], centerX: number, centerY: number, radius: number) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    // STEP 1: Fill the inside of the circle with water tiles
+    // STEP 2: Trace the edge with grass-to-water transition tiles
+    
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        
+        if (distance <= radius - 1) {
+          // Inner water area - use pure grass as "water" (since we don't have water tiles)
+          // In a real implementation, this would be 'water_deep' or similar
+          layout[y][x] = 'grass_pure';
+        }
+        else if (distance <= radius) {
+          // Water edge - slightly different water
+          layout[y][x] = 'grass_pure';
+        }
+        else if (distance <= radius + 1.5) {
+          // Lake shore transitions - create natural grass-to-water edges
+          // Use different transition tiles based on position relative to center
+          const angle = Math.atan2(y - centerY, x - centerX);
+          const normalizedAngle = ((angle + Math.PI) / (2 * Math.PI)) * 4; // 0-4 range
+          
+          if (normalizedAngle < 1) {
+            layout[y][x] = 'grass_cliff_left'; // Left shore
+          } else if (normalizedAngle < 2) {
+            layout[y][x] = 'grass_cliff_bottom'; // Bottom shore
+          } else if (normalizedAngle < 3) {
+            layout[y][x] = 'grass_cliff_right'; // Right shore  
+          } else {
+            layout[y][x] = 'grass_cliff_bottom'; // Top shore
+          }
+        }
+        // Else: leave existing tile (no modification beyond transition zone)
+      }
+    }
+    
+  }
+
+  private paintPath(layout: string[][], points: Array<{x: number, y: number}>) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Painting path connecting ${points.length} points`);
+    
+    // Connect each point to the next
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      
+      // Use Bresenham-like algorithm to connect points
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+      const sx = start.x < end.x ? 1 : -1;
+      const sy = start.y < end.y ? 1 : -1;
+      let err = dx - dy;
+      
+      let x = start.x;
+      let y = start.y;
+      
+      while (true) {
+        // Place path tile if within bounds and on grass
+        if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
+          const currentTile = layout[y][x];
+          if (currentTile.includes('grass')) {
+            layout[y][x] = 'sticks'; // Use sticks as "path_pebbles" equivalent
+          }
+        }
+        
+        if (x === end.x && y === end.y) break;
+        
+        const e2 = 2 * err;
+        if (e2 > -dy) {
+          err -= dy;
+          x += sx;
+        }
+        if (e2 < dx) {
+          err += dx;
+          y += sy;
+        }
+      }
+    }
+    
+    console.log(`✅ Path painted connecting all points`);
+  }
+
+  private scatterDecorations(layout: string[][]) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Scattering organic decorations across the world`);
+    
+    let decorationsPlaced = 0;
+    
+    // Loop through the entire map and add decorations with small probability
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const currentTile = layout[y][x];
+        
+        // Only place decorations on grass tiles
+        if (currentTile === 'grass_main' || currentTile === 'grass_pure') {
+          if (Math.random() < 0.02) { // 2% chance for decoration
+            const decorations = ['rocks_brown', 'rocks_dark', 'ladder'];
+            const decoration = decorations[Math.floor(Math.random() * decorations.length)];
+            layout[y][x] = decoration;
+            decorationsPlaced++;
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ Scattered ${decorationsPlaced} organic decorations`);
+  }
+
+  private paintScatteredFeatures(layout: string[][]) {
+    const mapHeight = layout.length;
+    const mapWidth = layout[0].length;
+    
+    console.log(`🎨 Adding scattered features with improved algorithms`);
+    
+    // Add a few small cliff outcrops for visual interest
+    for (let i = 0; i < 5; i++) {
+      const x = Math.floor(Math.random() * (mapWidth - 6)) + 3;
+      const y = Math.floor(Math.random() * (mapHeight - 6)) + 3;
+      
+      // Create small 2x2 cliff formations only on suitable terrain
+      if (layout[y][x] === 'grass_main' && 
+          layout[y][x + 1] === 'grass_main' &&
+          layout[y + 1][x] === 'grass_main' &&
+          layout[y + 1][x + 1] === 'grass_main') {
+        layout[y][x] = 'cliff_round';
+        layout[y][x + 1] = 'cliff_small';
+        layout[y + 1][x] = 'grass_cliff_bottom';
+        layout[y + 1][x + 1] = 'grass_cliff_bottom';
+      }
+    }
+    
+    console.log(`✅ Scattered features added with improved placement logic`);
+  }
+
+  // Old manual rendering methods removed - now using proper Phaser Tilemap system
 
   addTerrainDecorations(tileSize: number, mapWidth: number, mapHeight: number) {
     // Add decorative elements based on terrain layout
@@ -497,46 +1075,59 @@ class MainScene extends Phaser.Scene {
   }
 
 
-  // Enhanced collision detection using terrain layout
-  checkCliffCollision(x: number, y: number): boolean {
-    const playerRadius = 16; // Approximate player collision radius
-    const tileSize = TilesetConfig.image.tileSize;
+  // Enhanced tile-based collision detection using Phaser Tilemap system
+  checkTileCollision(worldX: number, worldY: number): boolean {
+    const tilemapLayer = (this as any).tilemapLayer as Phaser.Tilemaps.TilemapLayer;
     
-    // Convert world coordinates to tile coordinates
-    const tilePos = TilemapUtils.worldToTile(x, y, tileSize);
+    if (!tilemapLayer) {
+      // Fallback to old collision system if tilemap layer not available
+      // Check if mapLayout is properly initialized
+      if (this.mapLayout.length === 0 || !this.mapLayout[0]) {
+        return false; // No collision if map not initialized
+      }
+      
+      const tileSize = 32;
+      const tileX = Math.floor(worldX / tileSize);
+      const tileY = Math.floor(worldY / tileSize);
+      
+      if (tileX < 0 || tileX >= this.mapLayout[0].length || 
+          tileY < 0 || tileY >= this.mapLayout.length) {
+        return true;
+      }
+      
+      return this.collisionMap[tileY][tileX];
+    }
     
-    // Check collision in a 3x3 area around the player
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const checkX = tilePos.x + dx;
-        const checkY = tilePos.y + dy;
-        
-        // Check bounds
-        if (checkX >= 0 && checkX < this.terrainLayout[0].length && 
-            checkY >= 0 && checkY < this.terrainLayout.length) {
-          
-          const tileType = this.terrainLayout[checkY][checkX];
-          
-          // Check if tile has collision
-          if (TilemapUtils.hasCollision(tileType)) {
-            const tileWorldPos = TilemapUtils.tileToWorld(checkX, checkY, tileSize);
-            const tileRadius = tileSize / 2;
-            
-            // Calculate distance between player and tile center
-            const distance = Math.sqrt(
-              Math.pow(x - tileWorldPos.x, 2) + Math.pow(y - tileWorldPos.y, 2)
-            );
-            
-            // Check if player would collide with tile
-            if (distance < (playerRadius + tileRadius)) {
-              return true;
-            }
-          }
-        }
+    // Use Phaser's built-in tilemap collision checking
+    const tile = tilemapLayer.getTileAtWorldXY(worldX, worldY);
+    return tile ? tile.collides : false;
+  }
+  
+  // Enhanced collision detection that checks player boundaries
+  checkPlayerCollision(centerX: number, centerY: number): boolean {
+    const playerSize = 16; // Half the player's collision box size
+    
+    // Check all four corners of the player's collision box
+    const corners = [
+      { x: centerX - playerSize, y: centerY - playerSize }, // Top-left
+      { x: centerX + playerSize, y: centerY - playerSize }, // Top-right
+      { x: centerX - playerSize, y: centerY + playerSize }, // Bottom-left
+      { x: centerX + playerSize, y: centerY + playerSize }  // Bottom-right
+    ];
+    
+    // If any corner is in a solid tile, collision detected
+    for (const corner of corners) {
+      if (this.checkTileCollision(corner.x, corner.y)) {
+        return true;
       }
     }
     
     return false;
+  }
+  
+  // Legacy method for backward compatibility
+  checkCliffCollision(x: number, y: number): boolean {
+    return this.checkPlayerCollision(x, y);
   }
 
   createUI() {
@@ -546,6 +1137,7 @@ class MainScene extends Phaser.Scene {
     // Simple controls info at bottom
     const controlsBg = this.add.rectangle(120, 580, 220, 30, 0x000000, 0.6);
     controlsBg.setStrokeStyle(1, 0x90EE90, 0.3);
+    controlsBg.setScrollFactor(0); // Pin to camera
     
     const controls = this.add.text(120, 580, '🎮 WASD: Move  💬 Enter: Chat', {
       fontSize: '12px',
@@ -553,6 +1145,17 @@ class MainScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif'
     });
     controls.setOrigin(0.5);
+    controls.setScrollFactor(0); // Pin to camera
+  }
+
+  setWorldConfiguration(worldId?: string, isOwnWorld?: boolean) {
+    this.worldId = worldId;
+    this.isOwnWorld = isOwnWorld;
+  }
+  
+  setAuthInfo(address?: string, user?: any) {
+    this.address = address;
+    this.user = user;
   }
 
   async connectToServer() {
@@ -569,11 +1172,25 @@ class MainScene extends Phaser.Scene {
       const endpoint = `ws://${serverHost}:${port}`;
       console.log('Connecting to:', endpoint);
       
+      // Get player ID from wallet address or user ID
+      const playerId = this.address || this.user?.id || `guest_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Determine room type and options based on world configuration
+      let roomType = 'game'; // fallback to generic room
+      const roomOptions: RoomOptions = {
+        name: this.user?.google?.name || this.user?.email?.address?.split('@')[0] || `Player${Math.floor(Math.random() * 1000)}`,
+        playerId: playerId
+      };
+
+      if (this.worldId) {
+        roomType = 'world';
+        roomOptions.worldOwnerId = this.worldId;
+        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'}) with playerId: ${playerId}`);
+      }
+      
       try {
         this.client = new Client(endpoint);
-        this.room = await this.client.joinOrCreate<GameState>('game', {
-          name: `Player${Math.floor(Math.random() * 1000)}`
-        });
+        this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
       } catch (connectionError) {
         console.log('Primary connection failed, trying localhost fallback...');
         // Fallback to localhost if the detected hostname fails
@@ -581,9 +1198,7 @@ class MainScene extends Phaser.Scene {
           const fallbackEndpoint = `ws://localhost:${port}`;
           console.log('Fallback connecting to:', fallbackEndpoint);
           this.client = new Client(fallbackEndpoint);
-          this.room = await this.client.joinOrCreate<GameState>('game', {
-            name: `Player${Math.floor(Math.random() * 1000)}`
-          });
+          this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
         } else {
           throw connectionError;
         }
@@ -663,52 +1278,16 @@ class MainScene extends Phaser.Scene {
         return;
       }
       
-      // Determine character type - check global selection first, then fall back to player-specific
-      let characterType: CharacterType;
-      
+      // Force current player to spawn at center of screen
       if (isCurrentPlayer) {
-        // For current player, check global settings first
-        const globalCharacterSelection = MainScene.safeLocalStorage.getItem('character-selection') as CharacterType;
-        
-        if (globalCharacterSelection && CharacterDefinitions[globalCharacterSelection] !== undefined) {
-          characterType = globalCharacterSelection;
-          console.log(`🎭 Current player using global character selection: ${characterType}`);
-        } else {
-          // Fall back to player-specific or generate new
-          const playerAddress = player.address || sessionId;
-          const storageKey = `defi-valley-character-${playerAddress}`;
-          const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
-          
-          if (savedCharacter) {
-            characterType = savedCharacter as CharacterType;
-            console.log(`🎭 Current player using saved character ${characterType}`);
-          } else {
-            // First time - generate a character based on address and save it
-            const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
-            const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
-            characterType = characterTypes[characterIndex];
-            MainScene.safeLocalStorage.setItem(storageKey, characterType);
-            console.log(`🎭 Current player assigned new character ${characterType}`);
-          }
-        }
-      } else {
-        // For other players, use player-specific storage
-        const playerAddress = player.address || sessionId;
-        const storageKey = `defi-valley-character-${playerAddress}`;
-        const savedCharacter = MainScene.safeLocalStorage.getItem(storageKey);
-        
-        if (savedCharacter) {
-          characterType = savedCharacter as CharacterType;
-          console.log(`🎭 Player ${player.name} using saved character ${characterType}`);
-        } else {
-          // Generate a character based on address and save it
-          const characterTypes = Object.keys(CharacterDefinitions) as CharacterType[];
-          const characterIndex = Math.abs(playerAddress.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % characterTypes.length;
-          characterType = characterTypes[characterIndex];
-          MainScene.safeLocalStorage.setItem(storageKey, characterType);
-          console.log(`🎭 Player ${player.name} assigned new character ${characterType}`);
-        }
+        player.x = 400; // Center X (800/2)
+        player.y = 300; // Center Y (600/2)
+        console.log('🎯 Current player spawned at center:', player.x, player.y);
       }
+      
+      // All players are cowboys now - simplified character assignment
+      const characterType: CharacterType = 'cowboy';
+      console.log(`🤠 Player ${player.name} assigned cowboy character`);
       
       // Create PlayerInfo object
       const playerInfo: PlayerInfo = {
@@ -731,6 +1310,9 @@ class MainScene extends Phaser.Scene {
       
       if (isCurrentPlayer) {
         this.currentPlayer = playerObject;
+        // Start camera following the current player
+        this.updateCameraFollow();
+        console.log('📷 Camera now following current player');
       }
       
       console.log('Added player:', sessionId, player.name, 'with character:', characterType);
@@ -788,10 +1370,16 @@ class MainScene extends Phaser.Scene {
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
+    // Handle O key for stomp animation (only when chat is not active)
+    if (!chatActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
+      this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
+      console.log('🦶 Stomp animation triggered!');
+    }
+    
     // Don't process movement if chat is active
     if (chatActive) return;
 
-    const speed = 3;
+    const speed = 6;
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
@@ -799,16 +1387,16 @@ class MainScene extends Phaser.Scene {
     // Handle input with directional sprite changes and collision detection
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       const potentialX = Math.max(20, newX - speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(potentialX, newY)) {
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         this.lastDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      const potentialX = Math.min(780, newX + speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(potentialX, newY)) {
+      const potentialX = Math.min(this.worldWidth - 20, newX + speed);
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         this.lastDirection = 'right';
@@ -817,30 +1405,39 @@ class MainScene extends Phaser.Scene {
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       const potentialY = Math.max(20, newY - speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(newX, potentialY)) {
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         this.lastDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      const potentialY = Math.min(580, newY + speed);
-      // Check collision before moving
-      if (!this.checkCliffCollision(newX, potentialY)) {
+      const potentialY = Math.min(this.worldHeight - 20, newY + speed);
+      // Check collision before moving using new tile-based system
+      if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         this.lastDirection = 'down';
       }
     }
     
-    // Update sprite direction if moved
-    if (moved && this.currentPlayer) {
-      this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+    // Update sprite direction and animation state
+    if (this.currentPlayer) {
+      if (moved) {
+        this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+        // Update animation state to walking
+        this.currentPlayer.updateMovementState(true);
+      } else {
+        // Update animation state to idle when not moving
+        this.currentPlayer.updateMovementState(false);
+      }
     }
 
     // Send movement to server
     if (moved) {
       this.room.send('move', { x: newX, y: newY });
+      // Update camera to follow player
+      this.updateCameraFollow();
     }
   }
 
@@ -917,27 +1514,55 @@ class MainScene extends Phaser.Scene {
   }
 }
 
-function Game() {
+interface GameProps {
+  worldId?: string;
+  isOwnWorld?: boolean;
+}
+
+function Game({ worldId, isOwnWorld }: GameProps) {
   const gameRef = useRef<Phaser.Game | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
+  
+  // Get user authentication info
+  const { user } = usePrivy();
+  const { address } = useAccount();
 
   useEffect(() => {
+    // Calculate dimensions based on viewport minus bottom bar
+    const BAR_HEIGHT = 64; // Must match CSS --bar-height
+    const gameWidth = window.innerWidth;
+    const gameHeight = window.innerHeight - BAR_HEIGHT;
+    
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 800,
-      height: 600,
+      width: gameWidth,
+      height: gameHeight,
       parent: 'game-container',
       backgroundColor: '#87CEEB',
       scene: MainScene,
       physics: {
         default: 'arcade',
         arcade: {
-          gravity: { y: 0, x: 0 }
+          gravity: { y: 0, x: 0 },
+          debug: false // Set to true to see bounding boxes
         }
+      },
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        parent: 'game-container',
+        width: '100%',
+        height: '100%'
+      },
+      render: {
+        pixelArt: false,
+        antialias: true,
+        transparent: false,
+        clearBeforeRender: true,
+        preserveDrawingBuffer: false
       }
     };
 
@@ -948,6 +1573,11 @@ function Game() {
       const scene = gameRef.current?.scene.getScene('MainScene') as MainScene;
       if (scene) {
         sceneRef.current = scene;
+        
+        // Configure world settings and auth info
+        scene.setWorldConfiguration(worldId, isOwnWorld);
+        scene.setAuthInfo(address, user);
+        
         scene.init({
           chatCallback: (message: ChatMessage) => {
             setChatMessages(prev => [...prev, message]);
@@ -960,6 +1590,15 @@ function Game() {
         });
       }
     }, 500);
+
+    // Handle window resize
+    const handleResize = () => {
+      if (gameRef.current) {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight - BAR_HEIGHT;
+        gameRef.current.scale.resize(newWidth, newHeight);
+      }
+    };
 
     // Handle Enter key for chat
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -974,12 +1613,14 @@ function Game() {
       }
     };
 
+    window.addEventListener('resize', handleResize);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy(true);
       }
+      window.removeEventListener('resize', handleResize);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -1035,6 +1676,42 @@ function Game() {
     return sceneRef.current ? sceneRef.current.getGrowingCrops() : 0;
   };
 
+  const chatContainer = (
+    <div className="chat-container">
+      <div className="chat-messages">
+        {chatMessages.slice(-5).map((msg, index) => (
+          <div key={index} className="chat-message">
+            <span className="chat-name">{msg.name}:</span>
+            <span className="chat-text">{msg.message}</span>
+          </div>
+        ))}
+      </div>
+      
+      {showChat && (
+        <form onSubmit={handleChatSubmit} className="chat-input-form">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Type your message..."
+            className="chat-input"
+            autoFocus
+            onBlur={() => {
+              // Small delay to allow form submission to process
+              setTimeout(() => setShowChat(false), 100);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowChat(false);
+                setChatInput('');
+              }
+            }}
+          />
+        </form>
+      )}
+    </div>
+  );
+
   return (
     <div className="game-wrapper">
       <CropContextMenu
@@ -1047,40 +1724,19 @@ function Game() {
         <div id="game-container" />
       </CropContextMenu>
       
-      {/* Chat UI */}
-      <div className="chat-container">
-        <div className="chat-messages">
-          {chatMessages.slice(-5).map((msg, index) => (
-            <div key={index} className="chat-message">
-              <span className="chat-name">{msg.name}:</span>
-              <span className="chat-text">{msg.message}</span>
-            </div>
-          ))}
-        </div>
-        
-        {showChat && (
-          <form onSubmit={handleChatSubmit} className="chat-input-form">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Type your message..."
-              className="chat-input"
-              autoFocus
-              onBlur={() => {
-                // Small delay to allow form submission to process
-                setTimeout(() => setShowChat(false), 100);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setShowChat(false);
-                  setChatInput('');
-                }
-              }}
-            />
-          </form>
-        )}
-      </div>
+      {/* UI Stack with all left-side UI elements */}
+      <UIStack
+        getTotalCrops={getTotalCrops}
+        getReadyCrops={getReadyCrops}
+        getGrowingCrops={getGrowingCrops}
+        chatContainer={chatContainer}
+      />
+
+      {/* Crop Info Panel */}
+      <CropInfo 
+        crop={selectedCrop} 
+        onClose={() => setSelectedCrop(null)} 
+      />
 
       {/* Crop Info Panel */}
       <CropInfo 
@@ -1098,39 +1754,36 @@ function Game() {
       <style jsx>{`
         .game-wrapper {
           position: relative;
-          display: inline-block;
-          width: 800px;
-          height: 600px;
+          width: 100%;
+          height: 100%;
           background: transparent;
         }
 
         #game-container {
           width: 100%;
           height: 100%;
-          border-radius: 8px;
           overflow: hidden;
           position: relative;
         }
 
         .chat-container {
-          position: absolute;
-          bottom: 20px;
-          left: 20px;
-          width: 300px;
+          position: relative;
+          width: 100%;
           max-height: 200px;
           pointer-events: none;
           z-index: 10;
+          padding: 12px;
         }
 
         .chat-messages {
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(255, 255, 255, 0.1);
           border-radius: 8px;
           padding: 10px;
           margin-bottom: 10px;
           max-height: 150px;
           overflow-y: auto;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .chat-message {
@@ -1157,19 +1810,23 @@ function Game() {
         .chat-input {
           width: 100%;
           padding: 8px 12px;
-          border: none;
+          border: 1px solid rgba(255, 255, 255, 0.3);
           border-radius: 6px;
-          background: rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(135, 206, 235, 0.3);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-input::placeholder {
+          color: rgba(255, 255, 255, 0.6);
         }
 
         .chat-input:focus {
           outline: none;
-          background: white;
-          border-color: #87CEEB;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(135, 206, 235, 0.2);
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.5);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>

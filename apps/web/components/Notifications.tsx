@@ -197,9 +197,7 @@ export default function Notifications() {
 
       <style jsx>{`
         .notifications-container {
-          position: fixed;
-          top: 20px;
-          right: 20px;
+          position: relative;
           z-index: 10000;
           pointer-events: none;
         }
@@ -209,12 +207,6 @@ export default function Notifications() {
         }
 
         @media (max-width: 768px) {
-          .notifications-container {
-            top: 10px;
-            right: 10px;
-            left: 10px;
-          }
-
           .notifications-container :global(.notification-item) {
             max-width: none;
           }
