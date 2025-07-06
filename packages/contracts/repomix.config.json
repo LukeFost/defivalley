@@ -1,0 +1,33 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "artifacts/**/*.json",
+      "artifacts/**/*.d.ts",
+      "cache/**/*.json",
+      "node_modules/**",
+      "*.log",
+      "*.tmp",
+      ".env*",
+      "deployments/**/*.json",
+      "ignition/deployments/**/*.json",
+      "ignition/deployments/**/build-info/**"
+    ]
+  },
+  "include": [
+    "**/*.sol",
+    "**/*.ts",
+    "**/*.js",
+    "hardhat.config.ts",
+    "package.json",
+    "README.md",
+    "scripts/**",
+    "test/**",
+    "ignition/modules/**"
+  ]
+}
