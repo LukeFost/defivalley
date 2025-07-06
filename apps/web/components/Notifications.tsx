@@ -207,12 +207,6 @@ export default function Notifications() {
         }
 
         @media (max-width: 768px) {
-          .notifications-container {
-            top: 10px;
-            right: 10px;
-            left: 10px;
-          }
-
           .notifications-container :global(.notification-item) {
             max-width: none;
           }

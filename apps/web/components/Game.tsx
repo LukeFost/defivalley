@@ -1684,18 +1684,18 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           max-height: 200px;
           pointer-events: none;
           z-index: 10;
-          padding: 16px;
+          padding: 12px;
         }
 
         .chat-messages {
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(255, 255, 255, 0.1);
           border-radius: 8px;
           padding: 10px;
           margin-bottom: 10px;
           max-height: 150px;
           overflow-y: auto;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .chat-message {
@@ -1722,19 +1722,23 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         .chat-input {
           width: 100%;
           padding: 8px 12px;
-          border: none;
+          border: 1px solid rgba(255, 255, 255, 0.3);
           border-radius: 6px;
-          background: rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(135, 206, 235, 0.3);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-input::placeholder {
+          color: rgba(255, 255, 255, 0.6);
         }
 
         .chat-input:focus {
           outline: none;
-          background: white;
-          border-color: #87CEEB;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(135, 206, 235, 0.2);
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.5);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>

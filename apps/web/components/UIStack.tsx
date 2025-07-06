@@ -13,7 +13,7 @@ interface UIStackProps {
 
 export function UIStack({ getTotalCrops, getReadyCrops, getGrowingCrops, chatContainer }: UIStackProps) {
   return (
-    <div className="fixed top-4 left-4 flex flex-col gap-4 w-80 z-[1000]">
+    <div className="fixed top-4 left-4 flex flex-col gap-4 w-80 sm:w-96 md:w-80 lg:w-96 z-[1000] max-w-[calc(100vw-2rem)]">
       {/* Farm Statistics Panel */}
       <div className="bg-white rounded-lg shadow-lg p-3 min-w-[200px] border border-gray-200">
         <CropStats 
