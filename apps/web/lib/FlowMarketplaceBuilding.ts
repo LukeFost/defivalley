@@ -18,10 +18,10 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
     super(scene, x, y);
     this.scene = scene;
 
-    // Create Flow marketplace sprite (reuse market sprite with different styling)
+    // Create Flow marketplace sprite using Wild Orchard
     this.marketplaceSprite = scene.add.sprite(0, 0, "flow_market");
     this.marketplaceSprite.setScale(0.4);
-    this.marketplaceSprite.setTint(0x9932cc); // Purple tint for Flow branding
+    // No tint - let Wild Orchard show its natural colors
     this.add(this.marketplaceSprite);
 
     // Create interaction zone
@@ -224,8 +224,4 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
     // Additional update logic if needed
   }
 
-  preload(scene: Phaser.Scene) {
-    // Load Flow marketplace sprite (reuse market sprite)
-    scene.load.image("flow_market", "/market.png");
-  }
 }

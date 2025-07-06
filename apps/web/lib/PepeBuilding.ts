@@ -16,10 +16,28 @@ export class PepeBuilding extends Phaser.GameObjects.Container {
     super(scene, x, y);
     this.scene = scene;
 
-    // Create the building sprite - using market sprite with Pepe-themed tint
-    this.buildingSprite = scene.add.sprite(0, 0, "pepe_building");
-    this.buildingSprite.setScale(0.4);
-    this.buildingSprite.setTint(0x32cd32); // Pepe green tint
+    // Define a unique key for the building animation
+    const animKey = 'pepe_building_idle';
+
+    // Create the animation from the loaded atlas if it doesn't already exist
+    if (!scene.anims.exists(animKey)) {
+      scene.anims.create({
+        key: animKey,
+        frames: scene.anims.generateFrameNames('pepe_building_anim', {
+          prefix: 'Untitled_Artwork-',
+          suffix: '.png',
+          start: 1,
+          end: 15, // There are 15 frames in your building_pepe.json
+        }),
+        frameRate: 10,
+        repeat: -1, // Loop forever
+      });
+    }
+
+    // Create the sprite using the new animation atlas and play the animation
+    this.buildingSprite = scene.add.sprite(0, 0, 'pepe_building_anim');
+    this.buildingSprite.setScale(1.2); // Increased sprite size by 1.5x (0.8 * 1.5 = 1.2)
+    this.buildingSprite.play(animKey); // Play the animation
     this.add(this.buildingSprite);
 
     // Define interaction zone
@@ -104,8 +122,4 @@ export class PepeBuilding extends Phaser.GameObjects.Container {
     return this.getCollisionBounds().contains(x, y);
   }
   
-  preload(scene: Phaser.Scene) {
-    // Use existing market sprite for the building
-    scene.load.image("pepe_building", "/market.png");
-  }
 }

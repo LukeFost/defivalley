@@ -224,8 +224,4 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
     // Additional update logic if needed
   }
 
-  preload(scene: Phaser.Scene) {
-    // Load Flow bank sprite (reuse bank sprite)
-    scene.load.image("flow_bank", "/bank.png");
-  }
 }

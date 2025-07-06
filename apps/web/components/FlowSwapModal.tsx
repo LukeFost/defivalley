@@ -9,9 +9,10 @@ import { Loader2, ArrowRight } from 'lucide-react';
 import { usePunchSwap } from '@/hooks/usePunchSwap';
 import { useFrothToFvix } from '@/hooks/useFrothToFvix';
 import { useTokenBalance } from '@/hooks/useTokenBalance'; 
+import { useTokenAllowance } from '@/hooks/useTokenAllowance';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { FLOW_TOKENS } from '@/constants/flow-tokens';
+import { FLOW_TOKENS, FLOW_PROTOCOLS, NATIVE_TOKEN_ADDRESS } from '@/constants/flow-tokens';
 
 interface FlowSwapModalProps {
   isOpen: boolean;
@@ -20,27 +21,51 @@ interface FlowSwapModalProps {
 
 export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
   const { address } = useAccount();
-  const { data: flowBalance } = useBalance({ address });
+  const { data: flowBalance, refetch: refetchFlowBalance } = useBalance({ address });
   const { balance: frothBalance, refetch: refetchFrothBalance } = useTokenBalance(FLOW_TOKENS.FROTH, address);
   
   const [amount, setAmount] = useState('');
   
   const { swap, isLoading: isSwapping, error: swapError } = usePunchSwap();
-  const { convert, isConverting, error: convertError, getMaxConvertibleFroth, conversionRatio } = useFrothToFvix();
+  const { 
+    frothBalance: frothBalanceFromHook, 
+    isConverting, 
+    error: convertError, 
+    getMaxConvertibleFroth, 
+    conversionRatio 
+  } = useFrothToFvix();
+  
+  // Add FROTH allowance hook for PunchSwap router
+  const {
+    allowance: frothAllowance,
+    approve: approveFroth,
+    isApproving: isApprovingFroth,
+    checkApprovalNeeded: checkFrothApprovalNeeded
+  } = useTokenAllowance(FLOW_TOKENS.FROTH, FLOW_PROTOCOLS.PUNCHSWAP_V2_ROUTER);
 
   const handleSwapToFroth = async () => {
     if (amount) {
-        // Use the special address for the native token (FLOW)
-        const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' as const;
         await swap(NATIVE_TOKEN_ADDRESS, FLOW_TOKENS.FROTH, parseUnits(amount, 18));
         refetchFrothBalance();
+        refetchFlowBalance(); // Refetch FLOW balance after swap
     }
   };
 
   const handleConvertToFvix = async () => {
-    const maxFroth = getMaxConvertibleFroth();
-    if (maxFroth > 0n) {
-      await convert(maxFroth);
+    if (frothBalance <= 0n) return;
+
+    // Check if approval is needed first
+    if (checkFrothApprovalNeeded(frothBalance)) {
+      // If approval is needed, approve first
+      await approveFroth(frothBalance);
+      // The user will need to click again after approval confirms
+    } else {
+      // If already approved, perform the swap
+      await swap(FLOW_TOKENS.FROTH, FLOW_TOKENS.FVIX, frothBalance);
+      // Refetch balance after swap
+      setTimeout(() => {
+        refetchFrothBalance();
+      }, 1000);
     }
   };
 
@@ -70,11 +95,11 @@ export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
             <h4 className="font-semibold mb-2">Step 2: Convert FROTH ➔ FVIX</h4>
             <p className="text-sm text-muted-foreground mb-2">Convert your FROTH into the stakeable token, FVIX. (Ratio: {conversionRatio.toString()}:1)</p>
             <p className="text-sm">Available to convert: {formatUnits(frothBalance, 18)} FROTH</p>
-            <Button onClick={handleConvertToFvix} disabled={isConverting || frothBalance === 0n} className="mt-2 w-full">
-              {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Convert all FROTH to FVIX
+            <Button onClick={handleConvertToFvix} disabled={isSwapping || isApprovingFroth || frothBalance === 0n} className="mt-2 w-full">
+              {(isSwapping || isApprovingFroth) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {checkFrothApprovalNeeded(frothBalance) ? 'Approve FROTH' : 'Convert all FROTH to FVIX'}
             </Button>
-            {convertError && <p className="text-red-500 text-xs mt-2">{convertError}</p>}
+            {swapError && <p className="text-red-500 text-xs mt-2">{swapError}</p>}
           </div>
         </div>
       </DialogContent>

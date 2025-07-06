@@ -12,6 +12,7 @@ import { parseUnits, formatUnits, type Address } from "viem";
 import { flowMainnet } from "@/app/wagmi";
 import { FLOW_PROTOCOLS, FLOW_DEFI_CONFIG } from "@/constants/flow-tokens";
 import { useTokenAllowance } from "./useTokenAllowance";
+import { useUI } from "@/app/store";
 
 interface PunchSwapQuote {
   router: Address;
@@ -89,6 +90,7 @@ export function usePunchSwap(tokenInAddress?: Address) {
   const [error, setError] = useState<string | null>(null);
   const [currentQuote, setCurrentQuote] = useState<PunchSwapQuote | null>(null);
   const quoteIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { addNotification } = useUI();
 
   // Get allowance for the input token to PunchSwap Router
   const {
@@ -248,7 +250,33 @@ export function usePunchSwap(tokenInAddress?: Address) {
       };
     } catch (err: any) {
       console.error('Swap execution error:', err);
-      setError(err.message || "Failed to execute swap");
+      
+      // Check for user rejection error code
+      if (err.code === 4001 || err.cause?.code === 4001) {
+        const errorMessage = "Transaction was cancelled by user";
+        setError(errorMessage);
+        addNotification({
+          type: 'warning',
+          title: 'Transaction Cancelled',
+          message: 'You rejected the transaction in your wallet.'
+        });
+      } else if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
+        const errorMessage = "Transaction was cancelled by user";
+        setError(errorMessage);
+        addNotification({
+          type: 'warning',
+          title: 'Transaction Cancelled',
+          message: 'You rejected the transaction in your wallet.'
+        });
+      } else {
+        const errorMessage = err.shortMessage || err.message || "Failed to execute swap";
+        setError(errorMessage);
+        addNotification({
+          type: 'error',
+          title: 'Swap Failed',
+          message: errorMessage
+        });
+      }
       return null;
     } finally {
       setIsLoading(false);

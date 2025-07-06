@@ -26,7 +26,9 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
     isApproving,
     isDepositing,
     calculateAPY,
-    error
+    error,
+    refetchBalance,
+    refetchStakedBalance
   } = useFlowStaking();
 
   const depositAmountBigInt = useMemo(() => {
@@ -36,6 +38,15 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
       return 0n;
     }
   }, [amount]);
+
+  // Refresh balances when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔄 Staking modal opened, refreshing balances...');
+      refetchBalance();
+      refetchStakedBalance();
+    }
+  }, [isOpen, refetchBalance, refetchStakedBalance]);
 
   useEffect(() => {
     if (depositAmountBigInt > 0) {

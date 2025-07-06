@@ -6,6 +6,7 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useChainId,
 } from "wagmi";
 import { type Address } from "viem";
 import { FLOW_TOKENS, FLOW_DEFI_CONFIG } from "@/constants/flow-tokens";
@@ -69,6 +70,7 @@ const FVIX_MINTING_CONTRACT = FVIX_ADDRESS;
 
 export function useFrothToFvix() {
   const { address } = useAccount();
+  const chainId = useChainId();
   const [error, setError] = useState<string | null>(null);
   const [approvalNeeded, setApprovalNeeded] = useState(false);
 
@@ -82,7 +84,7 @@ export function useFrothToFvix() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    chainId: 747, // Flow mainnet chain ID
+    chainId: chainId,
   });
 
   // Read FVIX balance
@@ -95,7 +97,7 @@ export function useFrothToFvix() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Read current allowance
@@ -104,7 +106,7 @@ export function useFrothToFvix() {
     abi: erc20Abi,
     functionName: "allowance",
     args: address ? [address, FVIX_MINTING_CONTRACT] : undefined,
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Approve FROTH spending

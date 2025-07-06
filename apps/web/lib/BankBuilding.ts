@@ -223,8 +223,4 @@ export class BankBuilding extends Phaser.GameObjects.Container {
     // Additional update logic if needed
   }
 
-  preload(scene: Phaser.Scene) {
-    // Load bank sprite
-    scene.load.image("bank", "/bank.png");
-  }
 }

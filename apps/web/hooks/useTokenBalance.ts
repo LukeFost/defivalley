@@ -1,6 +1,6 @@
 'use client';
 
-import { useReadContract } from 'wagmi';
+import { useReadContract, useChainId } from 'wagmi';
 import { type Address } from 'viem';
 
 // Simple ERC20 ABI for balance checking
@@ -15,12 +15,14 @@ const erc20Abi = [
 ] as const;
 
 export function useTokenBalance(tokenAddress: Address | undefined, userAddress: Address | undefined) {
+  const chainId = useChainId();
+  
   const { data: balance, isLoading, refetch } = useReadContract({
     address: tokenAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: userAddress ? [userAddress] : undefined,
-    chainId: 747474, // Katana chain ID
+    chainId: chainId, // Use dynamic chainId from connected wallet
     query: {
       enabled: !!tokenAddress && !!userAddress,
     },

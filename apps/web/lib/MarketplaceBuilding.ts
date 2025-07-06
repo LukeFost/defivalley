@@ -223,8 +223,4 @@ export class MarketplaceBuilding extends Phaser.GameObjects.Container {
     // Additional update logic if needed
   }
 
-  preload(scene: Phaser.Scene) {
-    // Load marketplace sprite
-    scene.load.image("market", "/market.png");
-  }
 }

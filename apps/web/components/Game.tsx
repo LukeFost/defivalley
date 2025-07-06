@@ -165,11 +165,23 @@ class MainScene extends Phaser.Scene {
     // Load the tileset for world decoration
     this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
     
-    // Load bank building sprite
-    this.load.image('bank', '/bank.png');
+    // Load improved grass texture for background
+    this.load.image('improved_grass', '/tilesets/Grass_Improved.png');
     
-    // Load marketplace building sprite
+    // Load Katana network building sprites
+    this.load.image('bank', '/bank.png');
     this.load.image('market', '/market.png');
+
+    // Load Flow network building sprites
+    this.load.image('flow_bank', '/sprites/Coach_Wagon/Coach_Wagon.png');
+    this.load.image('flow_market', '/sprites/Wild_Orchard/Wild_Orchard.png');
+
+    // Load Pepe building animated sprite atlas
+    this.load.atlas(
+      'pepe_building_anim',
+      '/sprites/Pepe/_building_pepe/building_pepe.png',
+      '/sprites/Pepe/_building_pepe/building_pepe.json'
+    );
     
     // Initialize and preload crop system
     this.cropSystem = new CropSystem(this);
@@ -203,8 +215,6 @@ class MainScene extends Phaser.Scene {
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
 
-    // Create character-specific buildings (not tied to a network)
-    this.pepeBuilding = new PepeBuilding(this, 500, 800);
 
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -644,23 +654,10 @@ class MainScene extends Phaser.Scene {
   }
   
   createFarmBackgroundGraphics() {
-    // Create ultra-simple grass background
-    const grassBackground = this.add.graphics();
+    // Create improved grass background using the texture
+    const grassBackground = this.add.tileSprite(0, 0, this.worldWidth, this.worldHeight, 'improved_grass');
+    grassBackground.setOrigin(0, 0);
     grassBackground.setDepth(-10); // Behind everything
-    
-    // Simple grass field (nice green)
-    grassBackground.fillStyle(0x4A7C59, 1); // Forest green
-    grassBackground.fillRect(0, 0, this.worldWidth, this.worldHeight);
-    
-    // Add minimal texture with subtle darker green patches
-    grassBackground.fillStyle(0x355E3B, 0.2); // Very subtle darker green
-    for (let i = 0; i < 20; i++) {
-      const x = Math.random() * this.worldWidth;
-      const y = Math.random() * this.worldHeight;
-      const size = 30 + Math.random() * 60;
-      grassBackground.fillCircle(x, y, size);
-    }
-    
   }
   
   createInvisibleWalls() {
@@ -1156,13 +1153,14 @@ class MainScene extends Phaser.Scene {
     this.marketplaceBuilding?.destroy();
     this.flowBankBuilding?.destroy();
     this.flowMarketplaceBuilding?.destroy();
-    // Note: Pepe building is not network-specific, so it's not destroyed here
+    this.pepeBuilding?.destroy(); // Also destroy the Pepe building
 
     // Clear references
     this.bankBuilding = undefined as any;
     this.marketplaceBuilding = undefined as any;
     this.flowBankBuilding = undefined;
     this.flowMarketplaceBuilding = undefined;
+    this.pepeBuilding = undefined; // And clear its reference
 
     const isOnKatana = this.currentChainId === katanaChain.id;
     const isOnFlow = this.currentChainId === flowMainnet.id;
@@ -1178,6 +1176,8 @@ class MainScene extends Phaser.Scene {
       // Create Flow buildings at different positions for variety
       this.flowBankBuilding = new FlowBankBuilding(this, 300, 200);
       this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 300, 600);
+      // Create Pepe building only on Flow network
+      this.pepeBuilding = new PepeBuilding(this, 500, 800);
       console.log('🟣 Created Flow buildings');
     } else {
       // Default case - create Katana buildings
@@ -1191,12 +1191,8 @@ class MainScene extends Phaser.Scene {
   }
 
   setupBuildingEventListeners() {
-    // Clear existing listeners first
-    this.events.removeAllListeners('bankInteraction');
-    this.events.removeAllListeners('marketplaceInteraction');
-    this.events.removeAllListeners('flowBankInteraction');
-    this.events.removeAllListeners('flowMarketplaceInteraction');
-    this.events.removeAllListeners('pepeInteraction');
+    // Listeners are now managed by the React component's useEffect hook and should not be cleared here.
+    // This function is called on every network switch, and removing listeners was preventing modals from opening.
   }
 
   async connectToServer() {
@@ -1449,17 +1445,23 @@ class MainScene extends Phaser.Scene {
       this.pepeBuilding.checkInteraction();
     }
 
-    // Check if chat is active by looking for active input elements
-    const chatActive = document.querySelector('.chat-input:focus') !== null;
+    // Check if any input element is active (covers chat, modals, any input field)
+    const isUIInputElementActive =
+      document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement;
     
-    // Handle O key for stomp animation (only when chat is not active)
-    if (!chatActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
+    // Handle O key for stomp animation (only when not typing)
+    if (!isUIInputElementActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
       this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
       console.log('🦶 Stomp animation triggered!');
     }
     
-    // Don't process movement if chat is active
-    if (chatActive) return;
+    // Don't process movement if a UI input is active
+    if (isUIInputElementActive) {
+      // Make sure the player character stops moving visually
+      this.currentPlayer.updateMovementState(false);
+      return;
+    }
 
     const speed = 9;
     let moved = false;
@@ -1615,6 +1617,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [showPepeModal, setShowPepeModal] = useState(false);
   const [isDialogueOpen, setIsDialogueOpen] = useState(false);
   const [dialogueContent, setDialogueContent] = useState('');
+  const [dialogueCharacterName, setDialogueCharacterName] = useState('Guide');
   const [onDialogueContinue, setOnDialogueContinue] = useState<() => void>(() => {});
   
   // Get user authentication info
@@ -1688,6 +1691,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         // Set up Katana building interaction listeners
         scene.events.on('bankInteraction', () => {
           console.log('🏦 Opening Morpho deposit modal via dialogue');
+          setDialogueCharacterName('Katana Cat');
           setDialogueContent('Welcome to the Katana Morpho Bank. Here you can deposit assets to earn yield. Would you like to proceed?');
           setOnDialogueContinue(() => () => setShowMorphoModal(true));
           setIsDialogueOpen(true);
@@ -1695,6 +1699,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         
         scene.events.on('marketplaceInteraction', () => {
           console.log('🏪 Opening marketplace modal via dialogue');
+          setDialogueCharacterName('Shopkeeper');
           setDialogueContent('Welcome to the Katana Marketplace. You can swap tokens here using SushiSwap. Would you like to enter?');
           setOnDialogueContinue(() => () => setShowMarketplaceModal(true));
           setIsDialogueOpen(true);
@@ -1703,6 +1708,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         // Set up Flow building interaction listeners
         scene.events.on('flowBankInteraction', () => {
           console.log('🟠 Opening Flow staking modal via dialogue');
+          setDialogueCharacterName('Flow Banker');
           setDialogueContent('This is the Flow Bank. You can stake FVIX tokens here to earn yield. Shall we go inside?');
           setOnDialogueContinue(() => () => setShowFlowStakingModal(true));
           setIsDialogueOpen(true);
@@ -1710,6 +1716,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         
         scene.events.on('flowMarketplaceInteraction', () => {
           console.log('🟣 Opening Flow swap modal via dialogue');
+          setDialogueCharacterName('Flow Merchant');
           setDialogueContent('Welcome to the Flow DeFi Hub. Here you can swap FLOW for other tokens needed for staking. Ready to trade?');
           setOnDialogueContinue(() => () => setShowFlowSwapModal(true));
           setIsDialogueOpen(true);
@@ -1717,6 +1724,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
 
         scene.events.on('pepeInteraction', () => {
           console.log('🐸 Pepe interaction triggered!');
+          setDialogueCharacterName('Pepe');
           setDialogueContent("Feels good, man... Welcome to my pump launchpad. Want to create your own meme coin?");
           setOnDialogueContinue(() => () => setShowPepeModal(true));
           setIsDialogueOpen(true);
@@ -1870,6 +1878,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         content={dialogueContent}
         onClose={() => setIsDialogueOpen(false)}
         onContinue={handleDialogueContinue}
+        characterName={dialogueCharacterName}
       />
       
       <CropContextMenu

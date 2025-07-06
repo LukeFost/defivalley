@@ -6,6 +6,7 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useChainId,
 } from "wagmi";
 import { parseUnits, type Address } from "viem";
 import { FLOW_TOKENS, FLOW_DEFI_CONFIG } from "@/constants/flow-tokens";
@@ -120,6 +121,7 @@ const SFVIX_ADDRESS = FLOW_TOKENS.SFVIX;
 
 export function useFlowStaking() {
   const { address, chain } = useAccount();
+  const chainId = useChainId();
   const [error, setError] = useState<string | null>(null);
   const [approvalNeeded, setApprovalNeeded] = useState(false);
 
@@ -133,7 +135,7 @@ export function useFlowStaking() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    chainId: 747, // Flow mainnet chain ID
+    chainId: chainId,
   });
 
   // Read sFVIX balance (staked amount)
@@ -146,7 +148,7 @@ export function useFlowStaking() {
     abi: erc4626Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Read current allowance
@@ -155,7 +157,7 @@ export function useFlowStaking() {
     abi: erc20Abi,
     functionName: "allowance",
     args: address ? [address, SFVIX_ADDRESS] : undefined,
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Read total assets in vault for APY calculation
@@ -163,7 +165,7 @@ export function useFlowStaking() {
     address: SFVIX_ADDRESS,
     abi: erc4626Abi,
     functionName: "totalAssets",
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Read total supply for APY calculation
@@ -171,7 +173,7 @@ export function useFlowStaking() {
     address: SFVIX_ADDRESS,
     abi: erc4626Abi,
     functionName: "totalSupply",
-    chainId: 747,
+    chainId: chainId,
   });
 
   // Approve FVIX spending
@@ -380,6 +382,8 @@ export function useFlowStaking() {
     sFvixBalance,
     isLoadingBalance,
     isLoadingStakedBalance,
+    refetchBalance,
+    refetchStakedBalance,
 
     // Approval functions
     approve,

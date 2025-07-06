@@ -2,6 +2,9 @@
 
 import { type Address } from "viem";
 
+// Native token address constant for clarity
+export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' as const;
+
 // Main Flow tokens
 export const FLOW_TOKENS = {
   // Native and wrapped tokens
