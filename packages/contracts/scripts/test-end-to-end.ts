@@ -1,5 +1,14 @@
-import { viem } from "hardhat";
-import { formatEther, parseUnits } from "viem";
+import { network } from "hardhat";
+import {
+  formatEther,
+  parseUnits,
+  defineChain,
+  createPublicClient,
+  http,
+  createWalletClient,
+  getContract,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 // =============================================================================
 // DEPLOYED CONTRACT ADDRESSES (From Ignition deployments)
@@ -16,7 +25,7 @@ const ARBITRUM_SEPOLIA_CHAIN_ID = 421614;
 
 /**
  * End-to-End Cross-Chain Test Script
- * 
+ *
  * This script tests the complete DeFi Valley flow:
  * 1. Player plants seed on Saga (GameController)
  * 2. Axelar relays message to Arbitrum (DeFiVault)
@@ -25,120 +34,177 @@ const ARBITRUM_SEPOLIA_CHAIN_ID = 421614;
  */
 async function main() {
   console.log("🚀 Starting DeFi Valley End-to-End Cross-Chain Test");
-  console.log("=" .repeat(60));
+  console.log("=".repeat(60));
+  const { viem: sagaViem } = await network.connect({ network: "sagaTestnet" });
+  const { viem: arbitrumViem } = await network.connect({
+    network: "arbitrumSepolia",
+  });
+
+  const gameController = await sagaViem.deployContract("GameController", [GAME_CONTROLLER_SAGA]);
   
+  });
   try {
+    //    const counter = await viem.deployContract("Counter");
+    //      await counter.write.incBy([i]);
+    //    assert.equal(total, await counter.read.x());
+
     // =========================================================================
-    // STEP 1: Connect to GameController on Saga
+    // STEP 1: Create custom viem clients for Saga chainlet
     // =========================================================================
-    console.log("\n🔗 Step 1: Connecting to GameController on Saga Chainlet");
-    
-    const gameController = await viem.getContractAt("GameController", GAME_CONTROLLER_SAGA);
-    
+    console.log("\n🔗 Step 1: Creating custom viem clients for Saga chainlet");
+
+    console.log("✅ Custom viem clients created for Saga chainlet");
+
+    // =========================================================================
+    // STEP 2: Connect to GameController on Saga using native viem
+    // =========================================================================
+    console.log("\n🔗 Step 2: Connecting to GameController on Saga Chainlet");
+
+    // We need to get the ABI from Hardhat artifacts
+    const { viem: hardhatViem } = await network.connect("arbitrumSepolia"); // Use a recognized network to get artifacts
+    const gameControllerArtifact = await hardhatViem.getContractAt(
+      "GameController",
+      GAME_CONTROLLER_SAGA
+    );
+
+    // Create contract instance with custom clients
+    const gameController = getContract({
+      address: GAME_CONTROLLER_SAGA as `0x${string}`,
+      abi: gameControllerArtifact.abi,
+      client: {
+        public: sagaPublicClient,
+        wallet: sagaWalletClient,
+      },
+    });
+
     // Check if player is registered
     const isRegistered = await gameController.read.players([PLAYER_ADDRESS]);
     console.log(`- Player registered: ${isRegistered}`);
-    
+
     if (!isRegistered) {
       console.log("⚠️  Player not registered. Registering player first...");
       const registerTx = await gameController.write.registerPlayer();
       console.log(`- Registration transaction: ${registerTx}`);
-      
+
       // Wait for registration to complete
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
       console.log("✅ Player registration completed");
     }
-    
+
     // =========================================================================
-    // STEP 2: Check initial state on both chains
+    // STEP 3: Check initial state on both chains
     // =========================================================================
-    console.log("\n📊 Step 2: Checking initial state on both chains");
-    
+    console.log("\n📊 Step 3: Checking initial state on both chains");
+
     // Get player's current seed count on Saga
     const playerData = await gameController.read.players([PLAYER_ADDRESS]);
     console.log(`- Current seeds planted: ${playerData.seedsPlanted}`);
     console.log(`- Current experience: ${playerData.experience}`);
-    
-    // Connect to DeFiVault on Arbitrum
-    const deFiVault = await viem.getContractAt("DeFiVault", DEFI_VAULT_ARBITRUM);
-    const initialBalance = await deFiVault.read.getPlayerBalance([PLAYER_ADDRESS]);
-    console.log(`- Initial vault balance: ${initialBalance} USDC`);
-    
+
+    // Connect to DeFiVault on Arbitrum (using multi-chain capabilities)
+    console.log("\n🔗 Connecting to Arbitrum network for DeFiVault...");
+    const { viem: arbitrumViem } = await network.connect("arbitrumSepolia");
+    const deFiVault = await arbitrumViem.getContractAt(
+      "DeFiVault",
+      DEFI_VAULT_ARBITRUM
+    );
+    const initialPosition = await deFiVault.read.getPlayerPosition([
+      PLAYER_ADDRESS,
+    ]);
+    console.log(
+      `- Initial vault position: deposited=${initialPosition[0]}, lastClaim=${initialPosition[1]}, isActive=${initialPosition[3]}`
+    );
+
     // =========================================================================
-    // STEP 3: Plant a seed (trigger cross-chain deposit)
+    // STEP 4: Plant a seed (trigger cross-chain deposit)
     // =========================================================================
-    console.log("\n🌱 Step 3: Planting seed on Saga (cross-chain deposit)");
-    
+    console.log("\n🌱 Step 4: Planting seed on Saga (cross-chain deposit)");
+
     const amountToDeposit = parseUnits("10", 6); // 10 USDC (6 decimals)
     console.log(`- Depositing amount: ${amountToDeposit} (10 USDC)`);
-    
+
     // Estimate gas for the cross-chain call
     const gasEstimate = 500000n; // 500k gas units
     const gasValue = gasEstimate; // 1:1 ratio for gas payment
-    
+
     console.log(`- Estimated gas: ${gasEstimate}`);
     console.log(`- Gas payment: ${formatEther(gasValue)} native tokens`);
-    
+
     // Initiate the cross-chain deposit via plantSeed
     console.log("- Planting seed (triggers cross-chain deposit)...");
-    const plantTx = await gameController.write.plantSeed([
-      1,                           // Seed type (1 = USDC Sprout)
-      amountToDeposit,            // Amount to deposit
-      "0x0000000000000000000000000000000000000000" // Gas token (native)
-    ], { 
-      value: gasValue             // Pay for cross-chain gas
-    });
-    
+    const plantTx = await gameController.write.plantSeed(
+      [
+        1, // Seed type (1 = USDC Sprout)
+        amountToDeposit, // Amount to deposit
+        "0x0000000000000000000000000000000000000000", // Gas token (native)
+      ],
+      {
+        value: gasValue, // Pay for cross-chain gas
+      }
+    );
+
     console.log(`✅ Saga transaction sent: ${plantTx}`);
     console.log(`🔍 Monitor on Axelarscan: https://axelarscan.io/`);
-    
+
     // =========================================================================
-    // STEP 4: Wait and verify cross-chain message processing
+    // STEP 5: Wait and verify cross-chain message processing
     // =========================================================================
-    console.log("\n⏳ Step 4: Waiting for Axelar message processing...");
+    console.log("\n⏳ Step 5: Waiting for Axelar message processing...");
     console.log("This typically takes 2-5 minutes for cross-chain delivery");
-    
+
     // Wait for Axelar processing
     const waitTime = 30; // seconds
     console.log(`- Waiting ${waitTime} seconds for initial propagation...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, waitTime * 1000));
+
     // =========================================================================
-    // STEP 5: Verify final state on both chains
+    // STEP 6: Verify final state on both chains
     // =========================================================================
-    console.log("\n🔍 Step 5: Verifying final state on both chains");
-    
+    console.log("\n🔍 Step 6: Verifying final state on both chains");
+
     // Check updated player data on Saga
-    const updatedPlayerData = await gameController.read.players([PLAYER_ADDRESS]);
+    const updatedPlayerData = await gameController.read.players([
+      PLAYER_ADDRESS,
+    ]);
     console.log(`- Updated seeds planted: ${updatedPlayerData.seedsPlanted}`);
     console.log(`- Updated experience: ${updatedPlayerData.experience}`);
-    
+
     // Check if seed count increased
-    const seedsIncrease = Number(updatedPlayerData.seedsPlanted) - Number(playerData.seedsPlanted);
+    const seedsIncrease =
+      Number(updatedPlayerData.seedsPlanted) - Number(playerData.seedsPlanted);
     if (seedsIncrease > 0) {
       console.log(`✅ Seed planting successful! +${seedsIncrease} seeds`);
     } else {
       console.log("⚠️  Seed count unchanged (may still be processing)");
     }
-    
-    // Check updated vault balance on Arbitrum
-    const finalBalance = await deFiVault.read.getPlayerBalance([PLAYER_ADDRESS]);
-    console.log(`- Final vault balance: ${finalBalance} USDC`);
-    
-    const balanceIncrease = Number(finalBalance) - Number(initialBalance);
-    if (balanceIncrease > 0) {
-      console.log(`✅ Cross-chain deposit successful! +${balanceIncrease} USDC`);
+
+    // Check updated vault position on Arbitrum (using multi-chain connection)
+    const finalPosition = await deFiVault.read.getPlayerPosition([
+      PLAYER_ADDRESS,
+    ]);
+    console.log(
+      `- Final vault position: deposited=${finalPosition[0]}, lastClaim=${finalPosition[1]}, isActive=${finalPosition[3]}`
+    );
+
+    const depositIncrease =
+      Number(finalPosition[0]) - Number(initialPosition[0]); // depositedAmount
+    if (depositIncrease > 0) {
+      console.log(
+        `✅ Cross-chain deposit successful! +${depositIncrease} USDC`
+      );
     } else {
-      console.log("⚠️  Vault balance unchanged (message may still be processing)");
+      console.log(
+        "⚠️  Vault position unchanged (message may still be processing)"
+      );
     }
-    
+
     // =========================================================================
-    // STEP 6: Final verification and next steps
+    // STEP 7: Final verification and next steps
     // =========================================================================
-    console.log("\n🎯 Step 6: Test Results & Next Steps");
-    console.log("=" .repeat(60));
-    
-    if (seedsIncrease > 0 && balanceIncrease > 0) {
+    console.log("\n🎯 Step 7: Test Results & Next Steps");
+    console.log("=".repeat(60));
+
+    if (seedsIncrease > 0 && depositIncrease > 0) {
       console.log("🎉 SUCCESS: Complete cross-chain flow working!");
       console.log("✅ Saga → Arbitrum message delivery confirmed");
       console.log("✅ DeFi vault integration operational");
@@ -152,16 +218,15 @@ async function main() {
       console.log("🔄 Re-run this script in 2-3 minutes");
       console.log("📊 Monitor Axelarscan for message status");
     }
-    
+
     console.log("\n📋 Transaction Details:");
     console.log(`- Saga TX: ${plantTx}`);
     console.log(`- Player: ${PLAYER_ADDRESS}`);
     console.log(`- Amount: ${amountToDeposit} USDC`);
     console.log(`- Gas paid: ${formatEther(gasValue)} native tokens`);
-    
   } catch (error) {
     console.error("❌ Test failed with error:", error);
-    
+
     // Provide helpful debugging information
     console.log("\n🔧 Debugging Tips:");
     console.log("1. Ensure you have native tokens for gas on Saga");

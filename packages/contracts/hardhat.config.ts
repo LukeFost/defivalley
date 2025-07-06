@@ -1,12 +1,45 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import { config as dotenvConfig } from "dotenv";
+import { defineChain } from "viem";
 
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
-import { configVariable } from "hardhat/config";
 
 // Load environment variables
 dotenvConfig();
 
+// Define custom Saga chainlet for viem
+const sagaChainlet = defineChain({
+  id: 2751669528484000,
+  name: "Saga Chainlet",
+  network: "saga-chainlet",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
+  rpcUrls: {
+    default: {
+      http: [
+        process.env.SAGA_TESTNET_RPC_URL ||
+          "https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io",
+      ],
+    },
+    public: {
+      http: [
+        process.env.SAGA_TESTNET_RPC_URL ||
+          "https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io",
+      ],
+    },
+  },
+});
+const BASE_RPC_URL =
+  process.env.BASE_RPC_URL || "https://base-sepolia.public.blastapi.io";
+if (!BASE_RPC_URL) {
+  throw new Error("BASE_RPC_URL is not defined in the environment variables.");
+}
+if (!process.env.FLOW_RPC_URL) {
+  throw new Error("BASE_RPC_URL is not defined in the environment variables.");
+}
 const config: HardhatUserConfig = {
   /*
    * In Hardhat 3, plugins are defined as part of the Hardhat config instead of
@@ -16,6 +49,7 @@ const config: HardhatUserConfig = {
    * so this list is larger than what you would normally have.
    */
   plugins: [hardhatToolboxViemPlugin],
+
   paths: {
     sources: "./", // Contracts are in the root directory
   },
@@ -34,6 +68,10 @@ const config: HardhatUserConfig = {
        */
       default: {
         version: "0.8.28",
+        settings: {
+          evmVersion: "istanbul",
+          viaIR: true,
+        },
       },
       /*
        * The production profile is meant to be used for deployments, providing
@@ -43,6 +81,7 @@ const config: HardhatUserConfig = {
       production: {
         version: "0.8.28",
         settings: {
+          evmVersion: "istanbul",
           optimizer: {
             enabled: true,
             runs: 200,
@@ -82,26 +121,53 @@ const config: HardhatUserConfig = {
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
-    },
-    // Arbitrum Sepolia for DeFiVault deployment
-    arbitrumSepolia: {
-      type: "http",
-      chainType: "l1",
-      url: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? "",
-      accounts: [process.env.ARBITRUM_SEPOLIA_PRIVATE_KEY ?? ""],
-      chainId: 421614,
-      gasPrice: 100000000, // 0.1 gwei
+      url: process.env.SEPOLIA_RPC_URL ?? "",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
     },
     // Saga Chainlet for GameController deployment
     sagaTestnet: {
-      type: "http", 
+      type: "http",
       chainType: "generic",
-      url: process.env.SAGA_TESTNET_RPC_URL ?? "",
-      accounts: [process.env.SAGA_TESTNET_PRIVATE_KEY ?? ""],
+      url: process.env.SAGA_RPC_URL ?? "",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
       chainId: 2751669528484000, // Your actual Saga chainlet chain ID
       gasPrice: 100000000, // 0.1 Gwei minimum required by Saga
+    },
+    flow: {
+      type: "http",
+      chainType: "generic",
+      url: process.env.FLOW_RPC_URL ?? "",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
+      chainId: 747, // Flow EVM chainId
+    },
+    flowFork: {
+      type: "edr",
+      chainType: "generic",
+      chainId: 747,
+      forking: {
+        url: process.env.FLOW_RPC_URL,
+      },
+    },
+    katana: {
+      type: "http",
+      chainType: "generic",
+      url: process.env.KATANA_RPC_URL ?? "",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
+      chainId: 747474, // Your actual Saga chainlet chain ID
+    },
+    base: {
+      type: "http",
+      chainType: "generic",
+      url: process.env.BASE_RPC_URL ?? "",
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY ?? ""],
+      chainId: 8453, // Your actual Saga chainlet chain ID
+    },
+    baseFork: {
+      type: "edr",
+      chainType: "l1",
+      forking: {
+        url: BASE_RPC_URL,
+      },
     },
   },
 };
