@@ -641,15 +641,18 @@ class MainScene extends Phaser.Scene {
 
   createSimpleFarmBackground() {
     
-    // Set world dimensions for a farm area
-    this.worldWidth = 1600;
-    this.worldHeight = 1200;
+    // Set world dimensions for a larger farm area
+    this.worldWidth = 3200;
+    this.worldHeight = 2400;
+    
+    // Update physics world bounds to match the actual world size
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     
     // Create simple farm background using graphics
     this.createFarmBackgroundGraphics();
     
-    // Create invisible collision walls for farm boundaries and obstacles
-    this.createInvisibleWalls();
+    // Invisible walls are not needed since physics world bounds handle boundaries
+    // this.createInvisibleWalls();
     
   }
   
@@ -1109,6 +1112,15 @@ class MainScene extends Phaser.Scene {
     if (this.flowMarketplaceBuilding) {
       for (const corner of corners) {
         if (this.flowMarketplaceBuilding.checkCollision(corner.x, corner.y)) {
+          return true;
+        }
+      }
+    }
+    
+    // Check collision with Pepe building
+    if (this.pepeBuilding) {
+      for (const corner of corners) {
+        if (this.pepeBuilding.checkCollision(corner.x, corner.y)) {
           return true;
         }
       }
