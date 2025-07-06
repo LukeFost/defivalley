@@ -298,6 +298,18 @@ export const makeStore = () => {
             });
           },
           
+          showStakingOfficeModal: () => {
+            set((state) => {
+              state.ui.showStakingOfficeModal = true;
+            });
+          },
+          
+          hideStakingOfficeModal: () => {
+            set((state) => {
+              state.ui.showStakingOfficeModal = false;
+            });
+          },
+          
           toggleQuestBook: () => {
             set((state) => {
               state.ui.questBookExpanded = !state.ui.questBookExpanded;
@@ -467,6 +479,7 @@ export const useUI = () => useAppStore(state => ({
   isCorralModalOpen: state.ui.showCorralModal,
   isWellModalOpen: state.ui.showWellModal,
   isOrchardModalOpen: state.ui.showOrchardModal,
+  isStakingOfficeModalOpen: state.ui.showStakingOfficeModal,
   questBookExpanded: state.ui.questBookExpanded,
   // Flow Transaction modal state
   isSwapModalOpen: state.ui.showSwapModal,

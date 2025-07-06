@@ -73,10 +73,10 @@ export function QuestBookHUD() {
       description: 'Plant sFVIX as volatility crops in DeFi Valley',
       status: quest?.currentStep === 'PLANTED' || quest?.completedSteps.includes('PLANTED') ? 'completed' :
               quest?.completedSteps.includes('STAKED') ? 'available' : 'locked',
-      action: () => showSwapModal(), // Use swap modal for complete flow
-      actionText: 'Plant Seeds',
-      building: 'Farm',
-      buildingAction: () => showSwapModal()
+      action: () => showCorralModal(), // Go to Cowboy Pete for complete flow guidance
+      actionText: 'Visit Trading Corral',
+      building: 'Trading Corral',
+      buildingAction: () => showCorralModal()
     }
   ];
   

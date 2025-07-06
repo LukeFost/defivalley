@@ -71,6 +71,7 @@ export interface UIState {
   showCorralModal: boolean;
   showWellModal: boolean;
   showOrchardModal: boolean;
+  showStakingOfficeModal: boolean;
   questBookExpanded: boolean;
   // Flow Transaction modals
   showSwapModal: boolean;
@@ -149,6 +150,8 @@ export interface AppActions {
   hideWellModal: () => void;
   showOrchardModal: () => void;
   hideOrchardModal: () => void;
+  showStakingOfficeModal: () => void;
+  hideStakingOfficeModal: () => void;
   toggleQuestBook: () => void;
   // Flow Transaction modal actions
   showSwapModal: () => void;
@@ -221,6 +224,7 @@ export const initialState: AppState = {
     showCorralModal: false,
     showWellModal: false,
     showOrchardModal: false,
+    showStakingOfficeModal: false,
     questBookExpanded: false,
     showSwapModal: false,
     showMintModal: false,
