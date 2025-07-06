@@ -66,9 +66,12 @@ class MainScene extends Phaser.Scene {
   private buildingSprites: Map<string, Phaser.GameObjects.Image> = new Map();
   private buildingHotspots: Map<string, Phaser.GameObjects.Zone> = new Map();
   private buildingEntranceIndicators: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private buildingPhysicsZones: Map<string, Phaser.GameObjects.Zone> = new Map();
   private showCorralModalCallback?: () => void;
   private showOrchardModalCallback?: () => void;
   private showWellModalCallback?: () => void;
+  private lastTriggeredBuilding?: string;
+  private loggedMissingCallbacks?: Set<string>;
   
   // Simple background approach with invisible walls
   private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
@@ -320,7 +323,22 @@ class MainScene extends Phaser.Scene {
         strokeThickness: 2
       }).setOrigin(0.5).setDepth(buildingData.depth + 2);
       
-      // Create large interactive hotspot zone (easier to click)
+      // Create physics-based interaction zone for player collision
+      const physicsZone = this.add.zone(
+        buildingData.entryZone.x + buildingData.entryZone.width / 2,
+        buildingData.entryZone.y + buildingData.entryZone.height / 2,
+        buildingData.entryZone.width,
+        buildingData.entryZone.height
+      );
+      
+      // Enable physics on the zone
+      this.physics.add.existing(physicsZone, true);
+      physicsZone.setData('buildingType', config.id);
+      physicsZone.setData('callback', config.callback);
+      physicsZone.setData('name', config.name);
+      this.buildingPhysicsZones.set(config.id, physicsZone);
+      
+      // Keep the original clickable hotspot for backward compatibility
       const hotspot = this.add.zone(
         config.x,
         config.y,
@@ -695,6 +713,47 @@ class MainScene extends Phaser.Scene {
         console.log(`  Camera zoom: ${this.cameras.main.zoom}`);
         console.log(`  World bounds: ${this.worldWidth}x${this.worldHeight}`);
       };
+
+      (window as any).debugBuildings = () => {
+        console.log('🏗️ === BUILDING DEBUG INFO ===');
+        
+        console.log(`\\nBuilding data: ${this.buildings.size} buildings`);
+        this.buildings.forEach((building, id) => {
+          console.log(`  ${id}:`, building);
+        });
+        
+        console.log(`\\nPhysics zones: ${this.buildingPhysicsZones.size} zones`);
+        this.buildingPhysicsZones.forEach((zone, id) => {
+          const bounds = zone.getBounds();
+          console.log(`  ${id}: (${bounds.x}, ${bounds.y}) ${bounds.width}x${bounds.height}`);
+        });
+        
+        if (this.currentPlayer) {
+          const playerBounds = this.currentPlayer.getBounds();
+          console.log(`\\nPlayer bounds: (${playerBounds.x}, ${playerBounds.y}) ${playerBounds.width}x${playerBounds.height}`);
+          console.log(`Player physics enabled: ${!!this.currentPlayer.body}`);
+        } else {
+          console.log('\\nNo current player found');
+        }
+        
+        console.log(`\\nBuilding cooldown: ${this.buildingCooldown}`);
+        console.log(`Last triggered: ${this.lastTriggeredBuilding || 'none'}`);
+      };
+
+      (window as any).testBuildingTrigger = (buildingId: string) => {
+        console.log(`🧪 Testing building trigger for: ${buildingId}`);
+        this.triggerBuildingInteraction(buildingId);
+      };
+
+      (window as any).teleportToBuilding = (buildingId: string) => {
+        const building = this.buildings.get(buildingId);
+        if (building && this.currentPlayer) {
+          this.currentPlayer.setPosition(building.x, building.y + 50);
+          console.log(`🚀 Teleported to ${buildingId} at (${building.x}, ${building.y + 50})`);
+        } else {
+          console.log(`❌ Building ${buildingId} not found or no current player`);
+        }
+      };
       
       (window as any).debugPlayers = () => {
         console.log('👤 === PLAYER DEBUG INFO ===');
@@ -756,6 +815,9 @@ class MainScene extends Phaser.Scene {
       console.log('  🏗️ BUILDING DEBUGGING:');
       console.log('  - testBuildingVisibility(): Create test building shapes');
       console.log('  - debugAssets(): Check all loaded assets and textures');
+      console.log('  - debugBuildings(): Check building physics zones and interactions');
+      console.log('  - testBuildingTrigger(buildingId): Manually trigger building (corral, orchard, well)');
+      console.log('  - teleportToBuilding(buildingId): Teleport player to building entrance');
       console.log('  👤 PLAYER DEBUGGING:');
       console.log('  - debugPlayers(): Check player state and visibility');
       console.log('  - createTestPlayer(): Create test player shape');
@@ -903,29 +965,34 @@ class MainScene extends Phaser.Scene {
     // Just basic border walls to keep players in bounds
     const wallThickness = 32;
     
-    // Top wall
-    const topWall = this.add.rectangle(this.worldWidth / 2, -wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    // Top wall - Make visible as wooden fence border
+    const topWall = this.add.rectangle(this.worldWidth / 2, -wallThickness / 2, this.worldWidth, wallThickness, 0x8B4513, 0.8); // Brown fence
+    topWall.setStrokeStyle(2, 0x654321, 1.0); // Darker brown border
     this.physics.add.existing(topWall, true);
     walls.add(topWall);
     
-    // Bottom wall  
-    const bottomWall = this.add.rectangle(this.worldWidth / 2, this.worldHeight + wallThickness / 2, this.worldWidth, wallThickness, 0xff0000, 0);
+    // Bottom wall - Wooden fence
+    const bottomWall = this.add.rectangle(this.worldWidth / 2, this.worldHeight + wallThickness / 2, this.worldWidth, wallThickness, 0x8B4513, 0.8);
+    bottomWall.setStrokeStyle(2, 0x654321, 1.0);
     this.physics.add.existing(bottomWall, true);
     walls.add(bottomWall);
     
-    // Left wall
-    const leftWall = this.add.rectangle(-wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    // Left wall - Wooden fence
+    const leftWall = this.add.rectangle(-wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0x8B4513, 0.8);
+    leftWall.setStrokeStyle(2, 0x654321, 1.0);
     this.physics.add.existing(leftWall, true);
     walls.add(leftWall);
     
-    // Right wall
-    const rightWall = this.add.rectangle(this.worldWidth + wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0xff0000, 0);
+    // Right wall - Wooden fence
+    const rightWall = this.add.rectangle(this.worldWidth + wallThickness / 2, this.worldHeight / 2, wallThickness, this.worldHeight, 0x8B4513, 0.8);
+    rightWall.setStrokeStyle(2, 0x654321, 1.0);
     this.physics.add.existing(rightWall, true);
     walls.add(rightWall);
     
     // Store wall group for player collision detection
     this.invisibleWalls = walls;
     
+    console.log('🪵 Wooden fence boundaries created to keep players in world bounds');
   }
   
   private setupTilemapCollision(map: Phaser.Tilemaps.Tilemap, layer: Phaser.Tilemaps.TilemapLayer) {
@@ -1388,12 +1455,14 @@ class MainScene extends Phaser.Scene {
 
       this.sessionId = this.room.sessionId;
 
+      // Building collision detection is now set up immediately after player creation
+
       // Listen for state changes
       this.room.onStateChange((state) => {
         console.log('State changed, players:', state.players);
         
         // Make sure scene is initialized before handling players
-        if (!this.scene.isActive()) {
+        if (!this.scene || !this.scene.isActive()) {
           console.log('Scene not ready yet, skipping state update');
           return;
         }
@@ -1524,6 +1593,23 @@ class MainScene extends Phaser.Scene {
       
       if (isCurrentPlayer) {
         this.currentPlayer = playerObject;
+        
+        // Enable physics on the current player for building collision detection
+        this.physics.add.existing(this.currentPlayer);
+        if (this.currentPlayer.body) {
+          (this.currentPlayer.body as Phaser.Physics.Arcade.Body).setSize(32, 32);
+          (this.currentPlayer.body as Phaser.Physics.Arcade.Body).setOffset(-16, -16);
+        }
+        
+        // Set up wall collision to prevent player from leaving world bounds
+        if (this.invisibleWalls) {
+          this.physics.add.collider(this.currentPlayer, this.invisibleWalls);
+          console.log('🧱 Player collision with walls enabled');
+        }
+        
+        // Set up building interactions immediately after player physics is ready
+        this.setupBuildingCollisions();
+        
         // Start camera following the current player
         this.updateCameraFollow();
         console.log('📷 Camera now following current player');
@@ -1531,6 +1617,7 @@ class MainScene extends Phaser.Scene {
         console.log('🎮 Current player visible:', this.currentPlayer.visible);
         console.log('🎮 Current player alpha:', this.currentPlayer.alpha);
         console.log('🎮 Current player depth:', this.currentPlayer.depth);
+        console.log('⚡ Physics enabled on current player');
       }
       
       console.log('Added player:', sessionId, player.name, 'with character:', characterType);
@@ -1577,6 +1664,103 @@ class MainScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Set up physics-based collision detection between player and buildings
+   */
+  setupBuildingCollisions() {
+    if (!this.currentPlayer) {
+      console.log('⚠️ Cannot setup building collisions - no current player');
+      return;
+    }
+
+    // Create physics colliders for each building
+    this.buildingPhysicsZones.forEach((zone, buildingId) => {
+      // Set up overlap detection (not collision - we want to trigger, not block)
+      this.physics.add.overlap(this.currentPlayer, zone, () => {
+        this.triggerBuildingInteraction(buildingId);
+      });
+    });
+
+    console.log('🏗️ Building collision detection set up for', this.buildingPhysicsZones.size, 'buildings');
+  }
+
+  /**
+   * Check for building interactions manually (fallback method)
+   */
+  checkBuildingInteractions() {
+    if (!this.currentPlayer) return;
+
+    let currentlyInAnyZone = false;
+    let currentZoneId: string | undefined;
+
+    // Check all building zones to see if player is currently in any
+    this.buildingPhysicsZones.forEach((zone, buildingId) => {
+      // Use physics body bounds for more accurate collision detection
+      const playerBody = this.currentPlayer.body as Phaser.Physics.Arcade.Body;
+      const zoneBody = zone.body as Phaser.Physics.Arcade.StaticBody;
+      
+      if (playerBody && zoneBody) {
+        // Get physics body bounds instead of sprite bounds
+        const playerBounds = new Phaser.Geom.Rectangle(
+          playerBody.x, playerBody.y, playerBody.width, playerBody.height
+        );
+        const zoneBounds = new Phaser.Geom.Rectangle(
+          zoneBody.x, zoneBody.y, zoneBody.width, zoneBody.height
+        );
+
+        // Check if player overlaps with building zone
+        if (Phaser.Geom.Rectangle.Overlaps(playerBounds, zoneBounds)) {
+          currentlyInAnyZone = true;
+          currentZoneId = buildingId;
+          this.triggerBuildingInteraction(buildingId);
+        }
+      }
+    });
+
+    // Reset toggle if player has left all building zones
+    if (!currentlyInAnyZone && this.lastTriggeredBuilding) {
+      console.log(`🚪 Left building: ${this.lastTriggeredBuilding}`);
+      this.lastTriggeredBuilding = undefined;
+    }
+  }
+
+  /**
+   * Trigger building interaction with deduplication toggle
+   */
+  triggerBuildingInteraction(buildingId: string) {
+    // Only trigger if we're not already in this building (deduplication)
+    if (this.lastTriggeredBuilding === buildingId) {
+      return; // Already inside this building, don't re-trigger
+    }
+
+    const zone = this.buildingPhysicsZones.get(buildingId);
+    if (!zone) return;
+
+    const callback = zone.getData('callback');
+    const name = zone.getData('name');
+
+    if (callback && typeof callback === 'function') {
+      console.log(`🚪 Entering ${name}!`);
+      callback();
+      
+      // Mark this building as currently active (toggle on)
+      this.lastTriggeredBuilding = buildingId;
+    } else {
+      // Only log warning once per building to prevent spam
+      if (!this.loggedMissingCallbacks) {
+        this.loggedMissingCallbacks = new Set();
+      }
+      
+      if (!this.loggedMissingCallbacks.has(buildingId)) {
+        console.log(`⚠️ No callback found for building: ${buildingId}`);
+        this.loggedMissingCallbacks.add(buildingId);
+      }
+      
+      // Still mark as triggered to prevent repeated warnings
+      this.lastTriggeredBuilding = buildingId;
+    }
+  }
+
   update() {
     if (!this.room || !this.currentPlayer) return;
 
@@ -1584,6 +1768,11 @@ class MainScene extends Phaser.Scene {
     if (this.cropSystem) {
       this.cropSystem.update();
     }
+
+    // Building interactions now use toggle-based deduplication instead of cooldowns
+
+    // Check for building interactions
+    this.checkBuildingInteractions();
 
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;

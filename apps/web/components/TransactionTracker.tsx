@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useTransactions, useUI, TxStatus, CrossChainTx } from '../app/store';
 
 // Helper function to get explorer URL for transaction hash
@@ -108,10 +108,13 @@ interface TransactionCardProps {
 function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
   const [timeAgo, setTimeAgo] = useState('');
   
+  // Memoize the initial timestamp to prevent infinite re-renders
+  const initialTimestamp = useMemo(() => transaction.lastUpdated, [transaction.id]);
+  
   useEffect(() => {
     const updateTimeAgo = () => {
       const now = Date.now();
-      const diff = now - transaction.lastUpdated;
+      const diff = now - initialTimestamp;
       const seconds = Math.floor(diff / 1000);
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
@@ -129,7 +132,7 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
     const interval = setInterval(updateTimeAgo, 1000);
     
     return () => clearInterval(interval);
-  }, [transaction.lastUpdated]);
+  }, [initialTimestamp]);
   
   const getTransactionSteps = (tx: CrossChainTx) => {
     const baseSteps = [
