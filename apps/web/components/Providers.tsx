@@ -16,10 +16,20 @@ function HydrationBoundary({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (store) {
-      const rehydrateResult = store.persist.rehydrate();
-      if (rehydrateResult && typeof rehydrateResult.then === 'function') {
-        rehydrateResult.then(() => setIsHydrated(true));
-      } else {
+      try {
+        const rehydrateResult = store.persist.rehydrate();
+        if (rehydrateResult && typeof rehydrateResult.then === 'function') {
+          rehydrateResult
+            .then(() => setIsHydrated(true))
+            .catch((error) => {
+              console.warn('Hydration failed, continuing with default state:', error);
+              setIsHydrated(true);
+            });
+        } else {
+          setIsHydrated(true);
+        }
+      } catch (error) {
+        console.warn('Store rehydration error, using default state:', error);
         setIsHydrated(true);
       }
     }

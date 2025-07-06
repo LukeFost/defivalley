@@ -96,7 +96,10 @@ This starts:
 #### Beautiful Farming Experience
 1. **Start the farm**: `pnpm dev`
 2. **Enter DeFi Valley**: http://localhost:3000
-3. **Connect wallet**: Use email, social login, or crypto wallet
+3. **Connect your wallet**: Click the "Connect & Play" button in the top-right corner
+   - Choose from email, Google, Twitter, or external crypto wallets
+   - New users get an embedded wallet automatically created
+   - Access network switching, settings, and wallet details via the dropdown menu
 4. **Explore the farm**: Beautiful layered world with sky, grass, soil, and 32 organized farming plots
 5. **Meet other farmers**: See real players with unique character sprites and farming badges
 
@@ -104,9 +107,31 @@ This starts:
 - **Movement**: WASD or Arrow keys (with directional sprite animations)
 - **Chat**: Press Enter to open elegant chat interface
 - **Farming**: Click plots to plant USDC seeds (connects to real DeFi)
+- **Wallet Management**: Click your wallet button dropdown to:
+  - Switch between Saga (gaming) and Arbitrum (DeFi) networks
+  - View current wallet balance and address
+  - Access settings and logout options
+  - Monitor cross-chain transaction status
 - **Visual Elements**: Animated trees, swaying plants, farming paths, and cozy atmosphere
 - **Multiplayer**: Real-time player synchronization with deterministic character selection
 - **Character System**: 8 unique character types with persistent identity (see [Character System Docs](docs/CHARACTER_SYSTEM.md))
+
+#### Wallet Connection Flow
+1. **First Time Users**: 
+   - Click "Connect & Play" → Choose email or social login
+   - Embedded wallet automatically created and funded for gameplay
+   - No crypto experience required to start farming
+
+2. **Existing Crypto Users**:
+   - Click "Connect & Play" → Choose "Connect a wallet"
+   - Support for MetaMask, WalletConnect, Coinbase Wallet, and more
+   - Switch between Saga (gaming) and Arbitrum (DeFi) networks seamlessly
+
+3. **In-Game Wallet Features**:
+   - Top-right dropdown shows current network, balance, and address
+   - One-click network switching between gaming and DeFi layers
+   - Settings access for wallet management and preferences
+   - Real-time transaction status monitoring
 
 #### Network Multiplayer
 1. **Local farming**: Multiple browser tabs for testing
@@ -268,10 +293,16 @@ cd apps/server && pnpm dev  # Game server on port 2567
 3. For network play, share your IP address (check server logs)
 4. Use debug client: http://[YOUR_IP]:2567/test.html
 
+**Wallet Connection Issues**
+- If wallet button shows "Connect & Play", click it to authenticate
+- For embedded wallets, check that email verification was completed
+- For external wallets, ensure wallet extension is unlocked and connected
+- Use the dropdown menu to switch networks if transactions fail
+
 **Permission Errors**
 - Only farm owners can plant/harvest crops in their world
 - Visitors have read-only access to other players' farms
-- Check console for authentication errors
+- Check that you're connected with the correct wallet in the top-right dropdown
 
 **API Rate Limiting**
 - API endpoints limited to 100 requests per 15 minutes per IP

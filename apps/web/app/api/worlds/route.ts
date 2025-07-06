@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     });
     
     // Fetch active worlds from the Colyseus server
-    const response = await fetch(`http://localhost:2567/api/worlds?${queryParams}`, {
+    const gameServerUrl = process.env.GAME_SERVER_URL || 'http://localhost:2567';
+    const response = await fetch(`${gameServerUrl}/api/worlds?${queryParams}`, {
       headers: {
         'Content-Type': 'application/json',
       },
