@@ -136,8 +136,12 @@ export function usePunchSwap(tokenInAddress?: Address) {
       setError(null);
       setIsLoading(true);
 
-      // Create swap path (direct swap for now)
-      const path = [tokenIn, tokenOut];
+      // Explicitly define the WFLOW address
+      const WFLOW_ADDRESS = '0xd3bF53DAC106A0290B0483EcBC89d40FcC961f3e' as const;
+      const isNativeFlowIn = tokenIn === "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+
+      // Create swap path, ensuring WFLOW is used for native FLOW swaps
+      const path = isNativeFlowIn ? [WFLOW_ADDRESS, tokenOut] : [tokenIn, tokenOut];
       
       // Get expected output amounts
       const amounts = await getAmountsOut(amount, path);

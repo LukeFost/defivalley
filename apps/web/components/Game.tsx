@@ -12,12 +12,18 @@ import { BankBuilding } from '../lib/BankBuilding';
 import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { FlowBankBuilding } from '../lib/FlowBankBuilding';
 import { FlowMarketplaceBuilding } from '../lib/FlowMarketplaceBuilding';
+import { PepeBuilding } from '../lib/PepeBuilding';
+import { DialogueBox } from './DialogueBox';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { UIStack } from './UIStack';
 import { MorphoDepositModal } from './MorphoDepositModal';
 import { MarketplaceModal } from './MarketplaceModal';
+import { FlowSwapModal } from './FlowSwapModal';
+import { FlowStakingModal } from './FlowStakingModal';
+import { PepeModal } from './PepeModal';
 import { ConnectWalletButton } from './ConnectWalletButton';
+import { NetworkSelector } from './NetworkSelector';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAccount, useChainId } from 'wagmi';
@@ -61,6 +67,7 @@ class MainScene extends Phaser.Scene {
   private marketplaceBuilding!: MarketplaceBuilding;
   private flowBankBuilding?: FlowBankBuilding;
   private flowMarketplaceBuilding?: FlowMarketplaceBuilding;
+  private pepeBuilding?: PepeBuilding;
   private worldId?: string;
   private isOwnWorld?: boolean;
   private address?: string;
@@ -195,6 +202,9 @@ class MainScene extends Phaser.Scene {
 
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
+
+    // Create character-specific buildings (not tied to a network)
+    this.pepeBuilding = new PepeBuilding(this, 500, 800);
 
     // Set up input
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -1146,6 +1156,7 @@ class MainScene extends Phaser.Scene {
     this.marketplaceBuilding?.destroy();
     this.flowBankBuilding?.destroy();
     this.flowMarketplaceBuilding?.destroy();
+    // Note: Pepe building is not network-specific, so it's not destroyed here
 
     // Clear references
     this.bankBuilding = undefined as any;
@@ -1185,6 +1196,7 @@ class MainScene extends Phaser.Scene {
     this.events.removeAllListeners('marketplaceInteraction');
     this.events.removeAllListeners('flowBankInteraction');
     this.events.removeAllListeners('flowMarketplaceInteraction');
+    this.events.removeAllListeners('pepeInteraction');
   }
 
   async connectToServer() {
@@ -1431,6 +1443,12 @@ class MainScene extends Phaser.Scene {
       this.flowMarketplaceBuilding.checkInteraction();
     }
 
+    // Update Pepe building interactions (not network-specific)
+    if (this.pepeBuilding && this.currentPlayer) {
+      this.pepeBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
+      this.pepeBuilding.checkInteraction();
+    }
+
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
@@ -1443,7 +1461,7 @@ class MainScene extends Phaser.Scene {
     // Don't process movement if chat is active
     if (chatActive) return;
 
-    const speed = 6;
+    const speed = 9;
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
@@ -1594,6 +1612,10 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const [showMarketplaceModal, setShowMarketplaceModal] = useState(false);
   const [showFlowStakingModal, setShowFlowStakingModal] = useState(false);
   const [showFlowSwapModal, setShowFlowSwapModal] = useState(false);
+  const [showPepeModal, setShowPepeModal] = useState(false);
+  const [isDialogueOpen, setIsDialogueOpen] = useState(false);
+  const [dialogueContent, setDialogueContent] = useState('');
+  const [onDialogueContinue, setOnDialogueContinue] = useState<() => void>(() => {});
   
   // Get user authentication info
   const { user } = usePrivy();
@@ -1665,24 +1687,39 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         
         // Set up Katana building interaction listeners
         scene.events.on('bankInteraction', () => {
-          console.log('🏦 Opening Morpho deposit modal');
-          setShowMorphoModal(true);
+          console.log('🏦 Opening Morpho deposit modal via dialogue');
+          setDialogueContent('Welcome to the Katana Morpho Bank. Here you can deposit assets to earn yield. Would you like to proceed?');
+          setOnDialogueContinue(() => () => setShowMorphoModal(true));
+          setIsDialogueOpen(true);
         });
         
         scene.events.on('marketplaceInteraction', () => {
-          console.log('🏪 Opening marketplace modal');
-          setShowMarketplaceModal(true);
+          console.log('🏪 Opening marketplace modal via dialogue');
+          setDialogueContent('Welcome to the Katana Marketplace. You can swap tokens here using SushiSwap. Would you like to enter?');
+          setOnDialogueContinue(() => () => setShowMarketplaceModal(true));
+          setIsDialogueOpen(true);
         });
         
         // Set up Flow building interaction listeners
         scene.events.on('flowBankInteraction', () => {
-          console.log('🟠 Opening Flow staking modal');
-          setShowFlowStakingModal(true);
+          console.log('🟠 Opening Flow staking modal via dialogue');
+          setDialogueContent('This is the Flow Bank. You can stake FVIX tokens here to earn yield. Shall we go inside?');
+          setOnDialogueContinue(() => () => setShowFlowStakingModal(true));
+          setIsDialogueOpen(true);
         });
         
         scene.events.on('flowMarketplaceInteraction', () => {
-          console.log('🟣 Opening Flow swap modal');
-          setShowFlowSwapModal(true);
+          console.log('🟣 Opening Flow swap modal via dialogue');
+          setDialogueContent('Welcome to the Flow DeFi Hub. Here you can swap FLOW for other tokens needed for staking. Ready to trade?');
+          setOnDialogueContinue(() => () => setShowFlowSwapModal(true));
+          setIsDialogueOpen(true);
+        });
+
+        scene.events.on('pepeInteraction', () => {
+          console.log('🐸 Pepe interaction triggered!');
+          setDialogueContent("Feels good, man... Welcome to my pump launchpad. Want to create your own meme coin?");
+          setOnDialogueContinue(() => () => setShowPepeModal(true));
+          setIsDialogueOpen(true);
         });
       }
     }, 500);
@@ -1720,6 +1757,11 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  const handleDialogueContinue = () => {
+    setIsDialogueOpen(false);
+    onDialogueContinue();
+  };
 
   // Monitor chain changes and update buildings
   useEffect(() => {
@@ -1818,7 +1860,17 @@ function Game({ worldId, isOwnWorld }: GameProps) {
 
   return (
     <div className="game-wrapper">
-      <ConnectWalletButton />
+      <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
+        <ConnectWalletButton />
+        <NetworkSelector />
+      </div>
+
+      <DialogueBox
+        isOpen={isDialogueOpen}
+        content={dialogueContent}
+        onClose={() => setIsDialogueOpen(false)}
+        onContinue={handleDialogueContinue}
+      />
       
       <CropContextMenu
         onPlantCrop={handlePlantCrop}
@@ -1856,43 +1908,22 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         onClose={() => setShowMarketplaceModal(false)}
       />
 
-      {/* Flow Staking Modal (Placeholder) */}
-      {showFlowStakingModal && (
-        <div className="modal-overlay" onClick={() => setShowFlowStakingModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>🟠 Flow FVIX Staking</h2>
-              <button onClick={() => setShowFlowStakingModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p>Flow FVIX staking interface coming soon!</p>
-              <p>This will allow you to stake FVIX tokens to earn sFVIX yield.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Flow Staking Modal */}
+      <FlowStakingModal
+        isOpen={showFlowStakingModal}
+        onClose={() => setShowFlowStakingModal(false)}
+      />
 
-      {/* Flow Swap Modal (Placeholder) */}
-      {showFlowSwapModal && (
-        <div className="modal-overlay" onClick={() => setShowFlowSwapModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>🟣 Flow DeFi Hub</h2>
-              <button onClick={() => setShowFlowSwapModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p>Flow DeFi marketplace coming soon!</p>
-              <p>This will include:</p>
-              <ul>
-                <li>FLOW → FROTH swaps via PunchSwap</li>
-                <li>FROTH → FVIX conversion (10,000:1)</li>
-                <li>FVIX → sFVIX staking</li>
-                <li>Meme coin creation with PumpFlow</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Flow Swap Modal */}
+      <FlowSwapModal
+        isOpen={showFlowSwapModal}
+        onClose={() => setShowFlowSwapModal(false)}
+      />
+
+      <PepeModal
+        isOpen={showPepeModal}
+        onClose={() => setShowPepeModal(false)}
+      />
 
       <style jsx>{`
         .game-wrapper {
@@ -1900,6 +1931,17 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           width: 100%;
           height: 100%;
           background: transparent;
+        }
+
+        .top-right-ui {
+          position: fixed;
+          top: 1rem;
+          right: 1rem;
+          z-index: 1001;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.5rem;
         }
 
         #game-container {

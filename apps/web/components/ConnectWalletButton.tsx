@@ -26,20 +26,18 @@ export function ConnectWalletButton() {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <Button
-        onClick={handleClick}
-        variant={authenticated ? "outline" : "default"}
-        size="sm"
-        className="flex items-center gap-2 shadow-lg"
-      >
-        <Wallet className="h-4 w-4" />
-        {authenticated && address ? (
-          <span>{formatAddress(address)}</span>
-        ) : (
-          <span>Connect Wallet</span>
-        )}
-      </Button>
-    </div>
+    <Button
+      onClick={handleClick}
+      variant={authenticated ? "outline" : "default"}
+      size="sm"
+      className="flex items-center gap-2 shadow-lg"
+    >
+      <Wallet className="h-4 w-4" />
+      {authenticated && address ? (
+        <span>{formatAddress(address)}</span>
+      ) : (
+        <span>Connect Wallet</span>
+      )}
+    </Button>
   );
 }

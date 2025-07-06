@@ -87,6 +87,25 @@ const ANIMATION_PRESETS: Record<string, AnimationPreset> = {
       up: 2,        // Frame 2: Untitled_Artwork-3.png - facing down (no back view, use front)
     },
   },
+  pepe: {
+    frameWidth: 128,
+    frameHeight: 128,
+    scale: 0.5,
+    basePath: '/sprites/Pepe',
+    animations: {
+      // For now, we only have idle animation for Pepe
+    },
+    idleAtlas: {
+      file: '_idle_pepe/idle_pepe.png',
+      atlasFile: '_idle_pepe/idle_pepe.json',
+      frameMap: {
+        down: 'Untitled_Artwork-1.png',
+        up: 'Untitled_Artwork-1.png',
+        left: 'Untitled_Artwork-1.png',
+        right: 'Untitled_Artwork-1.png',
+      }
+    }
+  }
 } as const;
 
 // Helper function to create animation configuration from presets
@@ -131,6 +150,7 @@ function createCharacterConfig(name: string, preset: keyof typeof ANIMATION_PRES
 // Character definitions using the new configuration system
 export const CharacterDefinitions: Record<string, CharacterConfiguration> = {
   cowboy: createCharacterConfig('cowboy', 'cowboy'),
+  pepe: createCharacterConfig('pepe', 'pepe'),
 };
 
 
