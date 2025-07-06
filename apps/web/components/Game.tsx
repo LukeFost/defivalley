@@ -1295,14 +1295,14 @@ class MainScene extends Phaser.Scene {
     // Check if chat is active by looking for active input elements
     const chatActive = document.querySelector('.chat-input:focus') !== null;
     
-    // Don't process movement if chat is active
-    if (chatActive) return;
-
-    // Handle O key for stomp animation
-    if (Phaser.Input.Keyboard.JustDown(this.oKey)) {
+    // Handle O key for stomp animation (only when chat is not active)
+    if (!chatActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
       this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
       console.log('🦶 Stomp animation triggered!');
     }
+    
+    // Don't process movement if chat is active
+    if (chatActive) return;
 
     const speed = 6;
     let moved = false;
