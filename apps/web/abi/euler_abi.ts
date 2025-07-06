@@ -449,7 +449,7 @@ export const euler_swap_evc_address =
 export const weth_vault_address = "0x859160DB5841E5cfB8D3f144C6b3381A85A4b410";
 export const usdc_vault_address = "0x0A1a3b5f2041F33522C4efc754a7D096f880eE16";
 
-const ievault_abi = [
+export const ievault_abi = [
   {
     type: "function",
     name: "EVC",
@@ -1233,7 +1233,7 @@ const ievault_abi = [
   },
 ] as const;
 
-const ievc_abi = [
+export const ievc_abi = [
   { type: "constructor", inputs: [], stateMutability: "nonpayable" },
   { type: "receive", stateMutability: "payable" },
   {

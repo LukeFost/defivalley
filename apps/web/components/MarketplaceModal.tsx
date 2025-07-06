@@ -15,8 +15,9 @@ import { ShoppingBag, Package, Coins, ArrowDownUp, Loader2, AlertCircle, Refresh
 import { useSushiSwap } from '@/hooks/useSushiSwap';
 import { parseUnits, formatUnits, formatEther, type Address } from 'viem';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { KATANA_TOKENS } from '@/constants/katana-tokens';
+import { BASE_TOKENS, BASE_CHAIN_ID } from '@/constants/base-tokens';
 import { useWrapETH } from '@/hooks/useWrapETH';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 
@@ -25,12 +26,24 @@ interface MarketplaceModalProps {
   onClose: () => void;
 }
 
-// Token addresses on Katana
-const TOKENS = {
-  vbUSDC: KATANA_TOKENS.vbUSDC, // Bridged USDC for Morpho
-  vbETH: KATANA_TOKENS.vbETH,   // Bridged ETH
-  WETH: KATANA_TOKENS.WETH,     // IWETH on Katana
-  AUSDC: KATANA_TOKENS.AgoraUSD, // Agora USD
+// Network-specific token configurations
+const getNetworkTokens = (chainId: number) => {
+  if (chainId === BASE_CHAIN_ID) {
+    // Base network tokens - only WETH and USDC
+    return {
+      WETH: BASE_TOKENS.WETH,
+      USDC: BASE_TOKENS.USDC,
+      // No vbWETH or vbUSDC on Base
+    };
+  } else {
+    // Katana network tokens
+    return {
+      vbUSDC: KATANA_TOKENS.vbUSDC, // Bridged USDC for Morpho
+      vbETH: KATANA_TOKENS.vbETH,   // Bridged ETH
+      WETH: KATANA_TOKENS.WETH,     // IWETH on Katana
+      AUSDC: KATANA_TOKENS.AgoraUSD, // Agora USD
+    };
+  }
 };
 
 type TabType = 'menu' | 'swap' | 'wrap';
@@ -40,9 +53,34 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
   const [swapAmount, setSwapAmount] = useState('');
   const [wrapAmount, setWrapAmount] = useState('');
   const [wrapMode, setWrapMode] = useState(true); // true = wrap ETH to WETH, false = unwrap
-  const [tokenIn, setTokenIn] = useState<Address>(TOKENS.vbETH);
-  const [tokenOut, setTokenOut] = useState<Address>(TOKENS.vbUSDC);
+  const [customAddress, setCustomAddress] = useState('');
+  const [showCustomAddress, setShowCustomAddress] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
   const { address } = useAccount();
+  const chainId = useChainId();
+  
+  // Get network-specific tokens
+  const TOKENS = getNetworkTokens(chainId);
+  const isBaseNetwork = chainId === BASE_CHAIN_ID;
+  
+  // Initialize token pair based on network
+  const [tokenIn, setTokenIn] = useState<Address>(
+    isBaseNetwork ? TOKENS.WETH : (TOKENS as any).vbETH
+  );
+  const [tokenOut, setTokenOut] = useState<Address>(
+    isBaseNetwork ? TOKENS.USDC : (TOKENS as any).vbUSDC
+  );
+  // Helper function to get token decimals
+  const getTokenDecimals = (token: Address) => {
+    if (isBaseNetwork) {
+      if (token === TOKENS.WETH) return 18;
+      if (token === TOKENS.USDC) return 6;
+      // Custom tokens default to 18
+      return 18;
+    }
+    return (token === TOKENS.WETH || token === (TOKENS as any).vbETH) ? 18 : 6;
+  };
+
   const { 
     swap, 
     isLoading, 
@@ -72,15 +110,24 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
     refetchVbETH
   } = useWrapETH();
 
-  // Get token balances
-  const { balance: vbEthBalance, refetch: refetchVbEthBalance } = useTokenBalance(TOKENS.vbETH, address);
-  const { balance: vbUsdcBalance, refetch: refetchVbUsdcBalance } = useTokenBalance(TOKENS.vbUSDC, address);
-  const { balance: agoraUsdBalance, refetch: refetchAgoraUsdBalance } = useTokenBalance(TOKENS.AUSDC, address);
+  // Get token balances (network-aware)
+  const { balance: vbEthBalance, refetch: refetchVbEthBalance } = useTokenBalance(
+    isBaseNetwork ? undefined : (TOKENS as any).vbETH, 
+    address
+  );
+  const { balance: vbUsdcBalance, refetch: refetchVbUsdcBalance } = useTokenBalance(
+    isBaseNetwork ? TOKENS.USDC : (TOKENS as any).vbUSDC, 
+    address
+  );
+  const { balance: agoraUsdBalance, refetch: refetchAgoraUsdBalance } = useTokenBalance(
+    isBaseNetwork ? undefined : (TOKENS as any).AUSDC, 
+    address
+  );
 
   // Effect to handle live quotes
   useEffect(() => {
     if (activeTab === 'swap' && swapAmount && parseFloat(swapAmount) > 0) {
-      const decimals = (tokenIn === TOKENS.WETH || tokenIn === TOKENS.vbETH) ? 18 : 6;
+      const decimals = getTokenDecimals(tokenIn);
       const amount = parseUnits(swapAmount, decimals);
       console.log("Starting live quotes with amount:", amount.toString());
       startLiveQuotes(tokenIn, tokenOut, amount, 0.5);
@@ -116,7 +163,7 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
   const swapAmountBigInt = useMemo(() => {
     if (!swapAmount || parseFloat(swapAmount) <= 0) return BigInt(0);
     try {
-      const decimals = (tokenIn === TOKENS.WETH || tokenIn === TOKENS.vbETH) ? 18 : 6;
+      const decimals = getTokenDecimals(tokenIn);
       return parseUnits(swapAmount, decimals);
     } catch {
       return BigInt(0);
@@ -220,65 +267,98 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
 
   const swapButtonState = getSwapButtonState();
 
+  // Helper function to get token display name
+  const getTokenName = (address: Address): string => {
+    if (isBaseNetwork) {
+      if (address === TOKENS.WETH) return 'WETH';
+      if (address === TOKENS.USDC) return 'USDC';
+      return 'Custom Token';
+    } else {
+      if (address === (TOKENS as any).vbUSDC) return 'vbUSDC';
+      if (address === (TOKENS as any).vbETH) return 'vbETH';
+      if (address === TOKENS.WETH) return 'WETH';
+      if (address === (TOKENS as any).AUSDC) return 'Agora USD';
+      return 'Unknown';
+    }
+  };
+
+  // Handle cat click for flip animation
+  const handleCatClick = () => {
+    setIsFlipping(true);
+    setTimeout(() => setIsFlipping(false), 1000); // Reset after animation
+  };
+
   const renderMenu = () => (
     <div className="grid gap-4 py-4">
+      <div className="text-center mb-2">
+        <h3 className="text-lg font-semibold text-amber-900">Cat Merchant's Wares</h3>
+        <p className="text-sm text-amber-700">*purrs* What can I trade for you today?</p>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Button
           variant="outline"
-          className="h-24 flex-col gap-2"
+          className="h-24 flex-col gap-2 border-amber-400 hover:bg-amber-100 hover:border-amber-500"
           onClick={() => setActiveTab('swap')}
         >
-          <ArrowDownUp className="h-6 w-6" />
-          <div className="text-sm">Token Swap</div>
-          <div className="text-xs text-muted-foreground">Trade tokens via SushiSwap</div>
+          <ArrowDownUp className="h-6 w-6 text-amber-600" />
+          <div className="text-sm text-amber-900">Token Exchange</div>
+          <div className="text-xs text-amber-700">Trade magical tokens</div>
         </Button>
 
         <Button
           variant="outline"
-          className="h-24 flex-col gap-2"
+          className="h-24 flex-col gap-2 border-amber-400 hover:bg-amber-100 hover:border-amber-500"
           onClick={() => setActiveTab('wrap')}
         >
-          <RefreshCw className="h-6 w-6" />
-          <div className="text-sm">Wrap/Unwrap ETH</div>
-          <div className="text-xs text-muted-foreground">Convert ETH ↔ WETH</div>
+          <RefreshCw className="h-6 w-6 text-amber-600" />
+          <div className="text-sm text-amber-900">Essence Wrapping</div>
+          <div className="text-xs text-amber-700">Transform ETH essence</div>
         </Button>
 
         <Button
           variant="outline"
-          className="h-24 flex-col gap-2 opacity-50 cursor-not-allowed"
+          className="h-24 flex-col gap-2 border-amber-300 bg-amber-50 opacity-60 cursor-not-allowed"
           disabled
         >
-          <Package className="h-6 w-6" />
-          <div className="text-sm">Buy Seeds</div>
-          <div className="text-xs text-muted-foreground">Coming soon</div>
+          <Package className="h-6 w-6 text-amber-500" />
+          <div className="text-sm text-amber-700">Mystical Seeds</div>
+          <div className="text-xs text-amber-600">*yawns* Later...</div>
         </Button>
 
         <Button
           variant="outline"
-          className="h-24 flex-col gap-2 opacity-50 cursor-not-allowed"
+          className="h-24 flex-col gap-2 border-amber-300 bg-amber-50 opacity-60 cursor-not-allowed"
           disabled
         >
-          <Coins className="h-6 w-6" />
-          <div className="text-sm">Sell Harvest</div>
-          <div className="text-xs text-muted-foreground">Coming soon</div>
+          <Coins className="h-6 w-6 text-amber-500" />
+          <div className="text-sm text-amber-700">Harvest Exchange</div>
+          <div className="text-xs text-amber-600">*stretches* Soon...</div>
         </Button>
       </div>
     </div>
   );
 
   const renderSwap = () => {
+    // Validate if address is a valid Ethereum address
+    const isValidAddress = (addr: string): boolean => {
+      return /^0x[a-fA-F0-9]{40}$/.test(addr);
+    };
+
     // Get balance for selected token
     const getTokenBalance = (token: Address) => {
-      if (token === TOKENS.WETH) return wethBalance;
-      if (token === TOKENS.vbETH) return vbEthBalance;
-      if (token === TOKENS.vbUSDC) return vbUsdcBalance;
-      if (token === TOKENS.AUSDC) return agoraUsdBalance;
+      if (!isBaseNetwork) {
+        if (token === TOKENS.WETH) return wethBalance;
+        if (token === (TOKENS as any).vbETH) return vbEthBalance;
+        if (token === (TOKENS as any).vbUSDC) return vbUsdcBalance;
+        if (token === (TOKENS as any).AUSDC) return agoraUsdBalance;
+      } else {
+        // Base network
+        if (token === TOKENS.WETH) return wethBalance;
+        if (token === TOKENS.USDC) return vbUsdcBalance; // Using same hook for USDC
+      }
       return BigInt(0);
     };
 
-    const getTokenDecimals = (token: Address) => {
-      return (token === TOKENS.WETH || token === TOKENS.vbETH) ? 18 : 6;
-    };
 
     const tokenInBalance = getTokenBalance(tokenIn);
     const tokenInDecimals = getTokenDecimals(tokenIn);
@@ -287,28 +367,77 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
 
     return (
     <div className="grid gap-4 py-4">
+      <div className="text-center mb-2">
+        <h3 className="text-lg font-semibold text-amber-900">Token Exchange Ritual</h3>
+        <p className="text-sm text-amber-700">*meows knowingly* Choose your tokens wisely...</p>
+      </div>
       {/* Token In Selection */}
       <div className="grid gap-2">
         <div className="flex justify-between items-center">
-          <Label>From</Label>
-          <span className="text-sm text-muted-foreground">
-            Balance: {formatUnits(tokenInBalance, tokenInDecimals).slice(0, 8)}
+          <Label className="text-amber-900">Trade Away</Label>
+          <span className="text-sm text-amber-700">
+            You Have: {formatUnits(tokenInBalance, tokenInDecimals).slice(0, 8)}
           </span>
         </div>
-        <select 
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={tokenIn}
-          onChange={(e) => setTokenIn(e.target.value as Address)}
-        >
-          <option value={TOKENS.vbETH}>vbETH (Bridged ETH)</option>
-          <option value={TOKENS.WETH}>WETH</option>
-          <option value={TOKENS.vbUSDC}>vbUSDC (Bridged USDC)</option>
-          <option value={TOKENS.AUSDC}>Agora USD</option>
-        </select>
+        {isBaseNetwork ? (
+          <div className="space-y-2">
+            <select 
+              className="flex h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 focus:border-amber-500"
+              value={showCustomAddress ? 'custom' : tokenIn}
+              onChange={(e) => {
+                if (e.target.value === 'custom') {
+                  setShowCustomAddress(true);
+                } else {
+                  setShowCustomAddress(false);
+                  setTokenIn(e.target.value as Address);
+                }
+              }}
+            >
+              <option value={TOKENS.WETH}>Wrapped Ether (WETH)</option>
+              <option value={TOKENS.USDC}>USD Coin (USDC)</option>
+              <option value="custom">Custom Address...</option>
+            </select>
+            {showCustomAddress && (
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="0x..."
+                  value={customAddress}
+                  onChange={(e) => setCustomAddress(e.target.value)}
+                  className="text-xs border-amber-400 bg-amber-50"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (isValidAddress(customAddress)) {
+                      setTokenIn(customAddress as Address);
+                      setShowCustomAddress(false);
+                    }
+                  }}
+                  disabled={!isValidAddress(customAddress)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                >
+                  Use
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <select 
+            className="flex h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 focus:border-amber-500"
+            value={tokenIn}
+            onChange={(e) => setTokenIn(e.target.value as Address)}
+          >
+            <option value={(TOKENS as any).vbETH}>Ethereal Essence (vbETH)</option>
+            <option value={TOKENS.WETH}>Wrapped Ether (WETH)</option>
+            <option value={(TOKENS as any).vbUSDC}>Stable Coins (vbUSDC)</option>
+            <option value={(TOKENS as any).AUSDC}>Golden Currency (Agora USD)</option>
+          </select>
+        )}
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="amount">Amount</Label>
+        <Label htmlFor="amount" className="text-amber-900">Amount to Trade</Label>
         <div className="relative">
           <Input
             id="amount"
@@ -318,7 +447,7 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
             onChange={(e) => setSwapAmount(e.target.value)}
             step="0.01"
             min="0"
-            className="pr-16"
+            className="pr-16 border-amber-400 bg-amber-50 text-amber-900 placeholder:text-amber-600 focus:border-amber-500"
           />
           <Button
             type="button"
@@ -355,89 +484,100 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
       {/* Token Out Selection */}
       <div className="grid gap-2">
         <div className="flex justify-between items-center">
-          <Label>To</Label>
-          <span className="text-sm text-muted-foreground">
-            Balance: {formatUnits(tokenOutBalance, tokenOutDecimals).slice(0, 8)}
+          <Label className="text-amber-900">Receive</Label>
+          <span className="text-sm text-amber-700">
+            You Have: {formatUnits(tokenOutBalance, tokenOutDecimals).slice(0, 8)}
           </span>
         </div>
-        <select 
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={tokenOut}
-          onChange={(e) => setTokenOut(e.target.value as Address)}
-        >
-          <option value={TOKENS.vbUSDC}>vbUSDC (for Morpho deposits)</option>
-          <option value={TOKENS.vbETH}>vbETH (Bridged ETH)</option>
-          <option value={TOKENS.WETH}>WETH</option>
-          <option value={TOKENS.AUSDC}>Agora USD</option>
-        </select>
+        {isBaseNetwork ? (
+          <select 
+            className="flex h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 focus:border-amber-500"
+            value={tokenOut}
+            onChange={(e) => setTokenOut(e.target.value as Address)}
+          >
+            <option value={TOKENS.USDC}>USD Coin (USDC)</option>
+            <option value={TOKENS.WETH}>Wrapped Ether (WETH)</option>
+          </select>
+        ) : (
+          <select 
+            className="flex h-10 w-full rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 focus:border-amber-500"
+            value={tokenOut}
+            onChange={(e) => setTokenOut(e.target.value as Address)}
+          >
+            <option value={(TOKENS as any).vbUSDC}>Stable Coins (for magical deposits)</option>
+            <option value={(TOKENS as any).vbETH}>Ethereal Essence (vbETH)</option>
+            <option value={TOKENS.WETH}>Wrapped Ether (WETH)</option>
+            <option value={(TOKENS as any).AUSDC}>Golden Currency (Agora USD)</option>
+          </select>
+        )}
       </div>
 
       {/* Live Quote Display */}
       {currentQuote && (
-        <div className="rounded-lg border bg-muted/10 p-4">
+        <div className="rounded-lg border border-amber-400 bg-amber-50 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Live Quote</span>
+            <span className="text-sm font-medium text-amber-900">Cat's Price Oracle</span>
             <div className="flex items-center gap-1">
               {isQuoteStale ? (
-                <Clock className="h-3 w-3 text-orange-500" />
+                <Clock className="h-3 w-3 text-orange-600" />
               ) : (
-                <CheckCircle className="h-3 w-3 text-green-500" />
+                <CheckCircle className="h-3 w-3 text-green-600" />
               )}
-              <span className="text-xs text-muted-foreground">
-                {isQuoteStale ? 'Stale' : 'Live'}
+              <span className="text-xs text-amber-700">
+                {isQuoteStale ? '*sleepy*' : '*alert*'}
               </span>
             </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-muted-foreground">Expected Output:</span>
-              <div className="font-medium">
+              <span className="text-amber-700">You'll Receive:</span>
+              <div className="font-medium text-amber-900">
                 {formatUnits(
                   currentQuote.expectedOutput, 
-                  (tokenOut === TOKENS.WETH || tokenOut === TOKENS.vbETH) ? 18 : 6
+                  getTokenDecimals(tokenOut)
                 ).slice(0, 8)} {getTokenName(tokenOut)}
               </div>
             </div>
             <div>
-              <span className="text-muted-foreground">Price Impact:</span>
-              <div className={`font-medium ${currentQuote.priceImpact > 5 ? 'text-red-500' : 'text-green-500'}`}>
+              <span className="text-amber-700">Trade Cost:</span>
+              <div className={`font-medium ${currentQuote.priceImpact > 5 ? 'text-red-600' : 'text-green-600'}`}>
                 {currentQuote.priceImpact.toFixed(2)}%
               </div>
             </div>
           </div>
           
-          <div className="mt-2 text-xs text-muted-foreground">
-            Updated {new Date(currentQuote.timestamp).toLocaleTimeString()}
+          <div className="mt-2 text-xs text-amber-600">
+            Last updated: {new Date(currentQuote.timestamp).toLocaleTimeString()}
           </div>
         </div>
       )}
 
       {/* Approval Status */}
       {tokenIn !== TOKENS.vbETH && swapAmount && parseFloat(swapAmount) > 0 && (
-        <div className="rounded-lg border bg-blue-50 dark:bg-blue-900/10 p-3">
+        <div className="rounded-lg border border-amber-400 bg-amber-50 p-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">SushiSwap Approval</span>
+            <span className="text-sm font-medium text-amber-900">Cat's Trading License</span>
             {isLoadingSushiAllowance ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
             ) : (
               <span className="text-sm">
                 {(() => {
                   const needsApproval = checkApprovalNeeded(swapAmountBigInt);
                   return needsApproval ? (
-                    <span className="text-orange-600">⚠ Approval Required</span>
+                    <span className="text-orange-600">⚠ Permission Needed</span>
                   ) : (
-                    <span className="text-green-600">✓ Approved</span>
+                    <span className="text-green-600">✓ Ready to Trade</span>
                   );
                 })()}
               </span>
             )}
           </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Current allowance: {formatUnits(sushiAllowance, (tokenIn === TOKENS.WETH || tokenIn === TOKENS.vbETH) ? 18 : 6).slice(0, 8)}
+          <div className="text-xs text-amber-700 mt-1">
+            Current permission: {formatUnits(sushiAllowance, (tokenIn === TOKENS.WETH || tokenIn === TOKENS.vbETH) ? 18 : 6).slice(0, 8)}
           </div>
-          <div className="text-xs text-muted-foreground">
-            Spender: {routeProcessorAddress}
+          <div className="text-xs text-amber-600">
+            Trading through: {routeProcessorAddress}
           </div>
         </div>
       )}
@@ -453,22 +593,24 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
         <Button
           variant="outline"
           onClick={() => setActiveTab('menu')}
-          className="flex-1"
+          className="flex-1 border-amber-400 text-amber-900 hover:bg-amber-100"
         >
-          Back
+          Back to Shop
         </Button>
         <Button
           onClick={swapButtonState.action || (() => {})}
           disabled={swapButtonState.disabled}
           className={`flex-1 ${
             swapButtonState.text === 'Approve for SushiSwap' ? 'bg-orange-500 hover:bg-orange-600' : 
-            'bg-primary hover:bg-primary/90'
+            'bg-amber-600 hover:bg-amber-700 text-white'
           }`}
         >
           {(isSushiApproving || isLoading) && (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           )}
-          {swapButtonState.text}
+          {swapButtonState.text === 'Approve for SushiSwap' ? 'Get Permission' : 
+           swapButtonState.text === 'Swap' ? 'Trade with Cat' : 
+           swapButtonState.text}
         </Button>
       </div>
     </div>
@@ -477,6 +619,10 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
 
   const renderWrap = () => (
     <div className="grid gap-4 py-4">
+      <div className="text-center mb-2">
+        <h3 className="text-lg font-semibold text-amber-900">Essence Transformation</h3>
+        <p className="text-sm text-amber-700">*purrs mystically* Let me wrap your ethereal energies...</p>
+      </div>
       <div className="flex justify-center mb-2">
         <div className="inline-flex rounded-md shadow-sm" role="group">
           <button
@@ -484,8 +630,8 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
             onClick={() => setWrapMode(true)}
             className={`px-4 py-2 text-sm font-medium rounded-l-lg border ${
               wrapMode
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-foreground border-input hover:bg-accent'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-amber-50 text-amber-900 border-amber-400 hover:bg-amber-100'
             }`}
           >
             Wrap ETH
@@ -495,8 +641,8 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
             onClick={() => setWrapMode(false)}
             className={`px-4 py-2 text-sm font-medium rounded-r-lg border ${
               !wrapMode
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-foreground border-input hover:bg-accent'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-amber-50 text-amber-900 border-amber-400 hover:bg-amber-100'
             }`}
           >
             Unwrap WETH
@@ -505,8 +651,8 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="wrapAmount">
-          {wrapMode ? 'ETH Amount to Wrap' : 'WETH Amount to Unwrap'}
+        <Label htmlFor="wrapAmount" className="text-amber-900">
+          {wrapMode ? 'ETH Essence to Wrap' : 'WETH Essence to Unwrap'}
         </Label>
         <div className="relative">
           <Input
@@ -517,7 +663,7 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
             onChange={(e) => setWrapAmount(e.target.value)}
             step="0.01"
             min="0"
-            className="pr-16"
+            className="pr-16 border-amber-400 bg-amber-50 text-amber-900 placeholder:text-amber-600 focus:border-amber-500"
           />
           <Button
             type="button"
@@ -540,24 +686,24 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
         </div>
       </div>
 
-      <div className="text-sm text-muted-foreground text-center">
+      <div className="text-sm text-amber-700 text-center italic">
         {wrapMode 
-          ? 'Convert native ETH to WETH (Wrapped ETH) for use in DeFi protocols'
-          : 'Convert WETH back to native ETH for gas payments'
+          ? '*meows softly* Transform your raw ETH into wrapped essence for magical protocols'
+          : '*stretches paws* Unwrap your essence back to pure ETH for gas rituals'
         }
       </div>
 
       {/* Balance Display */}
       <div className="flex justify-between text-sm">
         <div>
-          <span className="text-muted-foreground">ETH Balance: </span>
-          <span className="font-medium">
+          <span className="text-amber-700">ETH Essence: </span>
+          <span className="font-medium text-amber-900">
             {isLoadingBalances ? '...' : formatEther(ethBalance).slice(0, 8)}
           </span>
         </div>
         <div>
-          <span className="text-muted-foreground">WETH Balance: </span>
-          <span className="font-medium">
+          <span className="text-amber-700">WETH Essence: </span>
+          <span className="font-medium text-amber-900">
             {isLoadingBalances ? '...' : formatEther(wethBalance).slice(0, 8)}
           </span>
         </div>
@@ -574,9 +720,9 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
         <Button
           variant="outline"
           onClick={() => setActiveTab('menu')}
-          className="flex-1"
+          className="flex-1 border-amber-400 text-amber-900 hover:bg-amber-100"
         >
-          Back
+          Back to Shop
         </Button>
         <Button
           onClick={async () => {
@@ -594,12 +740,12 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
             }
           }}
           disabled={!address || !wrapAmount || parseFloat(wrapAmount) <= 0 || isWrapping || isUnwrapping}
-          className="flex-1"
+          className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
         >
           {(isWrapping || isUnwrapping) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isWrapping || isUnwrapping 
-            ? (isWrapping ? 'Wrapping...' : 'Unwrapping...') 
-            : (wrapMode ? 'Wrap ETH' : 'Unwrap WETH')
+            ? (isWrapping ? '*transforming...*' : '*unwrapping...*') 
+            : (wrapMode ? 'Transform Essence' : 'Release Essence')
           }
         </Button>
       </div>
@@ -607,44 +753,134 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5" />
-            Marketplace
-          </DialogTitle>
-          <DialogDescription>
-            {activeTab === 'menu' 
-              ? 'Trade items, swap tokens, and manage your farm economy'
-              : activeTab === 'swap'
-              ? 'Swap your ETH to vbUSDC for Morpho deposits. Use SushiSwap DEX aggregator for best rates.'
-              : 'Wrap ETH to WETH or unwrap WETH back to ETH'
-            }
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {/* Custom CSS for cat animations */}
+      <style jsx>{`
+        @keyframes levitate {
+          0%, 100% {
+            transform: translateY(0px) translateX(-50%);
+          }
+          25% {
+            transform: translateY(-25px) translateX(-50%);
+          }
+          50% {
+            transform: translateY(-30px) translateX(-50%);
+          }
+          75% {
+            transform: translateY(-25px) translateX(-50%);
+          }
+        }
+        
+        @keyframes flip {
+          0% {
+            transform: translateY(-20px) translateX(-50%) rotateY(0deg);
+          }
+          25% {
+            transform: translateY(-60px) translateX(-50%) rotateY(90deg);
+          }
+          50% {
+            transform: translateY(-80px) translateX(-50%) rotateY(180deg);
+          }
+          75% {
+            transform: translateY(-60px) translateX(-50%) rotateY(270deg);
+          }
+          100% {
+            transform: translateY(-20px) translateX(-50%) rotateY(360deg);
+          }
+        }
+        
+        .cat-container {
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .cat-container:hover {
+          filter: brightness(1.1);
+        }
+      `}</style>
+      
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[1200px] p-0 bg-transparent border-0 shadow-none">
+        {/* Shop Interior Background - 2.5x larger */}
+        <div 
+          className="relative w-full h-[1000px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden"
+          style={{
+            backgroundImage: 'url(/shop_inside.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          {/* Euler Cat - sandwiched between background and foreground - 2x larger and higher with enhanced levitation */}
+          <div 
+            className="absolute top-[30%] left-[50%] transform -translate-x-1/2 w-64 h-64 bg-contain bg-no-repeat z-10 cat-container"
+            onClick={handleCatClick}
+            style={{
+              backgroundImage: 'url(/euler_cat.png)',
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              animation: isFlipping 
+                ? 'flip 1s ease-in-out' 
+                : 'levitate 4s ease-in-out infinite'
+            }}
+          />
+          
+          {/* Shop Foreground - sits in front of the cat */}
+          <div 
+            className="absolute inset-0 w-full h-full bg-contain bg-no-repeat z-15 pointer-events-none"
+            style={{
+              backgroundImage: 'url(/shop_forground.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          />
+          
+          {/* Overlay for better content readability */}
+          <div className="absolute inset-0 bg-black/15 backdrop-blur-[0.5px] z-16" />
+          
+          {/* Dialog Content */}
+          <div className="relative z-20 p-8 h-full flex flex-col">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="flex items-center gap-2 text-amber-900 text-2xl font-bold drop-shadow-md">
+                <ShoppingBag className="h-8 w-8 text-amber-700" />
+                Euler Cat's Trading Post
+              </DialogTitle>
+              <DialogDescription className="text-amber-800 font-medium drop-shadow-sm text-lg">
+                {activeTab === 'menu' 
+                  ? 'Welcome! The Euler Cat has rare DeFi tokens for trade.'
+                  : activeTab === 'swap'
+                  ? 'Trade your tokens with the mystical Euler Cat using ancient swap magic.'
+                  : 'Transform your ethereal currencies with the Euler Cat\'s magical wrapping powers.'
+                }
+              </DialogDescription>
+            </DialogHeader>
 
-        {activeTab === 'menu' ? renderMenu() : activeTab === 'swap' ? renderSwap() : renderWrap()}
+            {/* Spacer to position content below the table */}
+            <div className="flex-1" />
 
-        {activeTab === 'menu' && (
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
+            {/* Content Area positioned below the table in the shop - text-like appearance */}
+            <div className="bg-amber-50/95 backdrop-blur-sm rounded-lg border-2 border-amber-500 shadow-lg p-6 max-h-[500px] overflow-y-auto text-left">
+              {activeTab === 'menu' ? renderMenu() : activeTab === 'swap' ? renderSwap() : renderWrap()}
+            </div>
+
+            {activeTab === 'menu' && (
+              <div className="flex justify-end mt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={onClose}
+                  className="bg-amber-100 border-amber-400 text-amber-900 hover:bg-amber-200 shadow-md text-lg px-6 py-3"
+                >
+                  Leave Shop
+                </Button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
 // Helper function to get token display name
-function getTokenName(address: Address): string {
-  switch (address) {
-    case TOKENS.vbUSDC: return 'vbUSDC';
-    case TOKENS.vbETH: return 'vbETH';
-    case TOKENS.WETH: return 'WETH';
-    case TOKENS.AUSDC: return 'Agora USD';
-    default: return 'Unknown';
-  }
-}
+// This function needs to be moved inside the component
+// It will be replaced with a proper implementation inside the component

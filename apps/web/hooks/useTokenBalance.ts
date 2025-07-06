@@ -2,6 +2,7 @@
 
 import { useReadContract } from 'wagmi';
 import { type Address } from 'viem';
+import { BASE_CHAIN_ID } from '@/constants/base-tokens';
 
 // Simple ERC20 ABI for balance checking
 const erc20Abi = [
@@ -20,9 +21,10 @@ export function useTokenBalance(tokenAddress: Address | undefined, userAddress: 
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: userAddress ? [userAddress] : undefined,
-    chainId: 747474, // Katana chain ID
+    chainId: BASE_CHAIN_ID, // Base chain ID
     query: {
       enabled: !!tokenAddress && !!userAddress,
+      refetchInterval: 10000, // Refresh every 10 seconds for live balance updates
     },
   });
 

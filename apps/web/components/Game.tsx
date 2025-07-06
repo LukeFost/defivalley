@@ -14,11 +14,14 @@ import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { UIStack } from './UIStack';
 import { MorphoDepositModal } from './MorphoDepositModal';
+import { BankModal } from './BankModal';
 import { MarketplaceModal } from './MarketplaceModal';
 import { ConnectWalletButton } from './ConnectWalletButton';
+import { NetworkSwitch } from './NetworkSwitch';
 import { RoomOptions } from '../types/colyseus.types';
 import { usePrivy } from '@privy-io/react-auth';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
+import { BASE_CHAIN_ID } from '@/constants/base-tokens';
 
 interface GameState {
   players: Map<string, {
@@ -150,7 +153,7 @@ class MainScene extends Phaser.Scene {
     });
     
     // Load the tileset for world decoration
-    this.load.image('cliffs_grass_tileset', '/tilesets/LPC_cliffs_grass.png');
+    this.load.image('cliffs_grass_tileset', '/tilesets/green.png');
     
     // Load bank building sprite
     this.load.image('bank', '/bank.png');
@@ -502,6 +505,88 @@ class MainScene extends Phaser.Scene {
         console.log('Created cropped test tile at center-right (should be green)');
       };
       
+      (window as any).testFullTileset = () => {
+        console.log('🎨 Testing full tileset rendering...');
+        
+        // Create a large test tile showing the entire tileset
+        const fullTile = this.add.image(400, 300, 'cliffs_grass_tileset');
+        fullTile.setDisplaySize(256, 256);
+        fullTile.setDepth(1000);
+        console.log('Created full 256x256 tileset preview at center');
+        
+        // Create grid of smaller tiles to test different regions
+        for (let y = 0; y < 4; y++) {
+          for (let x = 0; x < 4; x++) {
+            const testTile = this.add.image(200 + x * 40, 150 + y * 40, 'cliffs_grass_tileset');
+            testTile.setCrop(x * 64, y * 64, 64, 64);
+            testTile.setDisplaySize(32, 32);
+            testTile.setDepth(1000);
+          }
+        }
+        console.log('Created 4x4 grid showing different regions of tileset');
+      };
+
+      (window as any).showGreenTile = () => {
+        console.log('🟢 Creating simple green tile test...');
+        
+        // Clear any test tiles
+        this.children.list.filter(child => child.getData && child.getData('testTile')).forEach(tile => tile.destroy());
+        
+        // Create a simple tile in the middle of the screen
+        const greenTile = this.add.image(400, 300, 'cliffs_grass_tileset');
+        greenTile.setDisplaySize(128, 128);
+        greenTile.setDepth(10000);
+        greenTile.setData('testTile', true);
+        console.log('✅ Created 128x128 green tile at center of screen');
+        console.log('If you see a green square, the tileset is loading correctly!');
+        console.log('If you see nothing, the tileset failed to load.');
+      };
+      
+      (window as any).testTileset = () => {
+        console.log('🎮 === TILESET IMPLEMENTATION TEST ===');
+        
+        // Check if tileset is loaded
+        const texture = this.textures.get('cliffs_grass_tileset');
+        console.log('✅ Tileset texture loaded:', texture ? 'YES' : 'NO');
+        if (texture) {
+          console.log(`📐 Tileset dimensions: ${texture.source[0].width}x${texture.source[0].height}`);
+        }
+        
+        // Check tilemap configuration
+        console.log(`⚙️ Config: ${TilesetConfig.image.width}x${TilesetConfig.image.height}, ${TilesetConfig.image.tilesPerRow} tiles/row`);
+        console.log(`🎯 Available tile types: ${Object.keys(TilesetConfig.tiles).length}`);
+        
+        // Check rendered tiles
+        const tiles = this.children.list.filter(child => child.getData && child.getData('tileType'));
+        console.log(`🗺️ Rendered tiles: ${tiles.length}`);
+        
+        if (tiles.length > 0) {
+          // Sample a few different tile types
+          const sampleTiles = tiles.slice(0, 5).map(tile => ({
+            type: (tile as any).getData('tileType'),
+            x: (tile as any).x,
+            y: (tile as any).y,
+            crop: (tile as any).frame
+          }));
+          console.log('📋 Sample tiles:', sampleTiles);
+        }
+        
+        // Test different tile types
+        console.log('🧪 Testing different tile types...');
+        const testTypes = ['grass_main', 'cliff_tall_1', 'grass_cliff_left'];
+        testTypes.forEach((tileType, i) => {
+          const config = TilesetConfig.tiles[tileType];
+          if (config) {
+            const testTile = this.add.image(100 + i * 40, 50, 'cliffs_grass_tileset');
+            testTile.setCrop(config.x, config.y, config.width, config.height);
+            testTile.setDisplaySize(32, 32);
+            testTile.setDepth(1000);
+            testTile.setData('testTile', true);
+            console.log(`  ${tileType}: crop(${config.x}, ${config.y}, ${config.width}, ${config.height})`);
+          }
+        });
+      };
+      
       console.log('🛠️ Dev tools available:');
       console.log('  - resetMyCharacter(): Reset character selection');
       console.log('  - toggleDebugMode(): Show/hide terrain debug overlay');
@@ -514,6 +599,10 @@ class MainScene extends Phaser.Scene {
       console.log('  🔍 TILEMAP DEBUGGING:');
       console.log('  - debugTilemap(): Complete tilemap diagnostic');
       console.log('  - testTileVisibility(): Test basic tile rendering');
+      console.log('  - testFullTileset(): Display full 256x256 tileset');
+      console.log('  - showGreenTile(): Simple test - shows a green tile in center');
+      console.log('  🎮 NEW TILESET DEBUGGING:');
+      console.log('  - testTileset(): Test the new green.png tileset implementation');
     }
   }
   
@@ -581,8 +670,8 @@ class MainScene extends Phaser.Scene {
     const mapWidth = this.terrainLayout[0].length;
     const mapHeight = this.terrainLayout.length;
     
-    // TODO: Implement createTilesFromLayout method for terrain refresh
-    // this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
+    // Recreate tiles from the updated layout
+    this.createTilesFromLayout(tileSize, mapWidth, mapHeight);
     this.addTerrainDecorations(tileSize, mapWidth, mapHeight);
     
     // Update debug overlay if active
@@ -593,10 +682,99 @@ class MainScene extends Phaser.Scene {
   }
 
   createFarmingWorld() {
-    // Use simple farm background with invisible walls (fast hackathon approach)
-    this.createSimpleFarmBackground();
+    // Generate terrain layout using the tilemap system
+    this.generateProceduralTerrain();
     
-    // No additional overlays needed - simple and fast!
+    // Create invisible walls for boundaries
+    this.createInvisibleWalls();
+  }
+
+  generateProceduralTerrain() {
+    console.log('🌍 Starting generateProceduralTerrain...');
+    
+    // Set world dimensions for a farm area
+    this.worldWidth = 1600;
+    this.worldHeight = 1200;
+    
+    // Generate terrain layout using the tilemap utility
+    const mapWidth = Math.floor(this.worldWidth / TilesetConfig.image.tileSize);
+    const mapHeight = Math.floor(this.worldHeight / TilesetConfig.image.tileSize);
+    
+    console.log(`📐 Map dimensions: ${mapWidth}x${mapHeight} tiles`);
+    
+    // Generate the terrain layout
+    this.terrainLayout = TilemapUtils.generateTerrainLayout(mapWidth, mapHeight);
+    this.mapLayout = this.terrainLayout; // Keep both for backward compatibility
+    
+    console.log(`📋 Terrain layout generated, first row:`, this.terrainLayout[0]?.slice(0, 5));
+    
+    // Initialize collision map
+    this.initializeCollisionMap();
+    
+    // Render the tiles from the layout
+    this.createTilesFromLayout(TilesetConfig.image.tileSize, mapWidth, mapHeight);
+    
+    console.log(`🗺️ Generated terrain: ${mapWidth}x${mapHeight} tiles (${this.worldWidth}x${this.worldHeight} pixels)`);
+  }
+
+  createTilesFromLayout(tileSize: number, mapWidth: number, mapHeight: number) {
+    console.log('🎨 Creating tiles from layout...');
+    
+    // Clear any existing tiles
+    this.children.each((child) => {
+      if (child.getData && child.getData('tileType')) {
+        child.destroy();
+      }
+    });
+    this.cliffTiles = [];
+    
+    let tilesCreated = 0;
+    
+    // Create tiles based on the terrain layout
+    for (let y = 0; y < mapHeight && y < this.terrainLayout.length; y++) {
+      for (let x = 0; x < mapWidth && x < this.terrainLayout[y].length; x++) {
+        const tileType = this.terrainLayout[y][x];
+        const worldPos = TilemapUtils.tileToWorld(x, y, tileSize);
+        
+        // Get tile configuration for proper cropping
+        const tileConfig = TilesetConfig.tiles[tileType];
+        if (!tileConfig) {
+          console.warn(`Unknown tile type: ${tileType}, using grass_main`);
+          continue;
+        }
+        
+        // Create tile image using the tileset
+        const tile = this.add.image(worldPos.x, worldPos.y, 'cliffs_grass_tileset');
+        
+        // Crop the tile to the correct region of the tileset
+        tile.setCrop(tileConfig.x, tileConfig.y, tileConfig.width, tileConfig.height);
+        
+        // Set tile properties
+        tile.setDisplaySize(tileSize, tileSize);
+        tile.setOrigin(0.5, 0.5);
+        tile.setDepth(0); // Base terrain layer
+        
+        // Store tile metadata
+        tile.setData('tileType', tileType);
+        tile.setData('tileX', x);
+        tile.setData('tileY', y);
+        
+        // Add to cliff tiles array for collision detection
+        if (this.isTileSolid(tileType)) {
+          this.cliffTiles.push(tile);
+        }
+        
+        tilesCreated++;
+      }
+    }
+    
+    console.log(`✅ Created ${tilesCreated} tiles using green.png tileset`);
+    console.log(`🗺️ Tileset: ${TilesetConfig.image.width}x${TilesetConfig.image.height}, tiles per row: ${TilesetConfig.image.tilesPerRow}`);
+    console.log(`🎨 Available tile types: ${Object.keys(TilesetConfig.tiles).length}`);
+    
+    if (tilesCreated === 0) {
+      console.error('❌ NO TILES WERE CREATED! Check terrain layout generation.');
+    }
   }
 
   createMinimalStructure() {
@@ -616,39 +794,6 @@ class MainScene extends Phaser.Scene {
     gridGraphics.strokePath();
   }
 
-  createSimpleFarmBackground() {
-    
-    // Set world dimensions for a farm area
-    this.worldWidth = 1600;
-    this.worldHeight = 1200;
-    
-    // Create simple farm background using graphics
-    this.createFarmBackgroundGraphics();
-    
-    // Create invisible collision walls for farm boundaries and obstacles
-    this.createInvisibleWalls();
-    
-  }
-  
-  createFarmBackgroundGraphics() {
-    // Create ultra-simple grass background
-    const grassBackground = this.add.graphics();
-    grassBackground.setDepth(-10); // Behind everything
-    
-    // Simple grass field (nice green)
-    grassBackground.fillStyle(0x4A7C59, 1); // Forest green
-    grassBackground.fillRect(0, 0, this.worldWidth, this.worldHeight);
-    
-    // Add minimal texture with subtle darker green patches
-    grassBackground.fillStyle(0x355E3B, 0.2); // Very subtle darker green
-    for (let i = 0; i < 20; i++) {
-      const x = Math.random() * this.worldWidth;
-      const y = Math.random() * this.worldHeight;
-      const size = 30 + Math.random() * 60;
-      grassBackground.fillCircle(x, y, size);
-    }
-    
-  }
   
   createInvisibleWalls() {
     
@@ -1505,11 +1650,20 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
   const [showMorphoModal, setShowMorphoModal] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
   const [showMarketplaceModal, setShowMarketplaceModal] = useState(false);
   
   // Get user authentication info
   const { user } = usePrivy();
   const { address } = useAccount();
+  const chainId = useChainId();
+
+  // Console log network changes
+  useEffect(() => {
+    console.log('🌐 Network changed - Chain ID:', chainId);
+    const networkName = chainId === BASE_CHAIN_ID ? 'Base' : chainId === 747474 ? 'Katana' : 'Unknown';
+    console.log(`🌐 Current network: ${networkName} (${chainId})`);
+  }, [chainId]);
 
   useEffect(() => {
     // Calculate dimensions based on viewport minus bottom bar
@@ -1522,7 +1676,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       width: gameWidth,
       height: gameHeight,
       parent: 'game-container',
-      backgroundColor: '#87CEEB',
+      backgroundColor: '#FF0000', // Red to make tiles visible
       scene: MainScene,
       physics: {
         default: 'arcade',
@@ -1571,8 +1725,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         
         // Set up bank interaction event listener
         scene.events.on('bankInteraction', () => {
-          console.log('🏦 Opening Morpho deposit modal');
-          setShowMorphoModal(true);
+          console.log('🏦 Bank interaction triggered, chain ID:', chainId);
+          if (chainId === BASE_CHAIN_ID) {
+            console.log('🏦 Opening Euler Bank modal (Base network)');
+            setShowBankModal(true);
+          } else {
+            console.log('🏦 Opening Morpho Deposit modal (Katana network)');
+            setShowMorphoModal(true);
+          }
         });
         
         // Set up marketplace interaction event listener
@@ -1707,6 +1867,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   return (
     <div className="game-wrapper">
       <ConnectWalletButton />
+      <NetworkSwitch />
       
       <CropContextMenu
         onPlantCrop={handlePlantCrop}
@@ -1730,6 +1891,12 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       <CropInfo 
         crop={selectedCrop} 
         onClose={() => setSelectedCrop(null)} 
+      />
+
+      {/* Bank Modal */}
+      <BankModal
+        isOpen={showBankModal}
+        onClose={() => setShowBankModal(false)}
       />
 
       {/* Morpho Deposit Modal */}

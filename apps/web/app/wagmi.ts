@@ -1,5 +1,5 @@
 import { http, createConfig, cookieStorage, createStorage } from 'wagmi'
-import { arbitrumSepolia } from 'wagmi/chains'
+import { arbitrumSepolia, base } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 
 // Define Saga Chainlet custom chain
@@ -69,7 +69,7 @@ export const katanaChain = {
 
 // Wagmi configuration
 export const config = createConfig({
-  chains: [sagaChainlet, arbitrumSepolia, katanaChain],
+  chains: [sagaChainlet, arbitrumSepolia, katanaChain, base],
   connectors: [
     injected(),
     walletConnect({
@@ -80,6 +80,7 @@ export const config = createConfig({
     [sagaChainlet.id]: http(),
     [arbitrumSepolia.id]: http(),
     [katanaChain.id]: http(),
+    [base.id]: http(),
   },
   ssr: true,
   storage: createStorage({

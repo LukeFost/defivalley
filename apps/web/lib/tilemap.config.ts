@@ -12,69 +12,67 @@ export interface TileConfig {
   collision: boolean;
 }
 
-// Corrected tile index mapping for Phaser Tilemap system
-// LPC tileset: 288px wide = 9 tiles per row (288/32=9)
-// Index = (row * 9) + col, counting left-to-right, top-to-bottom from 0
+// Simplified tile index mapping for green.png tileset
+// Green tileset: 32px wide = 1 tile per row (32/32=1)
+// Single grass tile at index 0
 export const TileIndexMap = {
-  // Row 0 (y=0): Cliff formations
-  cliff_tall_1: 0,    // (0,0) = (0*9)+0 = 0
-  cliff_tall_2: 1,    // (32,0) = (0*9)+1 = 1  
-  cliff_round: 2,     // (64,0) = (0*9)+2 = 2 (64x64, top-left index)
-  cliff_large: 4,     // (128,0) = (0*9)+4 = 4 (64x64, top-left index)
-  cliff_small: 6,     // (192,0) = (0*9)+6 = 6
-  cliff_thin: 7,      // (224,0) = (0*9)+7 = 7
+  // Single grass tile - all terrain types use the same green tile
+  grass_main: 0,
+  grass_pure: 0,
+  grass_with_cliff_base: 0,
+  grass_cliff_left: 0,
+  grass_cliff_right: 0,
+  grass_cliff_bottom: 0,
   
-  // Row 2 (y=64): Grass-cliff transitions
-  grass_cliff_left: 18,    // (0,64) = (2*9)+0 = 18
-  grass_cliff_right: 19,   // (32,64) = (2*9)+1 = 19  
-  grass_cliff_bottom: 20,  // (64,96) = (3*9)+2 = 29, but let's use simpler transition
+  // Cliffs also use grass tile (no collision for simplified version)
+  cliff_tall_1: 0,
+  cliff_tall_2: 0,
+  cliff_round: 0,
+  cliff_large: 0,
+  cliff_small: 0,
+  cliff_thin: 0,
   
-  // Row 2-3: Main grass areas  
-  grass_main: 21,     // (96,80) = (2*9)+3 = 21 (approximately, using row 2 col 3)
-  grass_pure: 22,     // (128,80) = (2*9)+4 = 22 
-  grass_with_cliff_base: 23, // Use next available grass variant
-  
-  // Decorations
-  ladder: 25,         // (224,64) = (2*9)+7 = 25
-  sticks: 26,         // (256,64) = (2*9)+8 = 26  
-  rocks_brown: 45,    // (0,160) = (5*9)+0 = 45
-  rocks_dark: 46,     // (32,160) = (5*9)+1 = 46
+  // Decorations use grass tile
+  ladder: 0,
+  sticks: 0,
+  rocks_brown: 0,
+  rocks_dark: 0,
 } as const;
 
 export const TilesetConfig = {
-  // Tileset image dimensions and tile size
+  // Tileset image dimensions and tile size (updated for green.png)
   image: {
-    width: 288,
-    height: 224,
+    width: 256,
+    height: 256,
     tileSize: 32,
-    tilesPerRow: 9  // 288 / 32 = 9 tiles per row
+    tilesPerRow: 8  // 256/32 = 8 tiles per row
   },
 
-  // Define specific tile regions from the tileset (actual pixel coordinates)
+  // Define specific tile regions from the tileset (using different areas of 256x256 green.png)
   tiles: {
-    // Main grass areas from the large middle section
-    grass_main: { x: 96, y: 80, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_main },
-    grass_pure: { x: 128, y: 80, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_pure },
-    grass_with_cliff_base: { x: 160, y: 120, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_with_cliff_base },
+    // Grass variants using different tiles from the tileset
+    grass_main: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_main },
+    grass_pure: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_pure },
+    grass_with_cliff_base: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_with_cliff_base },
     
-    // Cliff formations from top row (correct heights)
-    cliff_tall_1: { x: 0, y: 0, width: 32, height: 64, type: 'cliff', collision: true, index: TileIndexMap.cliff_tall_1 },
-    cliff_tall_2: { x: 32, y: 0, width: 32, height: 64, type: 'cliff', collision: true, index: TileIndexMap.cliff_tall_2 },
-    cliff_round: { x: 64, y: 0, width: 64, height: 64, type: 'cliff', collision: true, index: TileIndexMap.cliff_round },
-    cliff_large: { x: 128, y: 0, width: 64, height: 64, type: 'cliff', collision: true, index: TileIndexMap.cliff_large },
-    cliff_small: { x: 192, y: 0, width: 32, height: 32, type: 'cliff', collision: true, index: TileIndexMap.cliff_small },
-    cliff_thin: { x: 224, y: 0, width: 32, height: 64, type: 'cliff', collision: true, index: TileIndexMap.cliff_thin },
+    // Cliff formations use grass tile (no collision for simplified version)
+    cliff_tall_1: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_tall_1 },
+    cliff_tall_2: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_tall_2 },
+    cliff_round: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_round },
+    cliff_large: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_large },
+    cliff_small: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_small },
+    cliff_thin: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.cliff_thin },
     
     // Grass areas with natural cliff transitions
-    grass_cliff_left: { x: 0, y: 64, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_left },
-    grass_cliff_right: { x: 32, y: 64, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_right },
-    grass_cliff_bottom: { x: 64, y: 96, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_bottom },
+    grass_cliff_left: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_left },
+    grass_cliff_right: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_right },
+    grass_cliff_bottom: { x: 0, y: 0, width: 32, height: 32, type: 'grass', collision: false, index: TileIndexMap.grass_cliff_bottom },
     
-    // Decorative elements  
-    ladder: { x: 224, y: 64, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.ladder },
-    sticks: { x: 256, y: 64, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.sticks },
-    rocks_brown: { x: 0, y: 160, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.rocks_brown },
-    rocks_dark: { x: 32, y: 160, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.rocks_dark },
+    // Decorative elements use grass tile
+    ladder: { x: 0, y: 0, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.ladder },
+    sticks: { x: 0, y: 0, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.sticks },
+    rocks_brown: { x: 0, y: 0, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.rocks_brown },
+    rocks_dark: { x: 0, y: 0, width: 32, height: 32, type: 'decoration', collision: false, index: TileIndexMap.rocks_dark },
   } as Record<string, TileConfig & { index: number }>,
 
   // Terrain patterns for different areas (updated with correct tile names)
@@ -86,11 +84,11 @@ export const TilesetConfig = {
     decorations: ['ladder', 'sticks', 'rocks_brown', 'rocks_dark']
   },
 
-  // Collision layers (updated with correct tile names)
+  // Collision layers (updated for green.png - all tiles are walkable grass)
   collisionLayers: {
-    cliffs: ['cliff_tall_1', 'cliff_tall_2', 'cliff_round', 'cliff_large', 'cliff_small', 'cliff_thin'],
-    walkable: ['grass_main', 'grass_pure', 'grass_with_cliff_base', 'grass_cliff_left', 'grass_cliff_right', 'grass_cliff_bottom'],
-    decorative: ['ladder', 'sticks', 'rocks_brown', 'rocks_dark']
+    cliffs: [], // No collision tiles in simplified version
+    walkable: ['grass_main', 'grass_pure', 'grass_with_cliff_base', 'grass_cliff_left', 'grass_cliff_right', 'grass_cliff_bottom', 'cliff_tall_1', 'cliff_tall_2', 'cliff_round', 'cliff_large', 'cliff_small', 'cliff_thin', 'ladder', 'sticks', 'rocks_brown', 'rocks_dark'], // All tiles are walkable
+    decorative: [] // No special decorative layer
   }
 };
 
