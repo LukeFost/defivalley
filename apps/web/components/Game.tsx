@@ -244,18 +244,23 @@ class MainScene extends Phaser.Scene {
     this.inputManager = new InputManager(
       this,
       this.playerManager,
-      this.collisionManager,
-      this.networkManager
+      this.collisionManager
     );
+    
+    // Setup input through InputManager
+    this.inputManager.setupInput();
     
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
     
     // Compute collision grid after terrain and buildings are created
-    this.computeCollisionGrid();
+    if (this.collisionManager) {
+      this.collisionManager.computeCollisionGrid(this.terrainLayout);
+    } else {
+      this.computeCollisionGrid();
+    }
 
-
-    // Set up input
+    // Set up additional keys not handled by InputManager (for legacy support)
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
     this.oKey = this.input.keyboard!.addKey('O');
@@ -1484,11 +1489,6 @@ class MainScene extends Phaser.Scene {
         
         // Set up camera to follow current player
         this.updateCameraFollow();
-        
-        // Pass current player to InputManager
-        if (this.inputManager) {
-          this.inputManager.setCurrentPlayer(this.currentPlayer);
-        }
       }
       return;
     }

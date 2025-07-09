@@ -25,44 +25,42 @@ export class InputManager {
     const currentPlayer = this.playerManager.getCurrentPlayer();
     if (!currentPlayer) return;
 
+    // Check if input is initialized
+    if (!this.cursors || !this.wasd) return;
+
     // Speed scaled up to compensate for delta time multiplication
     const speed = GameConfig.PLAYER_SPEED;
     const moveDistance = speed * (delta / 1000);
-    let moved = false;
-    let newX = currentPlayer.x;
-    let newY = currentPlayer.y;
+    let direction: string | null = null;
 
+    // Check for movement input
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX - moveDistance, newY)) {
-        newX -= moveDistance;
-        moved = true;
-        this.lastDirection = 'left';
-      }
+      direction = 'left';
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX + moveDistance, newY)) {
-        newX += moveDistance;
-        moved = true;
-        this.lastDirection = 'right';
-      }
-    }
-
-    if (this.cursors.up.isDown || this.wasd.W.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX, newY - moveDistance)) {
-        newY -= moveDistance;
-        moved = true;
-        this.lastDirection = 'up';
-      }
+      direction = 'right';
+    } else if (this.cursors.up.isDown || this.wasd.W.isDown) {
+      direction = 'up';
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX, newY + moveDistance)) {
-        newY += moveDistance;
-        moved = true;
-        this.lastDirection = 'down';
-      }
+      direction = 'down';
     }
 
-    if (moved) {
-      this.playerManager.movePlayer(this.lastDirection as any, 0); // Speed is handled here
-      currentPlayer.setPosition(newX, newY);
+    if (direction) {
+      // Calculate the new position based on direction
+      let newX = currentPlayer.x;
+      let newY = currentPlayer.y;
+
+      switch (direction) {
+        case 'left': newX -= moveDistance; break;
+        case 'right': newX += moveDistance; break;
+        case 'up': newY -= moveDistance; break;
+        case 'down': newY += moveDistance; break;
+      }
+
+      // Check collision for the new position
+      if (!this.collisionManager.isPositionSolid(newX, newY)) {
+        this.playerManager.movePlayer(direction as any, moveDistance);
+        this.lastDirection = direction;
+      }
     } else {
       this.playerManager.stopPlayer();
     }

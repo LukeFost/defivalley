@@ -106,7 +106,35 @@ export class PlayerManager {
     }
   }
 
+  public updatePlayerDirection(direction: 'left' | 'right' | 'up' | 'down'): void {
+    if (this.currentPlayer) {
+      this.currentPlayer.updateDirection(direction);
+    }
+  }
+
+  public updatePlayerMovement(isMoving: boolean): void {
+    if (this.currentPlayer) {
+      this.currentPlayer.updateMovementState(isMoving);
+    }
+  }
+
+  public syncNetworkPosition(x: number, y: number): void {
+    const now = performance.now();
+    if (now - this.lastPlayerSync > GameConfig.NETWORK_UPDATE_INTERVAL) {
+      this.networkManager.send('move', { x, y });
+      this.lastPlayerSync = now;
+    }
+  }
+
   public getCurrentPlayer(): Player | undefined {
     return this.currentPlayer;
+  }
+
+  public getPlayer(sessionId: string): Player | undefined {
+    return this.players.get(sessionId);
+  }
+
+  public update(time: number): void {
+    // Currently empty - network sync is handled in other methods
   }
 }
