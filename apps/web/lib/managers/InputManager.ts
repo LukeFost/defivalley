@@ -23,10 +23,16 @@ export class InputManager {
 
   public update(delta: number): void {
     const currentPlayer = this.playerManager.getCurrentPlayer();
-    if (!currentPlayer) return;
+    if (!currentPlayer) {
+      console.log('[InputManager] No current player found');
+      return;
+    }
 
     // Check if input is initialized
-    if (!this.cursors || !this.wasd) return;
+    if (!this.cursors || !this.wasd) {
+      console.log('[InputManager] Keyboard controls not initialized');
+      return;
+    }
 
     // Check if UI element is active (prevent movement when typing)
     const activeElement = document.activeElement;
@@ -58,6 +64,8 @@ export class InputManager {
     }
 
     if (direction) {
+      console.log(`[InputManager] Key pressed: ${direction}, delta: ${delta}, moveDistance: ${moveDistance}`);
+      
       // Calculate the new position based on direction
       let newX = currentPlayer.x;
       let newY = currentPlayer.y;
@@ -71,8 +79,11 @@ export class InputManager {
 
       // Check collision for the new position
       if (!this.collisionManager.isPositionSolid(newX, newY)) {
+        console.log(`[InputManager] Moving player: direction=${direction}, distance=${moveDistance}`);
         this.playerManager.movePlayer(direction as any, moveDistance);
         this.lastDirection = direction;
+      } else {
+        console.log(`[InputManager] Collision detected at (${newX}, ${newY})`);
       }
     } else {
       this.playerManager.stopPlayer();

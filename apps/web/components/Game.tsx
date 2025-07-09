@@ -1269,8 +1269,8 @@ class MainScene extends Phaser.Scene {
     const oldChainId = this.currentChainId;
     this.currentChainId = chainId;
     
-    // If chain ID changed, recreate buildings
-    if (oldChainId !== chainId) {
+    // If chain ID changed and BuildingManager is ready, recreate buildings
+    if (oldChainId !== chainId && this.buildingManager) {
       this.createNetworkSpecificBuildings();
     }
   }
@@ -1315,8 +1315,9 @@ class MainScene extends Phaser.Scene {
         this.computeCollisionGrid();
       }
     } else {
-      // Fallback to old implementation if manager not available
-      console.error('BuildingManager not initialized');
+      // BuildingManager not yet initialized - this can happen during early initialization
+      console.warn('BuildingManager not initialized yet, skipping building creation');
+      // Buildings will be created when create() method completes
     }
   }
 
