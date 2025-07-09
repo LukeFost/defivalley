@@ -95,6 +95,10 @@ class MainScene extends Phaser.Scene {
   private lastBuildingCheck: number = 0;
   private lastCropUpdate: number = 0;
   private lastPlayerSync: number = 0;
+  
+  // Pre-computed collision grid for performance
+  private collisionGrid: boolean[][] = [];
+  private tileSize: number = 32;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -224,6 +228,9 @@ class MainScene extends Phaser.Scene {
 
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
+    
+    // Compute collision grid after terrain and buildings are created
+    this.computeCollisionGrid();
 
 
     // Set up input
@@ -1282,6 +1289,9 @@ class MainScene extends Phaser.Scene {
 
     // Set up event listeners for new buildings
     this.setupBuildingEventListeners();
+    
+    // Recompute collision grid when buildings change
+    this.computeCollisionGrid();
   }
 
   setupBuildingEventListeners() {
@@ -1549,14 +1559,14 @@ class MainScene extends Phaser.Scene {
 
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       const potentialX = Math.max(20, newX - speed);
-      if (!this.checkPlayerCollision(potentialX, newY)) {
+      if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         newDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
       const potentialX = Math.min(this.worldWidth - 20, newX + speed);
-      if (!this.checkPlayerCollision(potentialX, newY)) {
+      if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         newDirection = 'right';
@@ -1565,14 +1575,14 @@ class MainScene extends Phaser.Scene {
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       const potentialY = Math.max(20, newY - speed);
-      if (!this.checkPlayerCollision(newX, potentialY)) {
+      if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         newDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
       const potentialY = newY + speed;
-      if (!this.checkPlayerCollision(newX, potentialY)) {
+      if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         newDirection = 'down';
@@ -1613,6 +1623,101 @@ class MainScene extends Phaser.Scene {
         building.checkInteraction();
       }
     }
+  }
+
+  private markBuildingCollisions(gridHeight: number, gridWidth: number) {
+    const buildings = [
+      this.bankBuilding,
+      this.marketplaceBuilding, 
+      this.flowBankBuilding,
+      this.flowMarketplaceBuilding,
+      this.pepeBuilding
+    ];
+
+    for (const building of buildings) {
+      if (building && building.getCollisionBounds) {
+        const bounds = building.getCollisionBounds();
+        const startTile = TilemapUtils.worldToTile(bounds.x, bounds.y, this.tileSize);
+        const endTile = TilemapUtils.worldToTile(bounds.right, bounds.bottom, this.tileSize);
+
+        for (let y = startTile.y; y <= endTile.y; y++) {
+          for (let x = startTile.x; x <= endTile.x; x++) {
+            if (y >= 0 && y < gridHeight && x >= 0 && x < gridWidth) {
+              this.collisionGrid[y][x] = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private computeCollisionGrid() {
+    // If using simple background without terrain layout, create a basic grid
+    if (this.terrainLayout.length === 0) {
+      // Create grid based on world dimensions
+      const gridWidth = Math.ceil(this.worldWidth / this.tileSize);
+      const gridHeight = Math.ceil(this.worldHeight / this.tileSize);
+      this.collisionGrid = Array.from({ length: gridHeight }, () => Array(gridWidth).fill(false));
+      
+      // Just mark buildings as collision areas
+      this.markBuildingCollisions(gridHeight, gridWidth);
+      console.log('Collision grid computed for simple world (buildings only).');
+      return;
+    }
+    
+    const height = this.terrainLayout.length;
+    const width = this.terrainLayout[0].length;
+    this.collisionGrid = Array.from({ length: height }, () => Array(width).fill(false));
+
+    // 1. Mark terrain collisions
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (TilemapUtils.hasCollision(this.terrainLayout[y][x])) {
+          this.collisionGrid[y][x] = true;
+        }
+      }
+    }
+
+    // 2. Mark building collisions
+    this.markBuildingCollisions(height, width);
+    
+    console.log('Collision grid computed for optimized performance.');
+  }
+
+  private isPositionSolid(worldX: number, worldY: number): boolean {
+    if (this.collisionGrid.length === 0) {
+      // Fallback to old collision detection if grid not computed
+      return this.checkTileCollision(worldX, worldY);
+    }
+
+    const tileCoords = TilemapUtils.worldToTile(worldX, worldY, this.tileSize);
+    if (tileCoords.y < 0 || tileCoords.y >= this.collisionGrid.length || 
+        tileCoords.x < 0 || tileCoords.x >= this.collisionGrid[0].length) {
+      return true; // Out of bounds is solid
+    }
+
+    return this.collisionGrid[tileCoords.y][tileCoords.x];
+  }
+
+  private checkPlayerCollisionOptimized(centerX: number, centerY: number): boolean {
+    const playerSize = 16; // Half the player's collision box size
+    
+    // Check all four corners of the player's collision box using the optimized grid
+    const corners = [
+      { x: centerX - playerSize, y: centerY - playerSize }, // Top-left
+      { x: centerX + playerSize, y: centerY - playerSize }, // Top-right
+      { x: centerX - playerSize, y: centerY + playerSize }, // Bottom-left
+      { x: centerX + playerSize, y: centerY + playerSize }  // Bottom-right
+    ];
+    
+    // If any corner is in a solid tile, collision detected
+    for (const corner of corners) {
+      if (this.isPositionSolid(corner.x, corner.y)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   sendChatMessage(message: string) {

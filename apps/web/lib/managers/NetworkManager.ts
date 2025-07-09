@@ -1,7 +1,19 @@
 import { Client, Room } from 'colyseus.js';
 import { PlayerManager } from './PlayerManager';
 
-interface GameState { /* Define as needed */ }
+interface GameState { 
+  players: Map<string, {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    connected: boolean;
+    level?: number;
+    xp?: number;
+  }>;
+  serverTime: number;
+  gameStatus: string;
+}
 
 export class NetworkManager {
   private scene: Phaser.Scene;
@@ -33,7 +45,7 @@ export class NetworkManager {
         });
       });
 
-      this.room.state.players.onRemove = (player: any, sessionId: string) => {
+      (this.room.state as any).players.onRemove = (player: any, sessionId: string) => {
         playerManager.removePlayer(sessionId);
       };
 
