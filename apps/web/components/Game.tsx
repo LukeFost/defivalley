@@ -13,6 +13,11 @@ import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { FlowBankBuilding } from '../lib/FlowBankBuilding';
 import { FlowMarketplaceBuilding } from '../lib/FlowMarketplaceBuilding';
 import { PepeBuilding } from '../lib/PepeBuilding';
+import { PlayerManager } from '../lib/managers/PlayerManager';
+import { BuildingManager } from '../lib/managers/BuildingManager';
+import { InputManager } from '../lib/managers/InputManager';
+import { CollisionManager } from '../lib/managers/CollisionManager';
+import { NetworkManager } from '../lib/managers/NetworkManager';
 import { DialogueBox } from './DialogueBox';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
@@ -85,6 +90,21 @@ class MainScene extends Phaser.Scene {
   // Legacy tilemap properties (kept for backward compatibility)
   private mapLayout: string[][] = [];
   private collisionMap: boolean[][] = [];
+  
+  // Performance optimization properties
+  private lastBuildingCheck: number = 0;
+  private lastCropUpdate: number = 0;
+  private lastPlayerSync: number = 0;
+  
+  // Pre-computed collision grid for performance
+  private collisionGrid: boolean[][] = [];
+  private tileSize: number = 32;
+  
+  // Manager instances for better architecture
+  private playerManager?: PlayerManager;
+  private buildingManager?: BuildingManager;
+  private collisionManager?: CollisionManager;
+  private networkManager?: NetworkManager;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -212,8 +232,17 @@ class MainScene extends Phaser.Scene {
     // Initialize crop system
     this.cropSystem.create();
 
+    // Initialize managers
+    this.networkManager = new NetworkManager(this);
+    this.playerManager = new PlayerManager(this, this.networkManager);
+    this.buildingManager = new BuildingManager(this);
+    this.collisionManager = new CollisionManager(this, this.buildingManager);
+    
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
+    
+    // Compute collision grid after terrain and buildings are created
+    this.computeCollisionGrid();
 
 
     // Set up input
@@ -1232,46 +1261,48 @@ class MainScene extends Phaser.Scene {
   }
 
   createNetworkSpecificBuildings() {
-    // Destroy existing buildings
-    this.bankBuilding?.destroy();
-    this.marketplaceBuilding?.destroy();
-    this.flowBankBuilding?.destroy();
-    this.flowMarketplaceBuilding?.destroy();
-    this.pepeBuilding?.destroy(); // Also destroy the Pepe building
-
-    // Clear references
-    this.bankBuilding = undefined as any;
-    this.marketplaceBuilding = undefined as any;
-    this.flowBankBuilding = undefined;
-    this.flowMarketplaceBuilding = undefined;
-    this.pepeBuilding = undefined; // And clear its reference
-
-    const isOnKatana = this.currentChainId === katanaChain.id;
-    const isOnFlow = this.currentChainId === flowMainnet.id;
-
-    console.log(`🌐 Creating buildings for network: ${this.currentChainId} (Katana: ${isOnKatana}, Flow: ${isOnFlow})`);
-
-    if (isOnKatana) {
-      // Create Katana buildings closer to center
-      this.bankBuilding = new BankBuilding(this, 800, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
-      console.log('🔶 Created Katana buildings');
-    } else if (isOnFlow) {
-      // Create Flow buildings closer to center with better spacing
-      this.flowBankBuilding = new FlowBankBuilding(this, 500, 350);
-      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 500, 750);
-      // Create Pepe building only on Flow network
-      this.pepeBuilding = new PepeBuilding(this, 750, 800);
-      console.log('🟣 Created Flow buildings');
+    // Use BuildingManager to handle building creation
+    if (this.buildingManager) {
+      this.buildingManager.createBuildingsBasedOnChain(this.currentChainId);
+      
+      // Get buildings from manager for backward compatibility
+      const buildings = this.buildingManager.getBuildings();
+      
+      // Reset all building references first
+      this.bankBuilding = undefined as any;
+      this.marketplaceBuilding = undefined as any;
+      this.flowBankBuilding = undefined;
+      this.flowMarketplaceBuilding = undefined;
+      this.pepeBuilding = undefined;
+      
+      // Assign buildings based on their type
+      for (const building of buildings) {
+        if (building instanceof BankBuilding) {
+          this.bankBuilding = building;
+        } else if (building instanceof MarketplaceBuilding) {
+          this.marketplaceBuilding = building;
+        } else if (building instanceof FlowBankBuilding) {
+          this.flowBankBuilding = building;
+        } else if (building instanceof FlowMarketplaceBuilding) {
+          this.flowMarketplaceBuilding = building;
+        } else if (building instanceof PepeBuilding) {
+          this.pepeBuilding = building;
+        }
+      }
+      
+      // Set up event listeners for new buildings
+      this.setupBuildingEventListeners();
+      
+      // Recompute collision grid when buildings change
+      if (this.collisionManager) {
+        this.collisionManager.computeCollisionGrid(this.terrainLayout);
+      } else {
+        this.computeCollisionGrid();
+      }
     } else {
-      // Default case - create Katana buildings
-      console.log('⚪ Unknown network, creating default Katana buildings');
-      this.bankBuilding = new BankBuilding(this, 800, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
+      // Fallback to old implementation if manager not available
+      console.error('BuildingManager not initialized');
     }
-
-    // Set up event listeners for new buildings
-    this.setupBuildingEventListeners();
   }
 
   setupBuildingEventListeners() {
@@ -1280,6 +1311,42 @@ class MainScene extends Phaser.Scene {
   }
 
   async connectToServer() {
+    // Use NetworkManager if available
+    if (this.networkManager && this.playerManager) {
+      try {
+        await this.networkManager.connect(
+          this.playerManager,
+          this.worldId,
+          this.isOwnWorld,
+          this.address,
+          this.user
+        );
+        
+        // Get room and sessionId from NetworkManager
+        this.room = this.networkManager.getRoom()!;
+        this.sessionId = this.networkManager.getSessionId()!;
+        
+        // Set up message handlers
+        this.networkManager.onMessage('welcome', (message) => {
+          console.log('Welcome message:', message);
+        });
+        
+        this.networkManager.onMessage('chat', (message: ChatMessage) => {
+          console.log('Chat message:', message);
+          if (this.chatCallback) {
+            this.chatCallback(message);
+          }
+        });
+        
+        console.log(`Joined ${this.worldId ? 'world' : 'game'} room as ${this.sessionId}`);
+      } catch (error) {
+        console.error('Failed to connect:', error);
+        // Could show a UI error here
+      }
+      return;
+    }
+    
+    // Fallback to old implementation if managers not available
     try {
       // Try to detect the appropriate server URL
       const hostname = window.location.hostname;
@@ -1494,74 +1561,40 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  update(time: number, delta: number) {
     if (!this.room || !this.currentPlayer) return;
 
-    // Update crop system
-    if (this.cropSystem) {
-      this.cropSystem.update();
+    // Player input runs every frame for responsiveness
+    this.handlePlayerInput(delta);
+
+    // Throttled updates for less critical systems
+    if (time - this.lastBuildingCheck > 100) { // 10 times per second
+      this.updateBuildingInteractions();
+      this.lastBuildingCheck = time;
     }
 
-    // Update Katana building interactions
-    if (this.bankBuilding && this.currentPlayer) {
-      this.bankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.bankBuilding.checkInteraction();
+    if (time - this.lastCropUpdate > 500) { // 2 times per second
+      this.cropSystem?.update();
+      this.lastCropUpdate = time;
     }
-    
-    if (this.marketplaceBuilding && this.currentPlayer) {
-      this.marketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.marketplaceBuilding.checkInteraction();
-    }
-    
-    // Update Flow building interactions
-    if (this.flowBankBuilding && this.currentPlayer) {
-      this.flowBankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.flowBankBuilding.checkInteraction();
-    }
-    
-    if (this.flowMarketplaceBuilding && this.currentPlayer) {
-      this.flowMarketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.flowMarketplaceBuilding.checkInteraction();
-    }
+  }
 
-    // Update Pepe building interactions (not network-specific)
-    if (this.pepeBuilding && this.currentPlayer) {
-      this.pepeBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.pepeBuilding.checkInteraction();
-    }
+  private handlePlayerInput(delta: number) {
+    if (!this.currentPlayer) return;
 
-    // Check if any input element is active (covers chat, modals, any input field)
     const activeElement = document.activeElement;
-    const isUIInputElementActive =
+    const isUIInputElementActive = 
       activeElement instanceof HTMLInputElement ||
       activeElement instanceof HTMLTextAreaElement ||
       activeElement?.getAttribute('contenteditable') === 'true' ||
-      // Also check if we're inside a dialog/modal (additional safety)
       activeElement?.closest('[role="dialog"]') !== null;
-    
-    // Handle O key for stomp animation (only when not typing)
-    if (!isUIInputElementActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
-      this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
-      console.log('🦶 Stomp animation triggered!');
+
+    if (Phaser.Input.Keyboard.JustDown(this.oKey) && !isUIInputElementActive) {
+      this.currentPlayer.playStompAnimation(2000);
     }
-    
-    // Don't process movement if a UI input is active
+
     if (isUIInputElementActive) {
-      // Make sure the player character stops moving visually
       this.currentPlayer.updateMovementState(false);
-      // Also stop any current movement
-      if (this.cursors) {
-        this.cursors.left.isDown = false;
-        this.cursors.right.isDown = false;
-        this.cursors.up.isDown = false;
-        this.cursors.down.isDown = false;
-      }
-      if (this.wasd) {
-        this.wasd.W.isDown = false;
-        this.wasd.A.isDown = false;
-        this.wasd.S.isDown = false;
-        this.wasd.D.isDown = false;
-      }
       return;
     }
 
@@ -1569,67 +1602,205 @@ class MainScene extends Phaser.Scene {
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
+    let newDirection = this.lastDirection;
 
-    // Handle input with directional sprite changes and collision detection
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       const potentialX = Math.max(20, newX - speed);
-      // Check collision before moving using new tile-based system
-      if (!this.checkPlayerCollision(potentialX, newY)) {
+      if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
-        this.lastDirection = 'left';
+        newDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
       const potentialX = Math.min(this.worldWidth - 20, newX + speed);
-      // Check collision before moving using new tile-based system
-      if (!this.checkPlayerCollision(potentialX, newY)) {
+      if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
-        this.lastDirection = 'right';
+        newDirection = 'right';
       }
     }
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       const potentialY = Math.max(20, newY - speed);
-      // Check collision before moving using new tile-based system
-      if (!this.checkPlayerCollision(newX, potentialY)) {
+      if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
-        this.lastDirection = 'up';
+        newDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
       const potentialY = newY + speed;
-      // Check collision before moving using new tile-based system
-      if (!this.checkPlayerCollision(newX, potentialY)) {
+      if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
-        this.lastDirection = 'down';
-      }
-    }
-    
-    // Update sprite direction and animation state
-    if (this.currentPlayer) {
-      if (moved) {
-        this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
-        // Update animation state to walking
-        this.currentPlayer.updateMovementState(true);
-      } else {
-        // Update animation state to idle when not moving
-        this.currentPlayer.updateMovementState(false);
+        newDirection = 'down';
       }
     }
 
-    // Send movement to server
+    this.lastDirection = newDirection;
+    this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+    this.currentPlayer.updateMovementState(moved);
+
     if (moved) {
-      this.room.send('move', { x: newX, y: newY });
-      // Update camera to follow player
-      this.updateCameraFollow();
+      this.currentPlayer.setPosition(newX, newY);
+      const now = performance.now();
+      if (now - this.lastPlayerSync > 100) { // Sync position 10 times per second
+        this.room.send('move', { x: newX, y: newY });
+        this.lastPlayerSync = now;
+      }
+    }
+
+    this.updateCameraFollow();
+  }
+
+  private updateBuildingInteractions() {
+    if (!this.currentPlayer) return;
+    
+    // Use BuildingManager if available
+    if (this.buildingManager) {
+      this.buildingManager.update(Date.now(), this.currentPlayer);
+    } else {
+      // Fallback to old implementation
+      const { x, y } = this.currentPlayer;
+      const buildings = [
+        this.bankBuilding,
+        this.marketplaceBuilding,
+        this.flowBankBuilding,
+        this.flowMarketplaceBuilding,
+        this.pepeBuilding,
+      ];
+
+      for (const building of buildings) {
+        if (building) {
+          building.checkPlayerProximity(x, y);
+          building.checkInteraction();
+        }
+      }
+    }
+  }
+
+  private markBuildingCollisions(gridHeight: number, gridWidth: number) {
+    const buildings = [
+      this.bankBuilding,
+      this.marketplaceBuilding, 
+      this.flowBankBuilding,
+      this.flowMarketplaceBuilding,
+      this.pepeBuilding
+    ];
+
+    for (const building of buildings) {
+      if (building && building.getCollisionBounds) {
+        const bounds = building.getCollisionBounds();
+        const startTile = TilemapUtils.worldToTile(bounds.x, bounds.y, this.tileSize);
+        const endTile = TilemapUtils.worldToTile(bounds.right, bounds.bottom, this.tileSize);
+
+        for (let y = startTile.y; y <= endTile.y; y++) {
+          for (let x = startTile.x; x <= endTile.x; x++) {
+            if (y >= 0 && y < gridHeight && x >= 0 && x < gridWidth) {
+              this.collisionGrid[y][x] = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private computeCollisionGrid() {
+    // If using simple background without terrain layout, create a basic grid
+    if (this.terrainLayout.length === 0) {
+      // Create grid based on world dimensions
+      const gridWidth = Math.ceil(this.worldWidth / this.tileSize);
+      const gridHeight = Math.ceil(this.worldHeight / this.tileSize);
+      this.collisionGrid = Array.from({ length: gridHeight }, () => Array(gridWidth).fill(false));
+      
+      // Just mark buildings as collision areas
+      this.markBuildingCollisions(gridHeight, gridWidth);
+      console.log('Collision grid computed for simple world (buildings only).');
+      return;
+    }
+    
+    const height = this.terrainLayout.length;
+    const width = this.terrainLayout[0].length;
+    this.collisionGrid = Array.from({ length: height }, () => Array(width).fill(false));
+
+    // 1. Mark terrain collisions
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (TilemapUtils.hasCollision(this.terrainLayout[y][x])) {
+          this.collisionGrid[y][x] = true;
+        }
+      }
+    }
+
+    // 2. Mark building collisions
+    this.markBuildingCollisions(height, width);
+    
+    console.log('Collision grid computed for optimized performance.');
+  }
+
+  private isPositionSolid(worldX: number, worldY: number): boolean {
+    if (this.collisionGrid.length === 0) {
+      // Fallback to old collision detection if grid not computed
+      return this.checkTileCollision(worldX, worldY);
+    }
+
+    const tileCoords = TilemapUtils.worldToTile(worldX, worldY, this.tileSize);
+    if (tileCoords.y < 0 || tileCoords.y >= this.collisionGrid.length || 
+        tileCoords.x < 0 || tileCoords.x >= this.collisionGrid[0].length) {
+      return true; // Out of bounds is solid
+    }
+
+    return this.collisionGrid[tileCoords.y][tileCoords.x];
+  }
+
+  private checkPlayerCollisionOptimized(centerX: number, centerY: number): boolean {
+    // Use CollisionManager if available
+    if (this.collisionManager) {
+      const playerSize = 16;
+      const corners = [
+        { x: centerX - playerSize, y: centerY - playerSize },
+        { x: centerX + playerSize, y: centerY - playerSize },
+        { x: centerX - playerSize, y: centerY + playerSize },
+        { x: centerX + playerSize, y: centerY + playerSize }
+      ];
+      
+      for (const corner of corners) {
+        if (this.collisionManager.isPositionSolid(corner.x, corner.y)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      // Fallback to internal implementation
+      const playerSize = 16;
+      const corners = [
+        { x: centerX - playerSize, y: centerY - playerSize },
+        { x: centerX + playerSize, y: centerY - playerSize },
+        { x: centerX - playerSize, y: centerY + playerSize },
+        { x: centerX + playerSize, y: centerY + playerSize }
+      ];
+      
+      for (const corner of corners) {
+        if (this.isPositionSolid(corner.x, corner.y)) {
+          return true;
+        }
+      }
+      return false;
     }
   }
 
   sendChatMessage(message: string) {
-    console.log('Sending chat message:', message, 'Room:', this.room);
-    if (this.room && message.trim()) {
+    console.log('Sending chat message:', message);
+    
+    // Use NetworkManager if available
+    if (this.networkManager && message.trim()) {
+      try {
+        this.networkManager.send('chat', { text: message });
+        console.log('Chat message sent successfully');
+      } catch (error) {
+        console.error('Error sending chat message:', error);
+      }
+    } else if (this.room && message.trim()) {
+      // Fallback to old implementation
       try {
         this.room.send('chat', { text: message });
         console.log('Chat message sent successfully');
@@ -1637,12 +1808,15 @@ class MainScene extends Phaser.Scene {
         console.error('Error sending chat message:', error);
       }
     } else {
-      console.log('Cannot send chat - no room or empty message');
+      console.log('Cannot send chat - no connection or empty message');
     }
   }
 
   destroy() {
-    if (this.room) {
+    // Use NetworkManager if available
+    if (this.networkManager) {
+      this.networkManager.leave();
+    } else if (this.room) {
       this.room.leave();
     }
     this.scene.stop();
