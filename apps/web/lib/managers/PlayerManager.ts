@@ -23,10 +23,7 @@ export class PlayerManager {
     }
 
     // Determine character type (this logic should match MainScene)
-    const characterTypes: CharacterType[] = [
-      'knight', 'cowboy', 'elf_archer', 'mage', 
-      'cleric', 'rogue', 'skeleton', 'orc', 'gnome'
-    ];
+    const characterTypes: CharacterType[] = ['cowboy', 'pepe'];
     
     // Use player name hash for consistent character selection
     const nameHash = playerInfo.name.split('').reduce((acc: number, char: string) => {
