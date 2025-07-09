@@ -4,12 +4,14 @@
  * Supports FVIX staking and sFVIX vault operations
  */
 
+import { GameConfig } from './GameConfig';
+
 export class FlowBankBuilding extends Phaser.GameObjects.Container {
   private bankSprite: Phaser.GameObjects.Sprite;
   private glowEffect?: Phaser.GameObjects.Graphics;
   private interactionZone: Phaser.Geom.Circle;
   private isPlayerNear: boolean = false;
-  private interactionRadius: number = 250;
+  private interactionRadius: number = GameConfig.BUILDING_INTERACTION_RADIUS;
   public scene: Phaser.Scene;
   private interactionKey?: Phaser.Input.Keyboard.Key;
   private promptText?: Phaser.GameObjects.Text;
@@ -20,8 +22,8 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
 
     // Create Flow bank sprite (reuse bank sprite with different styling)
     this.bankSprite = scene.add.sprite(0, 0, "flow_bank");
-    this.bankSprite.setScale(0.4);
-    this.bankSprite.setTint(0xff6b35); // Orange tint for Flow DeFi vault
+    this.bankSprite.setScale(GameConfig.BUILDING_SCALE);
+    this.bankSprite.setTint(GameConfig.FLOW_BANK_COLOR); // Orange tint for Flow DeFi vault
     this.add(this.bankSprite);
 
     // Create interaction zone
@@ -40,14 +42,14 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     // Set depth to be above ground but below UI
-    this.setDepth(10);
+    this.setDepth(GameConfig.BUILDING_DEPTH);
 
     console.log("🟠 Flow Bank building created at", x, y);
   }
 
   private createGlowEffect() {
     this.glowEffect = this.scene.add.graphics();
-    this.glowEffect.lineStyle(4, 0xffa500, 0.8); // Orange glow for Flow vault
+    this.glowEffect.lineStyle(GameConfig.BUILDING_GLOW_LINE_WIDTH, GameConfig.FLOW_BANK_HOVER_COLOR, 0.8); // Orange glow for Flow vault
     this.glowEffect.strokeCircle(0, 0, this.interactionRadius);
     this.glowEffect.setAlpha(0);
     this.add(this.glowEffect);
@@ -127,8 +129,8 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
     // Add slight scale animation to bank
     this.scene.tweens.add({
       targets: this.bankSprite,
-      scaleX: 0.42,
-      scaleY: 0.42,
+      scaleX: GameConfig.BUILDING_SCALE * 1.05,
+      scaleY: GameConfig.BUILDING_SCALE * 1.05,
       duration: 300,
       ease: "Back.easeOut",
     });
@@ -161,8 +163,8 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
     // Reset bank scale
     this.scene.tweens.add({
       targets: this.bankSprite,
-      scaleX: 0.4,
-      scaleY: 0.4,
+      scaleX: GameConfig.BUILDING_SCALE,
+      scaleY: GameConfig.BUILDING_SCALE,
       duration: 300,
       ease: "Power2",
     });
@@ -183,8 +185,8 @@ export class FlowBankBuilding extends Phaser.GameObjects.Container {
       // Visual feedback for interaction
       this.scene.tweens.add({
         targets: this.bankSprite,
-        scaleX: 0.36,
-        scaleY: 0.36,
+        scaleX: GameConfig.BUILDING_SCALE * 0.9,
+        scaleY: GameConfig.BUILDING_SCALE * 0.9,
         duration: 100,
         yoyo: true,
         ease: "Power2",

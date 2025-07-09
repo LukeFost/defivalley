@@ -8,6 +8,7 @@ import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+import { GameConfig } from '../lib/GameConfig';
 import { BankBuilding } from '../lib/BankBuilding';
 import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { FlowBankBuilding } from '../lib/FlowBankBuilding';
@@ -80,9 +81,9 @@ class MainScene extends Phaser.Scene {
   private currentChainId?: number;
   
   // Camera system properties
-  private worldWidth: number = 5000; // Massively increased for huge exploration area
-  private worldHeight: number = 4000; // Massively increased for huge exploration area
-  private cameraLerpFactor: number = 0.1; // Smooth camera following
+  private worldWidth: number = GameConfig.WORLD_WIDTH; // Massively increased for huge exploration area
+  private worldHeight: number = GameConfig.WORLD_HEIGHT; // Massively increased for huge exploration area
+  private cameraLerpFactor: number = GameConfig.CAMERA_LERP_FACTOR; // Smooth camera following
   
   // Simple background approach with invisible walls
   private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
@@ -743,8 +744,8 @@ class MainScene extends Phaser.Scene {
   createSimpleFarmBackground() {
     
     // Set world dimensions for a larger farm area
-    this.worldWidth = 3200;
-    this.worldHeight = 2400;
+    this.worldWidth = GameConfig.SERVER_WORLD_WIDTH;
+    this.worldHeight = GameConfig.SERVER_WORLD_HEIGHT;
     
     // Update physics world bounds to match the actual world size
     this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
@@ -1573,7 +1574,7 @@ class MainScene extends Phaser.Scene {
       this.lastBuildingCheck = time;
     }
 
-    if (time - this.lastCropUpdate > 500) { // 2 times per second
+    if (time - this.lastCropUpdate > GameConfig.CROP_UPDATE_INTERVAL) { // 2 times per second
       this.cropSystem?.update();
       this.lastCropUpdate = time;
     }

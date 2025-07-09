@@ -59,5 +59,7 @@ export const ERROR_CODES = {
   DATABASE_ERROR: 'DATABASE_ERROR'
 } as const;
 
+import { GameConfig } from "../config/GameConfig";
+
 // Position validation constants
-export const CROP_COLLISION_RADIUS = 50; // pixels
+export const CROP_COLLISION_RADIUS = GameConfig.CROP_COLLISION_RADIUS; // pixels

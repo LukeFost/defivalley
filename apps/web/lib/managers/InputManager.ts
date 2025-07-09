@@ -1,5 +1,6 @@
 import { PlayerManager } from './PlayerManager';
 import { CollisionManager } from './CollisionManager';
+import { GameConfig } from '../GameConfig';
 
 export class InputManager {
   private scene: Phaser.Scene;
@@ -24,34 +25,36 @@ export class InputManager {
     const currentPlayer = this.playerManager.getCurrentPlayer();
     if (!currentPlayer) return;
 
-    const speed = 9;
+    // Speed scaled up to compensate for delta time multiplication
+    const speed = GameConfig.PLAYER_SPEED;
+    const moveDistance = speed * (delta / 1000);
     let moved = false;
     let newX = currentPlayer.x;
     let newY = currentPlayer.y;
 
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX - speed, newY)) {
-        newX -= speed;
+      if (!this.collisionManager.isPositionSolid(newX - moveDistance, newY)) {
+        newX -= moveDistance;
         moved = true;
         this.lastDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX + speed, newY)) {
-        newX += speed;
+      if (!this.collisionManager.isPositionSolid(newX + moveDistance, newY)) {
+        newX += moveDistance;
         moved = true;
         this.lastDirection = 'right';
       }
     }
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX, newY - speed)) {
-        newY -= speed;
+      if (!this.collisionManager.isPositionSolid(newX, newY - moveDistance)) {
+        newY -= moveDistance;
         moved = true;
         this.lastDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      if (!this.collisionManager.isPositionSolid(newX, newY + speed)) {
-        newY += speed;
+      if (!this.collisionManager.isPositionSolid(newX, newY + moveDistance)) {
+        newY += moveDistance;
         moved = true;
         this.lastDirection = 'down';
       }

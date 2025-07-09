@@ -1,12 +1,14 @@
 import { Player, PlayerInfo } from '../Player';
 import { CharacterType } from '../character.config';
 import { NetworkManager } from './NetworkManager';
+import { GameConfig } from '../GameConfig';
 
 export class PlayerManager {
   private scene: Phaser.Scene;
   private players: Map<string, Player> = new Map();
   private currentPlayer!: Player;
   private networkManager: NetworkManager;
+  private lastPlayerSync: number = 0;
 
   constructor(scene: Phaser.Scene, networkManager: NetworkManager) {
     this.scene = scene;
@@ -50,11 +52,11 @@ export class PlayerManager {
 
     if (isCurrentPlayer) {
       this.currentPlayer = playerObject;
-      this.scene.cameras.main.startFollow(this.currentPlayer, true, 0.1, 0.1);
+      this.scene.cameras.main.startFollow(this.currentPlayer, true, GameConfig.CAMERA_LERP_FACTOR, GameConfig.CAMERA_LERP_FACTOR);
       
       // Set initial camera bounds
-      const worldWidth = (this.scene as any).worldWidth || 3200;
-      const worldHeight = (this.scene as any).worldHeight || 2400;
+      const worldWidth = (this.scene as any).worldWidth || GameConfig.SERVER_WORLD_WIDTH;
+      const worldHeight = (this.scene as any).worldHeight || GameConfig.SERVER_WORLD_HEIGHT;
       this.scene.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     }
     
@@ -92,7 +94,13 @@ export class PlayerManager {
     this.currentPlayer.updatePosition(newX, newY);
     this.currentPlayer.updateDirection(direction);
     this.currentPlayer.updateMovementState(true);
-    this.networkManager.send('move', { x: newX, y: newY });
+    
+    // Throttle network updates
+    const now = performance.now();
+    if (now - this.lastPlayerSync > GameConfig.NETWORK_UPDATE_INTERVAL) { // Send updates max 10 times per second
+      this.networkManager.send('move', { x: newX, y: newY });
+      this.lastPlayerSync = now;
+    }
   }
 
   public stopPlayer(): void {

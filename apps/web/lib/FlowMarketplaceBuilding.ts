@@ -4,12 +4,14 @@
  * Supports FLOW->FROTH swaps and PunchSwap integration
  */
 
+import { GameConfig } from './GameConfig';
+
 export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
   private marketplaceSprite: Phaser.GameObjects.Sprite;
   private glowEffect?: Phaser.GameObjects.Graphics;
   private interactionZone: Phaser.Geom.Circle;
   private isPlayerNear: boolean = false;
-  private interactionRadius: number = 250;
+  private interactionRadius: number = GameConfig.BUILDING_INTERACTION_RADIUS;
   public scene: Phaser.Scene;
   private interactionKey?: Phaser.Input.Keyboard.Key;
   private promptText?: Phaser.GameObjects.Text;
@@ -20,7 +22,7 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
 
     // Create Flow marketplace sprite using Wild Orchard
     this.marketplaceSprite = scene.add.sprite(0, 0, "flow_market");
-    this.marketplaceSprite.setScale(0.4);
+    this.marketplaceSprite.setScale(GameConfig.BUILDING_SCALE);
     // No tint - let Wild Orchard show its natural colors
     this.add(this.marketplaceSprite);
 
@@ -40,14 +42,14 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     // Set depth to be above ground but below UI
-    this.setDepth(10);
+    this.setDepth(GameConfig.BUILDING_DEPTH);
 
     console.log("🟣 Flow Marketplace building created at", x, y);
   }
 
   private createGlowEffect() {
     this.glowEffect = this.scene.add.graphics();
-    this.glowEffect.lineStyle(4, 0xff00ff, 0.8); // Purple/magenta glow for Flow
+    this.glowEffect.lineStyle(GameConfig.BUILDING_GLOW_LINE_WIDTH, 0xff00ff, 0.8); // Purple/magenta glow for Flow
     this.glowEffect.strokeCircle(0, 0, this.interactionRadius);
     this.glowEffect.setAlpha(0);
     this.add(this.glowEffect);
@@ -127,8 +129,8 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
     // Add slight scale animation to marketplace
     this.scene.tweens.add({
       targets: this.marketplaceSprite,
-      scaleX: 0.42,
-      scaleY: 0.42,
+      scaleX: GameConfig.BUILDING_SCALE * 1.05,
+      scaleY: GameConfig.BUILDING_SCALE * 1.05,
       duration: 300,
       ease: "Back.easeOut",
     });
@@ -161,8 +163,8 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
     // Reset marketplace scale
     this.scene.tweens.add({
       targets: this.marketplaceSprite,
-      scaleX: 0.4,
-      scaleY: 0.4,
+      scaleX: GameConfig.BUILDING_SCALE,
+      scaleY: GameConfig.BUILDING_SCALE,
       duration: 300,
       ease: "Power2",
     });
@@ -183,8 +185,8 @@ export class FlowMarketplaceBuilding extends Phaser.GameObjects.Container {
       // Visual feedback for interaction
       this.scene.tweens.add({
         targets: this.marketplaceSprite,
-        scaleX: 0.36,
-        scaleY: 0.36,
+        scaleX: GameConfig.BUILDING_SCALE * 0.9,
+        scaleY: GameConfig.BUILDING_SCALE * 0.9,
         duration: 100,
         yoyo: true,
         ease: "Power2",

@@ -2,12 +2,15 @@
  * PepeBuilding - A unified building that combines Pepe character interaction with Flow pump launch functionality
  * This building serves as both a character encounter and a functional DeFi launchpad
  */
+
+import { GameConfig } from './GameConfig';
+
 export class PepeBuilding extends Phaser.GameObjects.Container {
   private buildingSprite: Phaser.GameObjects.Sprite;
   private glowEffect?: Phaser.GameObjects.Graphics;
   private interactionZone: Phaser.Geom.Circle;
   private isPlayerNear: boolean = false;
-  private interactionRadius: number = 250;
+  private interactionRadius: number = GameConfig.BUILDING_INTERACTION_RADIUS;
   public scene: Phaser.Scene;
   private interactionKey?: Phaser.Input.Keyboard.Key;
   private promptText?: Phaser.GameObjects.Text;
@@ -48,14 +51,14 @@ export class PepeBuilding extends Phaser.GameObjects.Container {
 
     this.interactionKey = scene.input.keyboard?.addKey("E");
     scene.add.existing(this);
-    this.setDepth(10);
+    this.setDepth(GameConfig.BUILDING_DEPTH);
 
     console.log("🐸 Pepe's Pump Launchpad created at", x, y);
   }
 
   private createGlowEffect() {
     this.glowEffect = this.scene.add.graphics();
-    this.glowEffect.lineStyle(4, 0x32cd32, 0.9); // Pepe green glow
+    this.glowEffect.lineStyle(GameConfig.BUILDING_GLOW_LINE_WIDTH, 0x32cd32, 0.9); // Pepe green glow
     this.glowEffect.strokeCircle(0, 0, this.interactionRadius);
     this.glowEffect.setAlpha(0);
     this.add(this.glowEffect);

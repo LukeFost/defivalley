@@ -7,8 +7,9 @@ import rateLimit from "express-rate-limit";
 import { GameRoom } from "./rooms/GameRoom";
 import { databaseService } from "./services/DatabaseService";
 import { sanitizeWorldId, validatePagination } from "./utils/validation";
+import { GameConfig } from "./config/GameConfig";
 
-const port = Number(process.env.PORT || 2567);
+const port = Number(process.env.PORT || GameConfig.NETWORK_SERVER_PORT);
 const app = express();
 const gameServer = new Server({
   server: createServer(app)

@@ -12,15 +12,16 @@ import {
 } from "../types/game.types";
 import { JoinOptions, AuthenticatedClient } from "../types/auth.types";
 import { hashPlayerId } from "../utils/auth";
+import { GameConfig } from "../config/GameConfig";
 
 export class GameRoom extends Room<GameState> {
-  maxClients = 10;
+  maxClients = GameConfig.MAX_CLIENTS;
   private worldOwnerId: string = 'default';
   private authenticatedClients = new Map<string, AuthenticatedClient>();
   
   // World size constants to match the client
-  private worldWidth = 3200;
-  private worldHeight = 2400;
+  private worldWidth = GameConfig.SERVER_WORLD_WIDTH;
+  private worldHeight = GameConfig.SERVER_WORLD_HEIGHT;
 
   onCreate(options: any) {
     this.setState(new GameState());

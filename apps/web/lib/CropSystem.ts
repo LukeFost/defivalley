@@ -3,6 +3,8 @@
  * Handles crop state, sprite management, and interaction logic
  */
 
+import { GameConfig } from './GameConfig';
+
 export interface CropData {
   id: string;
   type: CropType;
@@ -123,8 +125,8 @@ export class CropSystem {
   preload() {
     // Load crop spritesheet
     this.scene.load.spritesheet(this.cropSpritesheet, '/sprites/crops-v2/crops.png', {
-      frameWidth: 32,
-      frameHeight: 32
+      frameWidth: GameConfig.CROP_SPRITE_FRAME_WIDTH,
+      frameHeight: GameConfig.CROP_SPRITE_FRAME_HEIGHT
     });
   }
 
@@ -148,7 +150,7 @@ export class CropSystem {
       y,
       plantedAt: Date.now(),
       stage: 'seed',
-      health: 100
+      health: GameConfig.CROP_INITIAL_HEALTH
     };
 
     this.crops.set(cropId, cropData);
@@ -211,7 +213,7 @@ export class CropSystem {
   /**
    * Get crop at specific position (for context menu detection)
    */
-  getCropAtPosition(x: number, y: number, tolerance: number = 16): CropData | null {
+  getCropAtPosition(x: number, y: number, tolerance: number = GameConfig.CROP_POSITION_TOLERANCE): CropData | null {
     const crops = Array.from(this.crops.values());
     for (const crop of crops) {
       const distance = Math.sqrt(
@@ -271,7 +273,7 @@ export class CropSystem {
     
     const sprite = this.scene.add.sprite(crop.x, crop.y, this.cropSpritesheet, stageIndex);
     sprite.setOrigin(0.5, 0.5);
-    sprite.setScale(1.5); // Make crops slightly bigger
+    sprite.setScale(GameConfig.CROP_SPRITE_SCALE); // Make crops slightly bigger
     
     // Make sprite interactive for clicks
     sprite.setInteractive();
@@ -295,9 +297,9 @@ export class CropSystem {
     // Add subtle animations
     this.scene.tweens.add({
       targets: sprite,
-      scaleX: 1.6,
-      scaleY: 1.4,
-      duration: 2000 + Math.random() * 1000,
+      scaleX: GameConfig.CROP_SPRITE_SCALE + 0.1,
+      scaleY: GameConfig.CROP_SPRITE_SCALE - 0.1,
+      duration: GameConfig.HARVEST_ANIMATION_DURATION + Math.random() * GameConfig.PLANT_ANIMATION_DURATION,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut'
@@ -321,9 +323,9 @@ export class CropSystem {
     // Add growth animation
     this.scene.tweens.add({
       targets: sprite,
-      scaleX: 1.8,
-      scaleY: 1.8,
-      duration: 300,
+      scaleX: GameConfig.CROP_SPRITE_SCALE + 0.3,
+      scaleY: GameConfig.CROP_SPRITE_SCALE + 0.3,
+      duration: GameConfig.WITHER_ANIMATION_DURATION,
       yoyo: true,
       ease: 'Back.easeOut'
     });
@@ -334,22 +336,15 @@ export class CropSystem {
    */
   canPlantAt(x: number, y: number): boolean {
     // Check if there's already a crop nearby
-    const existingCrop = this.getCropAtPosition(x, y, 32);
+    const existingCrop = this.getCropAtPosition(x, y, GameConfig.CROP_MIN_PLANTING_DISTANCE);
     if (existingCrop) return false;
 
     // Check if position is within farming area bounds
-    const farmingArea = {
-      minX: 100,
-      maxX: 700,
-      minY: 180,
-      maxY: 500
-    };
-
     return (
-      x >= farmingArea.minX &&
-      x <= farmingArea.maxX &&
-      y >= farmingArea.minY &&
-      y <= farmingArea.maxY
+      x >= GameConfig.FARMING_AREA_MIN_X &&
+      x <= GameConfig.FARMING_AREA_MAX_X &&
+      y >= GameConfig.FARMING_AREA_MIN_Y &&
+      y <= GameConfig.FARMING_AREA_MAX_Y
     );
   }
 
@@ -430,9 +425,9 @@ export class CropSystem {
     // Animate the text
     this.scene.tweens.add({
       targets: harvestText,
-      y: y - 40,
+      y: y - GameConfig.TEXT_EFFECT_Y_OFFSET,
       alpha: 0,
-      duration: 1000,
+      duration: GameConfig.TEXT_EFFECT_DURATION,
       ease: 'Power2',
       onComplete: () => {
         harvestText.destroy();
@@ -440,11 +435,11 @@ export class CropSystem {
     });
     
     // Create sparkle effect
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < GameConfig.SPARKLE_PARTICLE_COUNT; i++) {
       const sparkle = this.scene.add.circle(
-        x + (Math.random() - 0.5) * 40,
-        y + (Math.random() - 0.5) * 40,
-        3,
+        x + (Math.random() - 0.5) * GameConfig.SPARKLE_PARTICLE_SPREAD,
+        y + (Math.random() - 0.5) * GameConfig.SPARKLE_PARTICLE_SPREAD,
+        GameConfig.SPARKLE_PARTICLE_RADIUS,
         0xFFD700
       );
       

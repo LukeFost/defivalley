@@ -3,12 +3,14 @@
  * Handles bank sprite, collision detection, and player interaction
  */
 
+import { GameConfig } from './GameConfig';
+
 export class BankBuilding extends Phaser.GameObjects.Container {
   private bankSprite: Phaser.GameObjects.Sprite;
   private glowEffect?: Phaser.GameObjects.Graphics;
   private interactionZone: Phaser.Geom.Circle;
   private isPlayerNear: boolean = false;
-  private interactionRadius: number = 250; // Increased to 150 for larger interaction area
+  private interactionRadius: number = GameConfig.BUILDING_INTERACTION_RADIUS;
   public scene: Phaser.Scene; // Made public to match Phaser Container type
   private interactionKey?: Phaser.Input.Keyboard.Key;
   private promptText?: Phaser.GameObjects.Text;
@@ -19,7 +21,7 @@ export class BankBuilding extends Phaser.GameObjects.Container {
 
     // Create bank sprite
     this.bankSprite = scene.add.sprite(0, 0, "bank");
-    this.bankSprite.setScale(0.4); // 2x larger than before (0.2 * 2 = 0.4)
+    this.bankSprite.setScale(GameConfig.BUILDING_SCALE);
     this.add(this.bankSprite);
 
     // Create interaction zone
@@ -38,14 +40,14 @@ export class BankBuilding extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     // Set depth to be above ground but below UI
-    this.setDepth(10);
+    this.setDepth(GameConfig.BUILDING_DEPTH);
 
     console.log("🏦 Bank building created at", x, y);
   }
 
   private createGlowEffect() {
     this.glowEffect = this.scene.add.graphics();
-    this.glowEffect.lineStyle(4, 0x00ff00, 0.8); // Thicker line for better visibility
+    this.glowEffect.lineStyle(GameConfig.BUILDING_GLOW_LINE_WIDTH, 0x00ff00, 0.8); // Thicker line for better visibility
     this.glowEffect.strokeCircle(0, 0, this.interactionRadius);
     this.glowEffect.setAlpha(0);
     this.add(this.glowEffect);
@@ -125,8 +127,8 @@ export class BankBuilding extends Phaser.GameObjects.Container {
     // Add slight scale animation to bank
     this.scene.tweens.add({
       targets: this.bankSprite,
-      scaleX: 0.42,
-      scaleY: 0.42,
+      scaleX: GameConfig.BUILDING_SCALE * 1.05,
+      scaleY: GameConfig.BUILDING_SCALE * 1.05,
       duration: 300,
       ease: "Back.easeOut",
     });
@@ -159,8 +161,8 @@ export class BankBuilding extends Phaser.GameObjects.Container {
     // Reset bank scale
     this.scene.tweens.add({
       targets: this.bankSprite,
-      scaleX: 0.4,
-      scaleY: 0.4,
+      scaleX: GameConfig.BUILDING_SCALE,
+      scaleY: GameConfig.BUILDING_SCALE,
       duration: 300,
       ease: "Power2",
     });
@@ -181,8 +183,8 @@ export class BankBuilding extends Phaser.GameObjects.Container {
       // Visual feedback for interaction
       this.scene.tweens.add({
         targets: this.bankSprite,
-        scaleX: 0.36,
-        scaleY: 0.36,
+        scaleX: GameConfig.BUILDING_SCALE * 0.9,
+        scaleY: GameConfig.BUILDING_SCALE * 0.9,
         duration: 100,
         yoyo: true,
         ease: "Power2",

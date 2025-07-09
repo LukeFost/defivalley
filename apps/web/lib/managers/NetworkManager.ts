@@ -1,5 +1,6 @@
 import { Client, Room } from 'colyseus.js';
 import { PlayerManager } from './PlayerManager';
+import { GameConfig } from '../GameConfig';
 
 interface GameState { 
   players: Map<string, {
@@ -27,7 +28,7 @@ export class NetworkManager {
   public async connect(playerManager: PlayerManager, worldId?: string, isOwnWorld?: boolean, address?: string, user?: any): Promise<void> {
     try {
       const hostname = window.location.hostname;
-      const port = '2567';
+      const port = GameConfig.NETWORK_SERVER_PORT.toString();
       const serverHost = hostname === 'localhost' || hostname === '127.0.0.1' ? 'localhost' : hostname;
       const endpoint = `ws://${serverHost}:${port}`;
       
@@ -57,7 +58,7 @@ export class NetworkManager {
       } catch (connectionError) {
         console.log('Primary connection failed, trying localhost fallback...');
         if (serverHost !== 'localhost') {
-          const fallbackEndpoint = `ws://localhost:${port}`;
+          const fallbackEndpoint = `ws://localhost:${GameConfig.NETWORK_SERVER_PORT}`;
           console.log('Fallback connecting to:', fallbackEndpoint);
           this.client = new Client(fallbackEndpoint);
           this.room = await this.client.joinOrCreate<GameState>(roomType, roomOptions);
