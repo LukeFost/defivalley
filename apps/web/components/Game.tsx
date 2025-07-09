@@ -1608,7 +1608,7 @@ class MainScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (!this.room) return;
+    // Allow local movement even without room connection
 
     // Clamp delta to prevent huge jumps when tab switching
     const clampedDelta = Math.min(delta, 100);
@@ -1621,8 +1621,8 @@ class MainScene extends Phaser.Scene {
       this.handlePlayerInput(clampedDelta);
     }
 
-    // Use PlayerManager for network throttling
-    if (this.playerManager) {
+    // Use PlayerManager for network throttling (only if connected to room)
+    if (this.playerManager && this.room) {
       this.playerManager.update(time);
     }
 
