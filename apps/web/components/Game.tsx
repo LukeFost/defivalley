@@ -99,12 +99,6 @@ class MainScene extends Phaser.Scene {
   // Pre-computed collision grid for performance
   private collisionGrid: boolean[][] = [];
   private tileSize: number = 32;
-  
-  // Manager instances for better architecture
-  private playerManager?: PlayerManager;
-  private buildingManager?: BuildingManager;
-  private collisionManager?: CollisionManager;
-  private networkManager?: NetworkManager;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -232,12 +226,6 @@ class MainScene extends Phaser.Scene {
     // Initialize crop system
     this.cropSystem.create();
 
-    // Initialize managers
-    this.networkManager = new NetworkManager(this);
-    this.playerManager = new PlayerManager(this, this.networkManager);
-    this.buildingManager = new BuildingManager(this);
-    this.collisionManager = new CollisionManager(this, this.buildingManager);
-    
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
     
@@ -1261,48 +1249,49 @@ class MainScene extends Phaser.Scene {
   }
 
   createNetworkSpecificBuildings() {
-    // Use BuildingManager to handle building creation
-    if (this.buildingManager) {
-      this.buildingManager.createBuildingsBasedOnChain(this.currentChainId);
-      
-      // Get buildings from manager for backward compatibility
-      const buildings = this.buildingManager.getBuildings();
-      
-      // Reset all building references first
-      this.bankBuilding = undefined as any;
-      this.marketplaceBuilding = undefined as any;
-      this.flowBankBuilding = undefined;
-      this.flowMarketplaceBuilding = undefined;
-      this.pepeBuilding = undefined;
-      
-      // Assign buildings based on their type
-      for (const building of buildings) {
-        if (building instanceof BankBuilding) {
-          this.bankBuilding = building;
-        } else if (building instanceof MarketplaceBuilding) {
-          this.marketplaceBuilding = building;
-        } else if (building instanceof FlowBankBuilding) {
-          this.flowBankBuilding = building;
-        } else if (building instanceof FlowMarketplaceBuilding) {
-          this.flowMarketplaceBuilding = building;
-        } else if (building instanceof PepeBuilding) {
-          this.pepeBuilding = building;
-        }
-      }
-      
-      // Set up event listeners for new buildings
-      this.setupBuildingEventListeners();
-      
-      // Recompute collision grid when buildings change
-      if (this.collisionManager) {
-        this.collisionManager.computeCollisionGrid(this.terrainLayout);
-      } else {
-        this.computeCollisionGrid();
-      }
+    // Destroy existing buildings
+    this.bankBuilding?.destroy();
+    this.marketplaceBuilding?.destroy();
+    this.flowBankBuilding?.destroy();
+    this.flowMarketplaceBuilding?.destroy();
+    this.pepeBuilding?.destroy(); // Also destroy the Pepe building
+
+    // Clear references
+    this.bankBuilding = undefined as any;
+    this.marketplaceBuilding = undefined as any;
+    this.flowBankBuilding = undefined;
+    this.flowMarketplaceBuilding = undefined;
+    this.pepeBuilding = undefined; // And clear its reference
+
+    const isOnKatana = this.currentChainId === katanaChain.id;
+    const isOnFlow = this.currentChainId === flowMainnet.id;
+
+    console.log(`🌐 Creating buildings for network: ${this.currentChainId} (Katana: ${isOnKatana}, Flow: ${isOnFlow})`);
+
+    if (isOnKatana) {
+      // Create Katana buildings closer to center
+      this.bankBuilding = new BankBuilding(this, 800, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
+      console.log('🔶 Created Katana buildings');
+    } else if (isOnFlow) {
+      // Create Flow buildings closer to center with better spacing
+      this.flowBankBuilding = new FlowBankBuilding(this, 500, 350);
+      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 500, 750);
+      // Create Pepe building only on Flow network
+      this.pepeBuilding = new PepeBuilding(this, 750, 800);
+      console.log('🟣 Created Flow buildings');
     } else {
-      // Fallback to old implementation if manager not available
-      console.error('BuildingManager not initialized');
+      // Default case - create Katana buildings
+      console.log('⚪ Unknown network, creating default Katana buildings');
+      this.bankBuilding = new BankBuilding(this, 800, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
     }
+
+    // Set up event listeners for new buildings
+    this.setupBuildingEventListeners();
+    
+    // Recompute collision grid when buildings change
+    this.computeCollisionGrid();
   }
 
   setupBuildingEventListeners() {
@@ -1311,42 +1300,6 @@ class MainScene extends Phaser.Scene {
   }
 
   async connectToServer() {
-    // Use NetworkManager if available
-    if (this.networkManager && this.playerManager) {
-      try {
-        await this.networkManager.connect(
-          this.playerManager,
-          this.worldId,
-          this.isOwnWorld,
-          this.address,
-          this.user
-        );
-        
-        // Get room and sessionId from NetworkManager
-        this.room = this.networkManager.getRoom()!;
-        this.sessionId = this.networkManager.getSessionId()!;
-        
-        // Set up message handlers
-        this.networkManager.onMessage('welcome', (message) => {
-          console.log('Welcome message:', message);
-        });
-        
-        this.networkManager.onMessage('chat', (message: ChatMessage) => {
-          console.log('Chat message:', message);
-          if (this.chatCallback) {
-            this.chatCallback(message);
-          }
-        });
-        
-        console.log(`Joined ${this.worldId ? 'world' : 'game'} room as ${this.sessionId}`);
-      } catch (error) {
-        console.error('Failed to connect:', error);
-        // Could show a UI error here
-      }
-      return;
-    }
-    
-    // Fallback to old implementation if managers not available
     try {
       // Try to detect the appropriate server URL
       const hostname = window.location.hostname;
@@ -1654,26 +1607,20 @@ class MainScene extends Phaser.Scene {
 
   private updateBuildingInteractions() {
     if (!this.currentPlayer) return;
-    
-    // Use BuildingManager if available
-    if (this.buildingManager) {
-      this.buildingManager.update(Date.now(), this.currentPlayer);
-    } else {
-      // Fallback to old implementation
-      const { x, y } = this.currentPlayer;
-      const buildings = [
-        this.bankBuilding,
-        this.marketplaceBuilding,
-        this.flowBankBuilding,
-        this.flowMarketplaceBuilding,
-        this.pepeBuilding,
-      ];
+    const { x, y } = this.currentPlayer;
 
-      for (const building of buildings) {
-        if (building) {
-          building.checkPlayerProximity(x, y);
-          building.checkInteraction();
-        }
+    const buildings = [
+      this.bankBuilding,
+      this.marketplaceBuilding,
+      this.flowBankBuilding,
+      this.flowMarketplaceBuilding,
+      this.pepeBuilding,
+    ];
+
+    for (const building of buildings) {
+      if (building) {
+        building.checkPlayerProximity(x, y);
+        building.checkInteraction();
       }
     }
   }
@@ -1753,54 +1700,29 @@ class MainScene extends Phaser.Scene {
   }
 
   private checkPlayerCollisionOptimized(centerX: number, centerY: number): boolean {
-    // Use CollisionManager if available
-    if (this.collisionManager) {
-      const playerSize = 16;
-      const corners = [
-        { x: centerX - playerSize, y: centerY - playerSize },
-        { x: centerX + playerSize, y: centerY - playerSize },
-        { x: centerX - playerSize, y: centerY + playerSize },
-        { x: centerX + playerSize, y: centerY + playerSize }
-      ];
-      
-      for (const corner of corners) {
-        if (this.collisionManager.isPositionSolid(corner.x, corner.y)) {
-          return true;
-        }
+    const playerSize = 16; // Half the player's collision box size
+    
+    // Check all four corners of the player's collision box using the optimized grid
+    const corners = [
+      { x: centerX - playerSize, y: centerY - playerSize }, // Top-left
+      { x: centerX + playerSize, y: centerY - playerSize }, // Top-right
+      { x: centerX - playerSize, y: centerY + playerSize }, // Bottom-left
+      { x: centerX + playerSize, y: centerY + playerSize }  // Bottom-right
+    ];
+    
+    // If any corner is in a solid tile, collision detected
+    for (const corner of corners) {
+      if (this.isPositionSolid(corner.x, corner.y)) {
+        return true;
       }
-      return false;
-    } else {
-      // Fallback to internal implementation
-      const playerSize = 16;
-      const corners = [
-        { x: centerX - playerSize, y: centerY - playerSize },
-        { x: centerX + playerSize, y: centerY - playerSize },
-        { x: centerX - playerSize, y: centerY + playerSize },
-        { x: centerX + playerSize, y: centerY + playerSize }
-      ];
-      
-      for (const corner of corners) {
-        if (this.isPositionSolid(corner.x, corner.y)) {
-          return true;
-        }
-      }
-      return false;
     }
+    
+    return false;
   }
 
   sendChatMessage(message: string) {
-    console.log('Sending chat message:', message);
-    
-    // Use NetworkManager if available
-    if (this.networkManager && message.trim()) {
-      try {
-        this.networkManager.send('chat', { text: message });
-        console.log('Chat message sent successfully');
-      } catch (error) {
-        console.error('Error sending chat message:', error);
-      }
-    } else if (this.room && message.trim()) {
-      // Fallback to old implementation
+    console.log('Sending chat message:', message, 'Room:', this.room);
+    if (this.room && message.trim()) {
       try {
         this.room.send('chat', { text: message });
         console.log('Chat message sent successfully');
@@ -1808,15 +1730,12 @@ class MainScene extends Phaser.Scene {
         console.error('Error sending chat message:', error);
       }
     } else {
-      console.log('Cannot send chat - no connection or empty message');
+      console.log('Cannot send chat - no room or empty message');
     }
   }
 
   destroy() {
-    // Use NetworkManager if available
-    if (this.networkManager) {
-      this.networkManager.leave();
-    } else if (this.room) {
+    if (this.room) {
       this.room.leave();
     }
     this.scene.stop();
