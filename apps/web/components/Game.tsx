@@ -1608,20 +1608,15 @@ class MainScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (!this.room || !this.currentPlayer) {
-      console.log('[Game.update] Missing requirements', { room: !!this.room, currentPlayer: !!this.currentPlayer });
-      return;
-    }
+    if (!this.room) return;
 
     // Clamp delta to prevent huge jumps when tab switching
     const clampedDelta = Math.min(delta, 100);
 
     // Use InputManager for delta-time based movement if available
     if (this.inputManager && this.playerManager) {
-      // console.log('[Game] Using InputManager for movement');
       this.inputManager.update(clampedDelta);
-    } else {
-      // console.log('[Game] Using fallback handlePlayerInput', { inputManager: !!this.inputManager, playerManager: !!this.playerManager });
+    } else if (this.currentPlayer) {
       // Fallback to old input handling with delta time
       this.handlePlayerInput(clampedDelta);
     }
@@ -1669,18 +1664,14 @@ class MainScene extends Phaser.Scene {
     // Convert speed to pixels per second for delta-time movement
     const speedPerSecond = GameConfig.PLAYER_SPEED; // 540 pixels/second from GameConfig
     const moveDistance = speedPerSecond * (delta / 1000);
-    console.log(`[handlePlayerInput] delta: ${delta}, moveDistance: ${moveDistance}, player pos: (${this.currentPlayer.x}, ${this.currentPlayer.y})`);
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
     let newDirection = this.lastDirection;
 
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      console.log('[handlePlayerInput] Left key pressed');
       const potentialX = Math.max(20, newX - moveDistance);
-      const hasCollision = this.checkPlayerCollisionOptimized(potentialX, newY);
-      console.log(`[handlePlayerInput] Checking collision at (${potentialX}, ${newY}): ${hasCollision}`);
-      if (!hasCollision) {
+      if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         newDirection = 'left';

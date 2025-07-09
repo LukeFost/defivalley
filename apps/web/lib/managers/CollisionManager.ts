@@ -82,20 +82,14 @@ export class CollisionManager {
 
   public isPositionSolid(worldX: number, worldY: number): boolean {
     if (!this.collisionGrid || this.gridWidth === 0 || this.gridHeight === 0) {
-      console.log('[CollisionManager] Grid not initialized, returning false');
       return false; // Default to non-solid if grid not computed
     }
 
     const tileCoords = TilemapUtils.worldToTile(worldX, worldY, this.tileSize);
     if (tileCoords.y < 0 || tileCoords.y >= this.gridHeight || tileCoords.x < 0 || tileCoords.x >= this.gridWidth) {
-      console.log(`[CollisionManager] Out of bounds at tile (${tileCoords.x}, ${tileCoords.y})`);
       return true; // Out of bounds is solid
     }
 
-    const isSolid = this.collisionGrid.get(tileCoords.x, tileCoords.y);
-    if (isSolid) {
-      console.log(`[CollisionManager] Collision detected at tile (${tileCoords.x}, ${tileCoords.y})`);
-    }
-    return isSolid;
+    return this.collisionGrid.get(tileCoords.x, tileCoords.y);
   }
 }
