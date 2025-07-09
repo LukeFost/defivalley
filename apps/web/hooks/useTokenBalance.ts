@@ -14,17 +14,18 @@ const erc20Abi = [
   },
 ] as const;
 
-export function useTokenBalance(tokenAddress: Address | undefined, userAddress: Address | undefined) {
+export function useTokenBalance(tokenAddress: Address | undefined, userAddress: Address | undefined, forceChainId?: number) {
   const chainId = useChainId();
+  const targetChainId = forceChainId || chainId;
   
   const { data: balance, isLoading, refetch } = useReadContract({
     address: tokenAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: userAddress ? [userAddress] : undefined,
-    chainId: chainId, // Use dynamic chainId from connected wallet
+    chainId: targetChainId,
     query: {
-      enabled: !!tokenAddress && !!userAddress,
+      enabled: !!tokenAddress && !!userAddress && (forceChainId ? chainId === forceChainId : true),
     },
   });
 

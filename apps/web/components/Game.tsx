@@ -221,6 +221,42 @@ class MainScene extends Phaser.Scene {
     this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
     this.oKey = this.input.keyboard!.addKey('O');
 
+    // Add global focus/blur event listeners to stop game input when typing
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement || 
+          target instanceof HTMLTextAreaElement ||
+          target.getAttribute('contenteditable') === 'true') {
+        // Disable Phaser keyboard input when focusing on input fields
+        this.input.keyboard!.enabled = false;
+        console.log('🎮 Game input disabled - user is typing');
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      // Small delay to prevent re-enabling too quickly
+      setTimeout(() => {
+        // Only re-enable if we're not focusing another input
+        const activeElement = document.activeElement;
+        if (!(activeElement instanceof HTMLInputElement) && 
+            !(activeElement instanceof HTMLTextAreaElement) &&
+            activeElement?.getAttribute('contenteditable') !== 'true') {
+          this.input.keyboard!.enabled = true;
+          console.log('🎮 Game input re-enabled');
+        }
+      }, 100);
+    };
+
+    // Add event listeners
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    // Clean up on scene shutdown
+    this.events.once('shutdown', () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    });
+
     // Connect to Colyseus after scene is fully ready
     this.time.delayedCall(100, () => {
       this.connectToServer();
@@ -537,7 +573,43 @@ class MainScene extends Phaser.Scene {
       console.log('  🔍 TILEMAP DEBUGGING:');
       console.log('  - debugTilemap(): Complete tilemap diagnostic');
       console.log('  - testTileVisibility(): Test basic tile rendering');
+      console.log('  📍 TELEPORTATION:');
+      console.log('  - teleportToBuildings(): Teleport to the buildings area');
+      console.log('  - showBuildingLocations(): Display all building coordinates');
     }
+    
+    // Add teleportation commands
+    (window as any).teleportToBuildings = () => {
+      if (!this.currentPlayer) {
+        console.log('❌ No current player found');
+        return;
+      }
+      
+      // Teleport to center of building area
+      const targetX = 650;
+      const targetY = 500;
+      this.currentPlayer.setPosition(targetX, targetY);
+      
+      // Send position update to server
+      if (this.room) {
+        this.room.send('move', { x: targetX, y: targetY });
+      }
+      
+      console.log(`✅ Teleported to building area (${targetX}, ${targetY})`);
+    };
+    
+    (window as any).showBuildingLocations = () => {
+      console.log('🏛️ Building Locations in Expanded World:');
+      console.log('\n📍 KATANA NETWORK BUILDINGS:');
+      console.log('  Bank (Morpho): x=1000, y=600');
+      console.log('  Marketplace (SushiSwap): x=1000, y=200');
+      console.log('\n📍 FLOW NETWORK BUILDINGS:');
+      console.log('  Flow Bank (Staking): x=300, y=200');
+      console.log('  Flow Marketplace (DeFi Hub): x=300, y=600');
+      console.log('  Pepe Building (Pump Launchpad): x=500, y=800');
+      console.log('\n💡 TIP: Use teleportToBuildings() to jump to the building area');
+      console.log('💡 Your world is now 6400x4800 pixels (was 800x600)');
+    };
   }
   
   renderDebugOverlay() {
@@ -1180,22 +1252,22 @@ class MainScene extends Phaser.Scene {
     console.log(`🌐 Creating buildings for network: ${this.currentChainId} (Katana: ${isOnKatana}, Flow: ${isOnFlow})`);
 
     if (isOnKatana) {
-      // Create Katana buildings at original positions
-      this.bankBuilding = new BankBuilding(this, 1000, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
+      // Create Katana buildings closer to center
+      this.bankBuilding = new BankBuilding(this, 800, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
       console.log('🔶 Created Katana buildings');
     } else if (isOnFlow) {
-      // Create Flow buildings at different positions for variety
-      this.flowBankBuilding = new FlowBankBuilding(this, 300, 200);
-      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 300, 600);
+      // Create Flow buildings closer to center with better spacing
+      this.flowBankBuilding = new FlowBankBuilding(this, 500, 350);
+      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 500, 750);
       // Create Pepe building only on Flow network
-      this.pepeBuilding = new PepeBuilding(this, 500, 800);
+      this.pepeBuilding = new PepeBuilding(this, 750, 800);
       console.log('🟣 Created Flow buildings');
     } else {
       // Default case - create Katana buildings
       console.log('⚪ Unknown network, creating default Katana buildings');
-      this.bankBuilding = new BankBuilding(this, 1000, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 1000, 200);
+      this.bankBuilding = new BankBuilding(this, 800, 600);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
     }
 
     // Set up event listeners for new buildings
@@ -1340,11 +1412,12 @@ class MainScene extends Phaser.Scene {
         return;
       }
       
-      // Force current player to spawn at center of screen
+      // Force current player to spawn near buildings
       if (isCurrentPlayer) {
-        player.x = 400; // Center X (800/2)
-        player.y = 300; // Center Y (600/2)
-        console.log('🎯 Current player spawned at center:', player.x, player.y);
+        // Spawn near the buildings area for easier access
+        player.x = 650; // Between Flow and Katana buildings
+        player.y = 500; // Middle of building cluster
+        console.log('🎯 Current player spawned near buildings:', player.x, player.y);
       }
       
       // All players are cowboys now - simplified character assignment
@@ -1458,9 +1531,13 @@ class MainScene extends Phaser.Scene {
     }
 
     // Check if any input element is active (covers chat, modals, any input field)
+    const activeElement = document.activeElement;
     const isUIInputElementActive =
-      document.activeElement instanceof HTMLInputElement ||
-      document.activeElement instanceof HTMLTextAreaElement;
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement?.getAttribute('contenteditable') === 'true' ||
+      // Also check if we're inside a dialog/modal (additional safety)
+      activeElement?.closest('[role="dialog"]') !== null;
     
     // Handle O key for stomp animation (only when not typing)
     if (!isUIInputElementActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
@@ -1472,6 +1549,19 @@ class MainScene extends Phaser.Scene {
     if (isUIInputElementActive) {
       // Make sure the player character stops moving visually
       this.currentPlayer.updateMovementState(false);
+      // Also stop any current movement
+      if (this.cursors) {
+        this.cursors.left.isDown = false;
+        this.cursors.right.isDown = false;
+        this.cursors.up.isDown = false;
+        this.cursors.down.isDown = false;
+      }
+      if (this.wasd) {
+        this.wasd.W.isDown = false;
+        this.wasd.A.isDown = false;
+        this.wasd.S.isDown = false;
+        this.wasd.D.isDown = false;
+      }
       return;
     }
 

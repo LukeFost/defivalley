@@ -17,6 +17,10 @@ export class GameRoom extends Room<GameState> {
   maxClients = 10;
   private worldOwnerId: string = 'default';
   private authenticatedClients = new Map<string, AuthenticatedClient>();
+  
+  // World size constants to match the client
+  private worldWidth = 3200;
+  private worldHeight = 2400;
 
   onCreate(options: any) {
     this.setState(new GameState());
@@ -34,8 +38,8 @@ export class GameRoom extends Room<GameState> {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       
-      player.x = Math.max(0, Math.min(800, message.x));
-      player.y = Math.max(0, Math.min(600, message.y));
+      player.x = Math.max(0, Math.min(this.worldWidth, message.x));
+      player.y = Math.max(0, Math.min(this.worldHeight, message.y));
       player.lastActive = Date.now();
     });
     
@@ -87,8 +91,8 @@ export class GameRoom extends Room<GameState> {
     const player = new Player();
     player.id = playerId;  // Use the actual player ID
     player.name = options.name || `Player ${playerId.substr(0, 8)}`;
-    player.x = Math.random() * 800; // Random spawn position
-    player.y = Math.random() * 600;
+    player.x = Math.random() * this.worldWidth; // Random spawn position
+    player.y = Math.random() * this.worldHeight;
     player.connected = true;
     
     // Load player data from database (only load XP for the world owner)

@@ -13,6 +13,7 @@ import { useTokenAllowance } from '@/hooks/useTokenAllowance';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { FLOW_TOKENS, FLOW_PROTOCOLS, NATIVE_TOKEN_ADDRESS } from '@/constants/flow-tokens';
+import { flowMainnet } from '@/app/wagmi';
 
 interface FlowSwapModalProps {
   isOpen: boolean;
@@ -20,9 +21,12 @@ interface FlowSwapModalProps {
 }
 
 export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
-  const { address } = useAccount();
-  const { data: flowBalance, refetch: refetchFlowBalance } = useBalance({ address });
-  const { balance: frothBalance, refetch: refetchFrothBalance } = useTokenBalance(FLOW_TOKENS.FROTH, address);
+  const { address, chainId } = useAccount();
+  const { data: flowBalance, refetch: refetchFlowBalance } = useBalance({ 
+    address,
+    chainId: flowMainnet.id // Force Flow mainnet chain ID
+  });
+  const { balance: frothBalance, refetch: refetchFrothBalance } = useTokenBalance(FLOW_TOKENS.FROTH, address, flowMainnet.id);
   
   const [amount, setAmount] = useState('');
   
@@ -44,10 +48,29 @@ export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
   } = useTokenAllowance(FLOW_TOKENS.FROTH, FLOW_PROTOCOLS.PUNCHSWAP_V2_ROUTER);
 
   const handleSwapToFroth = async () => {
-    if (amount) {
-        await swap(NATIVE_TOKEN_ADDRESS, FLOW_TOKENS.FROTH, parseUnits(amount, 18));
-        refetchFrothBalance();
-        refetchFlowBalance(); // Refetch FLOW balance after swap
+    if (!amount || parseFloat(amount) <= 0) {
+      return;
+    }
+    
+    if (chainId !== flowMainnet.id) {
+      alert('Please switch to Flow network to perform this swap');
+      return;
+    }
+    
+    try {
+      console.log('Swapping:', {
+        from: NATIVE_TOKEN_ADDRESS,
+        to: FLOW_TOKENS.FROTH,
+        amount: amount,
+        parsedAmount: parseUnits(amount, 18).toString()
+      });
+      
+      await swap(NATIVE_TOKEN_ADDRESS, FLOW_TOKENS.FROTH, parseUnits(amount, 18));
+      setAmount(''); // Clear the input after successful swap
+      refetchFrothBalance();
+      refetchFlowBalance(); // Refetch FLOW balance after swap
+    } catch (error) {
+      console.error('Swap failed:', error);
     }
   };
 
@@ -83,10 +106,17 @@ export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
             <p className="text-sm text-muted-foreground mb-2">Use PunchSwap to get the initial token.</p>
             <Label htmlFor="flow-amount">FLOW Amount</Label>
             <Input id="flow-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.0" />
-            <p className="text-xs text-muted-foreground mt-1">Balance: {flowBalance ? formatUnits(flowBalance.value, 18) : '0'} FLOW</p>
-            <Button onClick={handleSwapToFroth} disabled={isSwapping || !amount} className="mt-2 w-full">
+            <p className="text-xs text-muted-foreground mt-1">
+              Balance: {flowBalance && flowBalance.value > 0n ? formatUnits(flowBalance.value, 18) : '0'} FLOW
+              {chainId !== flowMainnet.id && ' (Switch to Flow network)'}
+            </p>
+            <Button 
+              onClick={handleSwapToFroth} 
+              disabled={isSwapping || !amount || chainId !== flowMainnet.id || parseFloat(amount || '0') <= 0} 
+              className="mt-2 w-full"
+            >
               {isSwapping && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Swap for FROTH
+              {chainId !== flowMainnet.id ? 'Switch to Flow Network' : 'Swap for FROTH'}
             </Button>
             {swapError && <p className="text-red-500 text-xs mt-2">{swapError}</p>}
           </div>

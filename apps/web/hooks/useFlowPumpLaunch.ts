@@ -4,24 +4,7 @@ import { useState } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { useUI } from '../app/store';
-
-// Mock contract addresses and ABI for Flow pump factory
-// These would need to be replaced with actual contract addresses and ABIs
-const pump_factory_address = '0x0000000000000000000000000000000000000000' as const;
-const pump_factory = [
-  {
-    inputs: [
-      { name: 'name', type: 'string' },
-      { name: 'symbol', type: 'string' },
-      { name: 'fundingRaised', type: 'uint256' },
-      { name: 'uniqueId', type: 'string' }
-    ],
-    name: 'createMemeToken',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function'
-  }
-] as const;
+import { pump_factory, pump_factory_address } from 'contracts/abi/pump_flow';
 
 // The creation fee is typically fixed by the contract, e.g., 3 FLOW
 const CREATION_FEE = parseEther('3');
