@@ -8,6 +8,7 @@ import { CharacterType, CharacterDefinitions } from '../lib/character.config';
 import { TilesetConfig, TilemapUtils } from '../lib/tilemap.config';
 import { TilemapEditor } from '../lib/tilemap.editor';
 import { CropSystem, CropType, CropData } from '../lib/CropSystem';
+import { GameConfig } from '../lib/GameConfig';
 import { BankBuilding } from '../lib/BankBuilding';
 import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { FlowBankBuilding } from '../lib/FlowBankBuilding';
@@ -80,9 +81,9 @@ class MainScene extends Phaser.Scene {
   private currentChainId?: number;
   
   // Camera system properties
-  private worldWidth: number = 5000; // Massively increased for huge exploration area
-  private worldHeight: number = 4000; // Massively increased for huge exploration area
-  private cameraLerpFactor: number = 0.1; // Smooth camera following
+  private worldWidth: number = GameConfig.world.width;
+  private worldHeight: number = GameConfig.world.height;
+  private cameraLerpFactor: number = GameConfig.camera.lerpFactor;
   
   // Simple background approach with invisible walls
   private invisibleWalls!: Phaser.Physics.Arcade.StaticGroup;
@@ -1269,22 +1270,25 @@ class MainScene extends Phaser.Scene {
     console.log(`🌐 Creating buildings for network: ${this.currentChainId} (Katana: ${isOnKatana}, Flow: ${isOnFlow})`);
 
     if (isOnKatana) {
-      // Create Katana buildings closer to center
-      this.bankBuilding = new BankBuilding(this, 800, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
+      // Create Katana buildings
+      const katanaPos = GameConfig.buildings.katana;
+      this.bankBuilding = new BankBuilding(this, katanaPos.bank.x, katanaPos.bank.y);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, katanaPos.marketplace.x, katanaPos.marketplace.y);
       console.log('🔶 Created Katana buildings');
     } else if (isOnFlow) {
-      // Create Flow buildings closer to center with better spacing
-      this.flowBankBuilding = new FlowBankBuilding(this, 500, 350);
-      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, 500, 750);
+      // Create Flow buildings
+      const flowPos = GameConfig.buildings.flow;
+      this.flowBankBuilding = new FlowBankBuilding(this, flowPos.bank.x, flowPos.bank.y);
+      this.flowMarketplaceBuilding = new FlowMarketplaceBuilding(this, flowPos.marketplace.x, flowPos.marketplace.y);
       // Create Pepe building only on Flow network
-      this.pepeBuilding = new PepeBuilding(this, 750, 800);
+      this.pepeBuilding = new PepeBuilding(this, flowPos.pepe.x, flowPos.pepe.y);
       console.log('🟣 Created Flow buildings');
     } else {
       // Default case - create Katana buildings
       console.log('⚪ Unknown network, creating default Katana buildings');
-      this.bankBuilding = new BankBuilding(this, 800, 600);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, 800, 400);
+      const katanaPos = GameConfig.buildings.katana;
+      this.bankBuilding = new BankBuilding(this, katanaPos.bank.x, katanaPos.bank.y);
+      this.marketplaceBuilding = new MarketplaceBuilding(this, katanaPos.marketplace.x, katanaPos.marketplace.y);
     }
 
     // Set up event listeners for new buildings
@@ -1435,8 +1439,8 @@ class MainScene extends Phaser.Scene {
       // Force current player to spawn near buildings
       if (isCurrentPlayer) {
         // Spawn near the buildings area for easier access
-        player.x = 650; // Between Flow and Katana buildings
-        player.y = 500; // Middle of building cluster
+        player.x = GameConfig.player.spawnPosition.x;
+        player.y = GameConfig.player.spawnPosition.y;
         console.log('🎯 Current player spawned near buildings:', player.x, player.y);
       }
       
@@ -1507,8 +1511,12 @@ class MainScene extends Phaser.Scene {
 
   updatePlayerDirection(player: Player, direction: string) {
     try {
-      player.updateDirection(direction as any);
-      console.log(`🧭 Updated player direction: ${direction}`);
+      // Only update if direction actually changed
+      const currentDirection = player.getPlayerInfo().direction;
+      if (currentDirection !== direction) {
+        player.updateDirection(direction as any);
+        // Remove spammy console log - was causing performance issues
+      }
     } catch (error) {
       console.error('Error updating player direction:', error);
     }
@@ -1521,12 +1529,12 @@ class MainScene extends Phaser.Scene {
     this.handlePlayerInput(delta);
 
     // Throttled updates for less critical systems
-    if (time - this.lastBuildingCheck > 100) { // 10 times per second
+    if (time - this.lastBuildingCheck > GameConfig.updateIntervals.buildingCheck) {
       this.updateBuildingInteractions();
       this.lastBuildingCheck = time;
     }
 
-    if (time - this.lastCropUpdate > 500) { // 2 times per second
+    if (time - this.lastCropUpdate > GameConfig.updateIntervals.cropUpdate) {
       this.cropSystem?.update();
       this.lastCropUpdate = time;
     }
@@ -1551,7 +1559,9 @@ class MainScene extends Phaser.Scene {
       return;
     }
 
-    const speed = 9;
+    // Frame-rate independent movement: 540 pixels per second
+    const baseSpeed = 540;
+    const speed = (baseSpeed * delta) / 1000; // Convert to pixels per frame
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
@@ -1596,7 +1606,7 @@ class MainScene extends Phaser.Scene {
     if (moved) {
       this.currentPlayer.setPosition(newX, newY);
       const now = performance.now();
-      if (now - this.lastPlayerSync > 100) { // Sync position 10 times per second
+      if (now - this.lastPlayerSync > GameConfig.network.positionSyncInterval) {
         this.room.send('move', { x: newX, y: newY });
         this.lastPlayerSync = now;
       }
