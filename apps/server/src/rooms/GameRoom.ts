@@ -14,6 +14,10 @@ import { JoinOptions, AuthenticatedClient } from "../types/auth.types";
 import { hashPlayerId } from "../utils/auth";
 import { GameConfig } from "../config/GameConfig";
 
+interface CreateOptions {
+  worldOwnerId?: string;
+}
+
 export class GameRoom extends Room<GameState> {
   maxClients = GameConfig.MAX_CLIENTS;
   private worldOwnerId: string = 'default';
@@ -23,7 +27,7 @@ export class GameRoom extends Room<GameState> {
   private worldWidth = GameConfig.SERVER_WORLD_WIDTH;
   private worldHeight = GameConfig.SERVER_WORLD_HEIGHT;
 
-  onCreate(options: any) {
+  onCreate(options: CreateOptions) {
     this.setState(new GameState());
     
     // Get the world owner ID from options (defaults to 'default' for fallback)

@@ -25,7 +25,7 @@ export class NetworkManager {
     this.scene = scene;
   }
 
-  public async connect(playerManager: PlayerManager, worldId?: string, isOwnWorld?: boolean, address?: string, user?: any): Promise<void> {
+  public async connect(playerManager: PlayerManager, worldId?: string, isOwnWorld?: boolean, address?: string, user?: { id: string; [key: string]: any }): Promise<void> {
     try {
       const hostname = window.location.hostname;
       const port = GameConfig.NETWORK_SERVER_PORT.toString();
@@ -44,7 +44,7 @@ export class NetworkManager {
       
       const displayName = address ? formatAddress(address) : `Player${Math.floor(Math.random() * 1000)}`;
 
-      const roomOptions: any = { name: displayName, playerId };
+      const roomOptions: { name: string; playerId: string; worldOwnerId?: string } = { name: displayName, playerId };
       const roomType = worldId ? 'world' : 'game';
       
       if (worldId) {

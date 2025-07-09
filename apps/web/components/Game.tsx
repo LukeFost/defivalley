@@ -77,7 +77,7 @@ class MainScene extends Phaser.Scene {
   private worldId?: string;
   private isOwnWorld?: boolean;
   private address?: string;
-  private user?: any;
+  private user?: { id: string; [key: string]: any };
   private currentChainId?: number;
   
   // Camera system properties
@@ -106,6 +106,7 @@ class MainScene extends Phaser.Scene {
   private buildingManager?: BuildingManager;
   private collisionManager?: CollisionManager;
   private networkManager?: NetworkManager;
+  private inputManager?: InputManager;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -238,6 +239,14 @@ class MainScene extends Phaser.Scene {
     this.playerManager = new PlayerManager(this, this.networkManager);
     this.buildingManager = new BuildingManager(this);
     this.collisionManager = new CollisionManager(this, this.buildingManager);
+    
+    // Initialize InputManager after collision manager is ready
+    this.inputManager = new InputManager(
+      this,
+      this.playerManager,
+      this.collisionManager,
+      this.networkManager
+    );
     
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
@@ -1246,7 +1255,7 @@ class MainScene extends Phaser.Scene {
     this.isOwnWorld = isOwnWorld;
   }
   
-  setAuthInfo(address?: string, user?: any) {
+  setAuthInfo(address?: string, user?: { id: string; [key: string]: any }) {
     this.address = address;
     this.user = user;
   }
@@ -1464,7 +1473,27 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  addPlayer(sessionId: string, player: any) {
+  addPlayer(sessionId: string, player: { name: string; x: number; y: number; level?: number; connected?: boolean }) {
+    // Use PlayerManager if available
+    if (this.playerManager) {
+      this.playerManager.addPlayer(sessionId, player, sessionId === this.sessionId);
+      
+      // Get the current player reference if this is us
+      if (sessionId === this.sessionId) {
+        this.currentPlayer = this.playerManager.getPlayer(sessionId)!;
+        
+        // Set up camera to follow current player
+        this.updateCameraFollow();
+        
+        // Pass current player to InputManager
+        if (this.inputManager) {
+          this.inputManager.setCurrentPlayer(this.currentPlayer);
+        }
+      }
+      return;
+    }
+    
+    // Fallback to old implementation
     try {
       const isCurrentPlayer = sessionId === this.sessionId;
       
@@ -1525,6 +1554,14 @@ class MainScene extends Phaser.Scene {
   }
 
   removePlayer(sessionId: string) {
+    // Use PlayerManager if available
+    if (this.playerManager) {
+      this.playerManager.removePlayer(sessionId);
+      this.players.delete(sessionId);
+      return;
+    }
+    
+    // Fallback to old implementation
     try {
       const player = this.players.get(sessionId);
       if (player) {
@@ -1537,7 +1574,14 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  updatePlayer(sessionId: string, playerData: any) {
+  updatePlayer(sessionId: string, playerData: { x?: number; y?: number; level?: number; connected?: boolean }) {
+    // Use PlayerManager if available
+    if (this.playerManager) {
+      this.playerManager.updatePlayer(sessionId, playerData);
+      return;
+    }
+    
+    // Fallback to old implementation
     try {
       const player = this.players.get(sessionId);
       if (player && playerData) {
@@ -1565,16 +1609,33 @@ class MainScene extends Phaser.Scene {
   update(time: number, delta: number) {
     if (!this.room || !this.currentPlayer) return;
 
-    // Player input runs every frame for responsiveness
-    this.handlePlayerInput(delta);
+    // Clamp delta to prevent huge jumps when tab switching
+    const clampedDelta = Math.min(delta, 100);
 
-    // Throttled updates for less critical systems
-    if (time - this.lastBuildingCheck > 100) { // 10 times per second
+    // Use InputManager for delta-time based movement if available
+    if (this.inputManager && this.playerManager) {
+      this.inputManager.update(clampedDelta);
+    } else {
+      // Fallback to old input handling with delta time
+      this.handlePlayerInput(clampedDelta);
+    }
+
+    // Use PlayerManager for network throttling
+    if (this.playerManager) {
+      this.playerManager.update(time);
+    }
+
+    // Use BuildingManager for interactions
+    if (this.buildingManager) {
+      this.buildingManager.update(time, this.currentPlayer);
+    } else if (time - this.lastBuildingCheck > 100) {
+      // Fallback to old building interaction
       this.updateBuildingInteractions();
       this.lastBuildingCheck = time;
     }
 
-    if (time - this.lastCropUpdate > GameConfig.CROP_UPDATE_INTERVAL) { // 2 times per second
+    // Update crop system
+    if (time - this.lastCropUpdate > GameConfig.CROP_UPDATE_INTERVAL) {
       this.cropSystem?.update();
       this.lastCropUpdate = time;
     }
@@ -1599,21 +1660,23 @@ class MainScene extends Phaser.Scene {
       return;
     }
 
-    const speed = 9;
+    // Convert speed to pixels per second for delta-time movement
+    const speedPerSecond = GameConfig.PLAYER_SPEED; // 540 pixels/second from GameConfig
+    const moveDistance = speedPerSecond * (delta / 1000);
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
     let newDirection = this.lastDirection;
 
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      const potentialX = Math.max(20, newX - speed);
+      const potentialX = Math.max(20, newX - moveDistance);
       if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
         newDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      const potentialX = Math.min(this.worldWidth - 20, newX + speed);
+      const potentialX = Math.min(this.worldWidth - 20, newX + moveDistance);
       if (!this.checkPlayerCollisionOptimized(potentialX, newY)) {
         newX = potentialX;
         moved = true;
@@ -1622,14 +1685,14 @@ class MainScene extends Phaser.Scene {
     }
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
-      const potentialY = Math.max(20, newY - speed);
+      const potentialY = Math.max(20, newY - moveDistance);
       if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
         newDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      const potentialY = newY + speed;
+      const potentialY = newY + moveDistance;
       if (!this.checkPlayerCollisionOptimized(newX, potentialY)) {
         newY = potentialY;
         moved = true;
