@@ -14,9 +14,25 @@ export class PlayerManager {
   }
 
   public addPlayer(sessionId: string, playerInfo: any, isCurrentPlayer: boolean): void {
-    if (this.players.has(sessionId)) return;
+    // Update existing player if already exists
+    if (this.players.has(sessionId)) {
+      this.updatePlayer(sessionId, playerInfo);
+      return;
+    }
 
-    const characterType: CharacterType = 'cowboy'; // Simplified
+    // Determine character type (this logic should match MainScene)
+    const characterTypes: CharacterType[] = [
+      'knight', 'cowboy', 'elf_archer', 'mage', 
+      'cleric', 'rogue', 'skeleton', 'orc', 'gnome'
+    ];
+    
+    // Use player name hash for consistent character selection
+    const nameHash = playerInfo.name.split('').reduce((acc: number, char: string) => {
+      return acc + char.charCodeAt(0);
+    }, 0);
+    const characterIndex = nameHash % characterTypes.length;
+    const characterType = characterTypes[characterIndex];
+
     const newPlayerInfo: PlayerInfo = {
       id: sessionId,
       name: playerInfo.name,
@@ -35,7 +51,14 @@ export class PlayerManager {
     if (isCurrentPlayer) {
       this.currentPlayer = playerObject;
       this.scene.cameras.main.startFollow(this.currentPlayer, true, 0.1, 0.1);
+      
+      // Set initial camera bounds
+      const worldWidth = (this.scene as any).worldWidth || 3200;
+      const worldHeight = (this.scene as any).worldHeight || 2400;
+      this.scene.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     }
+    
+    console.log(`${isCurrentPlayer ? '👤' : '👥'} ${isCurrentPlayer ? 'You joined' : `${playerInfo.name} joined`} as ${characterType}`);
   }
 
   public removePlayer(sessionId: string): void {

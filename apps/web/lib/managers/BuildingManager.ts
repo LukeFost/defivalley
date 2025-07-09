@@ -50,11 +50,7 @@ export class BuildingManager {
     }
   }
 
-  public getBuildings(): (Phaser.GameObjects.Container & { 
-    getCollisionBounds: () => Phaser.Geom.Rectangle; 
-    checkPlayerProximity: (x: number, y: number) => void;
-    checkInteraction: () => void;
-  })[] {
+  public getBuildings(): any[] {
     const allBuildings = [
       this.bankBuilding,
       this.marketplaceBuilding,
@@ -62,7 +58,27 @@ export class BuildingManager {
       this.flowMarketplaceBuilding,
       this.pepeBuilding
     ];
-    return allBuildings.filter(b => b !== undefined) as any[];
+    return allBuildings.filter(b => b !== undefined);
+  }
+  
+  public getBankBuilding(): BankBuilding | undefined {
+    return this.bankBuilding;
+  }
+  
+  public getMarketplaceBuilding(): MarketplaceBuilding | undefined {
+    return this.marketplaceBuilding;
+  }
+  
+  public getFlowBankBuilding(): FlowBankBuilding | undefined {
+    return this.flowBankBuilding;
+  }
+  
+  public getFlowMarketplaceBuilding(): FlowMarketplaceBuilding | undefined {
+    return this.flowMarketplaceBuilding;
+  }
+  
+  public getPepeBuilding(): PepeBuilding | undefined {
+    return this.pepeBuilding;
   }
 
   private destroyBuildings(): void {
