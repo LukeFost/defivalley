@@ -241,14 +241,19 @@ class MainScene extends Phaser.Scene {
     this.collisionManager = new CollisionManager(this, this.buildingManager);
     
     // Initialize InputManager after collision manager is ready
+    // Set up keyboard controls first
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
+    this.oKey = this.input.keyboard!.addKey('O');
+
     this.inputManager = new InputManager(
       this,
       this.playerManager,
       this.collisionManager
     );
     
-    // Setup input through InputManager
-    this.inputManager.setupInput();
+    // Setup input through InputManager with existing keyboard controls
+    this.inputManager.setupInput(this.cursors, this.wasd);
     
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
@@ -259,11 +264,6 @@ class MainScene extends Phaser.Scene {
     } else {
       this.computeCollisionGrid();
     }
-
-    // Set up additional keys not handled by InputManager (for legacy support)
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
-    this.oKey = this.input.keyboard!.addKey('O');
 
     // Add global focus/blur event listeners to stop game input when typing
     const handleFocusIn = (e: FocusEvent) => {

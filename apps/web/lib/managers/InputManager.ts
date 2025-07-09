@@ -16,9 +16,9 @@ export class InputManager {
     this.collisionManager = collisionManager;
   }
 
-  public setupInput(): void {
-    this.cursors = this.scene.input.keyboard!.createCursorKeys();
-    this.wasd = this.scene.input.keyboard!.addKeys('W,S,A,D') as { [key: string]: Phaser.Input.Keyboard.Key };
+  public setupInput(cursors: Phaser.Types.Input.Keyboard.CursorKeys, wasd: { [key: string]: Phaser.Input.Keyboard.Key }): void {
+    this.cursors = cursors;
+    this.wasd = wasd;
   }
 
   public update(delta: number): void {
@@ -27,6 +27,19 @@ export class InputManager {
 
     // Check if input is initialized
     if (!this.cursors || !this.wasd) return;
+
+    // Check if UI element is active (prevent movement when typing)
+    const activeElement = document.activeElement;
+    const isUIInputElementActive = 
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement?.getAttribute('contenteditable') === 'true' ||
+      activeElement?.closest('[role="dialog"]') !== null;
+
+    if (isUIInputElementActive) {
+      this.playerManager.stopPlayer();
+      return;
+    }
 
     // Speed scaled up to compensate for delta time multiplication
     const speed = GameConfig.PLAYER_SPEED;
