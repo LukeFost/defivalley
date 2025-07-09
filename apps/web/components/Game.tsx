@@ -1615,8 +1615,10 @@ class MainScene extends Phaser.Scene {
 
     // Use InputManager for delta-time based movement if available
     if (this.inputManager && this.playerManager) {
+      console.log('[Game] Using InputManager for movement');
       this.inputManager.update(clampedDelta);
     } else {
+      console.log('[Game] Using fallback handlePlayerInput', { inputManager: !!this.inputManager, playerManager: !!this.playerManager });
       // Fallback to old input handling with delta time
       this.handlePlayerInput(clampedDelta);
     }
