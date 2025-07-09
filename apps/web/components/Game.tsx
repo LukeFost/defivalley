@@ -13,6 +13,11 @@ import { MarketplaceBuilding } from '../lib/MarketplaceBuilding';
 import { FlowBankBuilding } from '../lib/FlowBankBuilding';
 import { FlowMarketplaceBuilding } from '../lib/FlowMarketplaceBuilding';
 import { PepeBuilding } from '../lib/PepeBuilding';
+import { PlayerManager } from '../lib/managers/PlayerManager';
+import { BuildingManager } from '../lib/managers/BuildingManager';
+import { InputManager } from '../lib/managers/InputManager';
+import { CollisionManager } from '../lib/managers/CollisionManager';
+import { NetworkManager } from '../lib/managers/NetworkManager';
 import { DialogueBox } from './DialogueBox';
 import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
@@ -85,6 +90,11 @@ class MainScene extends Phaser.Scene {
   // Legacy tilemap properties (kept for backward compatibility)
   private mapLayout: string[][] = [];
   private collisionMap: boolean[][] = [];
+  
+  // Performance optimization properties
+  private lastBuildingCheck: number = 0;
+  private lastCropUpdate: number = 0;
+  private lastPlayerSync: number = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -1494,74 +1504,40 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  update(time: number, delta: number) {
     if (!this.room || !this.currentPlayer) return;
 
-    // Update crop system
-    if (this.cropSystem) {
-      this.cropSystem.update();
+    // Player input runs every frame for responsiveness
+    this.handlePlayerInput(delta);
+
+    // Throttled updates for less critical systems
+    if (time - this.lastBuildingCheck > 100) { // 10 times per second
+      this.updateBuildingInteractions();
+      this.lastBuildingCheck = time;
     }
 
-    // Update Katana building interactions
-    if (this.bankBuilding && this.currentPlayer) {
-      this.bankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.bankBuilding.checkInteraction();
+    if (time - this.lastCropUpdate > 500) { // 2 times per second
+      this.cropSystem?.update();
+      this.lastCropUpdate = time;
     }
-    
-    if (this.marketplaceBuilding && this.currentPlayer) {
-      this.marketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.marketplaceBuilding.checkInteraction();
-    }
-    
-    // Update Flow building interactions
-    if (this.flowBankBuilding && this.currentPlayer) {
-      this.flowBankBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.flowBankBuilding.checkInteraction();
-    }
-    
-    if (this.flowMarketplaceBuilding && this.currentPlayer) {
-      this.flowMarketplaceBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.flowMarketplaceBuilding.checkInteraction();
-    }
+  }
 
-    // Update Pepe building interactions (not network-specific)
-    if (this.pepeBuilding && this.currentPlayer) {
-      this.pepeBuilding.checkPlayerProximity(this.currentPlayer.x, this.currentPlayer.y);
-      this.pepeBuilding.checkInteraction();
-    }
+  private handlePlayerInput(delta: number) {
+    if (!this.currentPlayer) return;
 
-    // Check if any input element is active (covers chat, modals, any input field)
     const activeElement = document.activeElement;
-    const isUIInputElementActive =
+    const isUIInputElementActive = 
       activeElement instanceof HTMLInputElement ||
       activeElement instanceof HTMLTextAreaElement ||
       activeElement?.getAttribute('contenteditable') === 'true' ||
-      // Also check if we're inside a dialog/modal (additional safety)
       activeElement?.closest('[role="dialog"]') !== null;
-    
-    // Handle O key for stomp animation (only when not typing)
-    if (!isUIInputElementActive && Phaser.Input.Keyboard.JustDown(this.oKey)) {
-      this.currentPlayer.playStompAnimation(2000); // Play for 2 seconds
-      console.log('🦶 Stomp animation triggered!');
+
+    if (Phaser.Input.Keyboard.JustDown(this.oKey) && !isUIInputElementActive) {
+      this.currentPlayer.playStompAnimation(2000);
     }
-    
-    // Don't process movement if a UI input is active
+
     if (isUIInputElementActive) {
-      // Make sure the player character stops moving visually
       this.currentPlayer.updateMovementState(false);
-      // Also stop any current movement
-      if (this.cursors) {
-        this.cursors.left.isDown = false;
-        this.cursors.right.isDown = false;
-        this.cursors.up.isDown = false;
-        this.cursors.down.isDown = false;
-      }
-      if (this.wasd) {
-        this.wasd.W.isDown = false;
-        this.wasd.A.isDown = false;
-        this.wasd.S.isDown = false;
-        this.wasd.D.isDown = false;
-      }
       return;
     }
 
@@ -1569,61 +1545,73 @@ class MainScene extends Phaser.Scene {
     let moved = false;
     let newX = this.currentPlayer.x;
     let newY = this.currentPlayer.y;
+    let newDirection = this.lastDirection;
 
-    // Handle input with directional sprite changes and collision detection
     if (this.cursors.left.isDown || this.wasd.A.isDown) {
       const potentialX = Math.max(20, newX - speed);
-      // Check collision before moving using new tile-based system
       if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
-        this.lastDirection = 'left';
+        newDirection = 'left';
       }
     } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
       const potentialX = Math.min(this.worldWidth - 20, newX + speed);
-      // Check collision before moving using new tile-based system
       if (!this.checkPlayerCollision(potentialX, newY)) {
         newX = potentialX;
         moved = true;
-        this.lastDirection = 'right';
+        newDirection = 'right';
       }
     }
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       const potentialY = Math.max(20, newY - speed);
-      // Check collision before moving using new tile-based system
       if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
-        this.lastDirection = 'up';
+        newDirection = 'up';
       }
     } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
       const potentialY = newY + speed;
-      // Check collision before moving using new tile-based system
       if (!this.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
-        this.lastDirection = 'down';
-      }
-    }
-    
-    // Update sprite direction and animation state
-    if (this.currentPlayer) {
-      if (moved) {
-        this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
-        // Update animation state to walking
-        this.currentPlayer.updateMovementState(true);
-      } else {
-        // Update animation state to idle when not moving
-        this.currentPlayer.updateMovementState(false);
+        newDirection = 'down';
       }
     }
 
-    // Send movement to server
+    this.lastDirection = newDirection;
+    this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+    this.currentPlayer.updateMovementState(moved);
+
     if (moved) {
-      this.room.send('move', { x: newX, y: newY });
-      // Update camera to follow player
-      this.updateCameraFollow();
+      this.currentPlayer.setPosition(newX, newY);
+      const now = performance.now();
+      if (now - this.lastPlayerSync > 100) { // Sync position 10 times per second
+        this.room.send('move', { x: newX, y: newY });
+        this.lastPlayerSync = now;
+      }
+    }
+
+    this.updateCameraFollow();
+  }
+
+  private updateBuildingInteractions() {
+    if (!this.currentPlayer) return;
+    const { x, y } = this.currentPlayer;
+
+    const buildings = [
+      this.bankBuilding,
+      this.marketplaceBuilding,
+      this.flowBankBuilding,
+      this.flowMarketplaceBuilding,
+      this.pepeBuilding,
+    ];
+
+    for (const building of buildings) {
+      if (building) {
+        building.checkPlayerProximity(x, y);
+        building.checkInteraction();
+      }
     }
   }
 
