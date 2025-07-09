@@ -74,10 +74,10 @@ Players plant seeds in a farming game → Real USDC deposits into EulerSwap vaul
 
 ## 🎯 **CURRENT PROJECT STATUS: CONSOLIDATED ARCHITECTURE**
 
-**Current Branch**: `develop` - Single stable branch containing all integrated features
+**Current Branch**: `main` - Single stable branch containing all integrated features
 
 ### ✅ **Integrated Feature Set (v2.0)**
-All features have been successfully consolidated into the develop branch:
+All features have been successfully consolidated into the main branch:
 
 1. **🎨 Enhanced UI System** - Clean, minimal interface with improved user experience
 2. **🗺️ World Decoration & Tilemap** - Natural terrain generation with cliff collision detection
@@ -92,6 +92,13 @@ All features have been successfully consolidated into the develop branch:
 - **Development Ready**: Dependencies installed, foundation stable
 
 ## 📋 **COMPLETED TASKS & RECENT UPDATES**
+
+### ✅ **Code Cleanup & Architecture Improvements (Latest)**
+1. **Removed Unused Manager Classes**
+   - Deleted 5 unused manager files (352 lines of dead code)
+   - Cleaned up imports in Game.tsx
+   - Managers were imported but never instantiated
+   - All functionality already exists in MainScene class
 
 ### ✅ **Security & Performance Improvements (Completed)**
 1. **Fixed SQL Injection Vulnerabilities**
@@ -118,6 +125,7 @@ All features have been successfully consolidated into the develop branch:
    - Fixed dynamic require() anti-patterns
    - Added proper TypeScript types
    - Improved error propagation
+   - Removed unused manager architecture
 
 ### 🔧 **Next Steps (Medium Priority)**
 1. **Complete Auto-Bridge Integration**
