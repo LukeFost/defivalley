@@ -111,8 +111,8 @@ export class Player extends Phaser.GameObjects.Container {
     // Scale all characters by 2x for better visibility
     sprite.setScale(sprite.scaleX * 2, sprite.scaleY * 2);
     
-    // Set sprite origin to center for proper rotation and rendering
-    sprite.setOrigin(0.5, 0.5);
+    // Set sprite origin to bottom-center for proper 2.5D depth sorting
+    sprite.setOrigin(0.5, 1);
     
     // Enable auto-clearing to prevent ghosting
     sprite.setBlendMode(Phaser.BlendModes.NORMAL);
@@ -124,7 +124,7 @@ export class Player extends Phaser.GameObjects.Container {
    * Creates the nameplate text object
    */
   private createNameplate(scene: Phaser.Scene): Phaser.GameObjects.Text {
-    const nameplate = scene.add.text(0, -60, this.playerInfo.name, {  // Adjusted from -40 to -60 for 2x scale
+    const nameplate = scene.add.text(0, -80, this.playerInfo.name, {  // Adjusted for bottom-origin sprite
       fontSize: '12px',
       color: this.playerInfo.isCurrentPlayer ? '#00ff00' : '#ffffff',
       backgroundColor: '#000000',
@@ -138,7 +138,7 @@ export class Player extends Phaser.GameObjects.Container {
    * Creates the level badge text object
    */
   private createBadge(scene: Phaser.Scene): Phaser.GameObjects.Text {
-    const badge = scene.add.text(30, -30, `L${this.playerInfo.level || 1}`, {  // Adjusted from 20,-20 to 30,-30 for 2x scale
+    const badge = scene.add.text(30, -50, `L${this.playerInfo.level || 1}`, {  // Adjusted for bottom-origin sprite
       fontSize: '10px',
       color: '#ffffff',
       backgroundColor: '#4a90e2',
