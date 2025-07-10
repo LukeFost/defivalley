@@ -11,7 +11,7 @@ interface DialogueBoxProps {
   characterName?: string;
 }
 
-export function DialogueBox({ isOpen, content, onClose, onContinue, characterName = "Guide" }: DialogueBoxProps) {
+export const DialogueBox = React.memo(function DialogueBox({ isOpen, content, onClose, onContinue, characterName = "Guide" }: DialogueBoxProps) {
   if (!isOpen) return null;
 
   return (
@@ -91,4 +91,4 @@ export function DialogueBox({ isOpen, content, onClose, onContinue, characterNam
       `}</style>
     </div>
   );
-}
+});

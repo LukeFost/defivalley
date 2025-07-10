@@ -106,30 +106,21 @@ interface TransactionCardProps {
 }
 
 function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
-  const [timeAgo, setTimeAgo] = useState('');
-  
-  useEffect(() => {
-    const updateTimeAgo = () => {
-      const now = Date.now();
-      const diff = now - transaction.lastUpdated;
-      const seconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      
-      if (hours > 0) {
-        setTimeAgo(`${hours}h ago`);
-      } else if (minutes > 0) {
-        setTimeAgo(`${minutes}m ago`);
-      } else {
-        setTimeAgo(`${seconds}s ago`);
-      }
-    };
+  const getTimeAgo = () => {
+    const now = Date.now();
+    const diff = now - transaction.lastUpdated;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
     
-    updateTimeAgo();
-    const interval = setInterval(updateTimeAgo, 1000);
-    
-    return () => clearInterval(interval);
-  }, [transaction.lastUpdated]);
+    if (hours > 0) {
+      return `${hours}h ago`;
+    } else if (minutes > 0) {
+      return `${minutes}m ago`;
+    } else {
+      return `${seconds}s ago`;
+    }
+  };
   
   const getTransactionSteps = (tx: CrossChainTx) => {
     const baseSteps = [
@@ -245,7 +236,7 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
               {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1).replace('_', ' ')}
             </span>
             <span>•</span>
-            <span>{timeAgo}</span>
+            <span>{getTimeAgo()}</span>
           </div>
         </div>
         
@@ -371,6 +362,7 @@ function TransactionCard({ transaction, onRetry }: TransactionCardProps) {
 export default function TransactionTracker() {
   const { active: activeTransactions, history: transactionHistory, retry, clearCompleted, complete } = useTransactions();
   const { showTransactionTracker, toggleTransactionTracker } = useUI();
+  const [, forceUpdate] = useState({});
   
   // Clean up stuck transactions on component mount
   useEffect(() => {
@@ -386,6 +378,15 @@ export default function TransactionTracker() {
       }
     });
   }, [activeTransactions, complete]);
+  
+  // Single interval for all time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate({}); // Force re-render to update all time displays
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Debug: Check transaction state
   if (activeTransactions?.length === 0 && transactionHistory?.length === 0) {

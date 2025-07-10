@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ interface FlowSwapModalProps {
   onClose: () => void;
 }
 
-export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
+const FlowSwapModal = React.memo(function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
   const { address, chainId } = useAccount();
   const { data: flowBalance, refetch: refetchFlowBalance } = useBalance({ 
     address,
@@ -135,4 +135,6 @@ export function FlowSwapModal({ isOpen, onClose }: FlowSwapModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+export { FlowSwapModal };

@@ -14,17 +14,7 @@ export interface CropData {
   health: number;
 }
 
-export type CropType = 
-  | 'potato'
-  | 'carrot'
-  | 'tomato'
-  | 'corn'
-  | 'pumpkin'
-  | 'watermelon'
-  | 'strawberry'
-  | 'cabbage'
-  | 'lettuce'
-  | 'pepper';
+export type CropType = 'potato';
 
 export type GrowthStage = 
   | 'seed'
@@ -49,71 +39,25 @@ export interface CropConfig {
 export const CROP_CONFIGS: Record<CropType, CropConfig> = {
   potato: {
     name: 'Potato',
-    growthTime: 30, // 30 seconds for demo
+    growthTime: 30, // 30 seconds for MVP demo
     spriteIndex: 0,
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
-  },
-  carrot: {
-    name: 'Carrot',
-    growthTime: 25,
-    spriteIndex: 5,
-    stages: { seed: 5, sprout: 6, growing: 7, mature: 8, ready: 9 }
-  },
-  tomato: {
-    name: 'Tomato',
-    growthTime: 40,
-    spriteIndex: 10,
-    stages: { seed: 10, sprout: 11, growing: 12, mature: 13, ready: 14 }
-  },
-  corn: {
-    name: 'Corn',
-    growthTime: 50,
-    spriteIndex: 15,
-    stages: { seed: 15, sprout: 16, growing: 17, mature: 18, ready: 19 }
-  },
-  pumpkin: {
-    name: 'Pumpkin',
-    growthTime: 60,
-    spriteIndex: 20,
-    stages: { seed: 20, sprout: 21, growing: 22, mature: 23, ready: 24 }
-  },
-  watermelon: {
-    name: 'Watermelon',
-    growthTime: 45,
-    spriteIndex: 25,
-    stages: { seed: 25, sprout: 26, growing: 27, mature: 28, ready: 29 }
-  },
-  strawberry: {
-    name: 'Strawberry',
-    growthTime: 20,
-    spriteIndex: 30,
-    stages: { seed: 30, sprout: 31, growing: 32, mature: 33, ready: 34 }
-  },
-  cabbage: {
-    name: 'Cabbage',
-    growthTime: 35,
-    spriteIndex: 35,
-    stages: { seed: 35, sprout: 36, growing: 37, mature: 38, ready: 39 }
-  },
-  lettuce: {
-    name: 'Lettuce',
-    growthTime: 15,
-    spriteIndex: 40,
-    stages: { seed: 40, sprout: 41, growing: 42, mature: 43, ready: 44 }
-  },
-  pepper: {
-    name: 'Pepper',
-    growthTime: 30,
-    spriteIndex: 45,
-    stages: { seed: 45, sprout: 46, growing: 47, mature: 48, ready: 49 }
   }
 };
+
+export interface ViewportBounds {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 
 export class CropSystem {
   private crops: Map<string, CropData> = new Map();
   private scene: Phaser.Scene;
   private cropSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private cropSpritesheet: string = 'crops';
+  private viewportPadding: number = 50; // Extra padding for viewport culling
   
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -128,17 +72,44 @@ export class CropSystem {
     });
   }
 
+  /**
+   * Check if a position is within the viewport bounds
+   */
+  private isInViewport(x: number, y: number, bounds: ViewportBounds): boolean {
+    return x >= bounds.left - this.viewportPadding &&
+           x <= bounds.right + this.viewportPadding &&
+           y >= bounds.top - this.viewportPadding &&
+           y <= bounds.bottom + this.viewportPadding;
+  }
+
+  /**
+   * Get current viewport bounds from camera
+   */
+  private getViewportBounds(): ViewportBounds {
+    const camera = this.scene.cameras.main;
+    return {
+      left: camera.scrollX,
+      right: camera.scrollX + camera.width,
+      top: camera.scrollY,
+      bottom: camera.scrollY + camera.height
+    };
+  }
+
   create() {
     // Create crop sprites from loaded data
+    const viewportBounds = this.getViewportBounds();
     this.crops.forEach((crop) => {
-      this.createCropSprite(crop);
+      // Only create sprites for crops within viewport
+      if (this.isInViewport(crop.x, crop.y, viewportBounds)) {
+        this.createCropSprite(crop);
+      }
     });
   }
 
   /**
    * Plant a crop at the specified position
    */
-  plantCrop(x: number, y: number, cropType: CropType): string {
+  plantCrop(x: number, y: number, cropType: CropType = 'potato'): string {
     const cropId = `crop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const cropData: CropData = {
@@ -152,7 +123,13 @@ export class CropSystem {
     };
 
     this.crops.set(cropId, cropData);
-    this.createCropSprite(cropData);
+    
+    // Only create sprite if within viewport
+    const viewportBounds = this.getViewportBounds();
+    if (this.isInViewport(x, y, viewportBounds)) {
+      this.createCropSprite(cropData);
+    }
+    
     this.saveCropsToStorage();
     
     console.log(`🌱 Planted ${cropType} at (${x}, ${y})`);
@@ -184,7 +161,7 @@ export class CropSystem {
   /**
    * Harvest a crop (only if ready)
    */
-  harvestCrop(cropId: string): { success: boolean; reward?: string } {
+  harvestCrop(cropId: string): { success: boolean; reward?: string; goldReward?: number } {
     const crop = this.crops.get(cropId);
     if (!crop) return { success: false };
     
@@ -196,16 +173,20 @@ export class CropSystem {
     // Remove the crop
     this.removeCrop(cropId);
     
-    // Calculate harvest reward
+    // Calculate harvest reward - simple MVP: 10 gold per potato
     const config = CROP_CONFIGS[crop.type];
-    const reward = `Harvested ${config.name}!`;
+    const goldReward = 10; // Hardcoded for MVP
+    const reward = `Harvested ${config.name}! +${goldReward} Gold`;
     
     console.log(`🚜 Harvested ${crop.type}: ${reward}`);
     
     // Show harvest animation at crop location
     this.showHarvestEffect(crop.x, crop.y);
     
-    return { success: true, reward };
+    // Emit harvest event with gold reward
+    this.scene.events.emit('cropHarvested', { cropId, goldReward });
+    
+    return { success: true, reward, goldReward };
   }
 
   /**
@@ -227,12 +208,36 @@ export class CropSystem {
   /**
    * Update crop growth stages
    */
-  update() {
+  update(viewportBounds?: ViewportBounds) {
     const now = Date.now();
     let updated = false;
 
+    // Get viewport bounds if not provided
+    const bounds = viewportBounds || this.getViewportBounds();
+
     const crops = Array.from(this.crops.values());
     crops.forEach((crop) => {
+      const isInView = this.isInViewport(crop.x, crop.y, bounds);
+      const hasSprite = this.cropSprites.has(crop.id);
+
+      // Handle sprite creation/destruction based on viewport
+      if (isInView && !hasSprite) {
+        // Crop entered viewport - create sprite
+        this.createCropSprite(crop);
+      } else if (!isInView && hasSprite) {
+        // Crop left viewport - destroy sprite
+        const sprite = this.cropSprites.get(crop.id);
+        if (sprite) {
+          sprite.destroy();
+          this.cropSprites.delete(crop.id);
+        }
+      }
+
+      // Only update crops within viewport
+      if (!isInView) {
+        return; // Skip animation updates for off-screen crops
+      }
+
       const config = CROP_CONFIGS[crop.type];
       const timeElapsed = (now - crop.plantedAt) / 1000; // Convert to seconds
       const growthProgress = Math.min(timeElapsed / config.growthTime, 1);
@@ -266,6 +271,11 @@ export class CropSystem {
    * Create visual sprite for crop
    */
   private createCropSprite(crop: CropData) {
+    // Check if sprite already exists
+    if (this.cropSprites.has(crop.id)) {
+      return;
+    }
+
     const config = CROP_CONFIGS[crop.type];
     const stageIndex = config.stages[crop.stage];
     
@@ -285,9 +295,22 @@ export class CropSystem {
       sprite.clearTint();
     });
     
-    // Add click handler for crop information
+    // Add click handler for crop information and harvesting
     sprite.on('pointerdown', () => {
       console.log(`🌱 Clicked crop: ${crop.type} (${crop.stage})`);
+      
+      // If crop is ready, harvest it
+      if (crop.stage === 'ready') {
+        this.harvestCrop(crop.id);
+      } else {
+        // Show growth progress
+        const config = CROP_CONFIGS[crop.type];
+        const timeElapsed = (Date.now() - crop.plantedAt) / 1000;
+        const growthProgress = Math.min(timeElapsed / config.growthTime, 1);
+        const percentComplete = Math.floor(growthProgress * 100);
+        console.log(`🌱 Crop growth: ${percentComplete}% complete`);
+      }
+      
       // Emit event for crop info display
       this.scene.events.emit('cropClicked', crop);
     });
@@ -338,11 +361,12 @@ export class CropSystem {
     if (existingCrop) return false;
 
     // Check if position is within farming area bounds
+    // Updated to match our 4x4 plot grid location
     const farmingArea = {
-      minX: 100,
-      maxX: 700,
-      minY: 180,
-      maxY: 500
+      minX: 600,
+      maxX: 960,
+      minY: 400,
+      maxY: 760
     };
 
     return (
@@ -420,12 +444,13 @@ export class CropSystem {
    */
   private showHarvestEffect(x: number, y: number) {
     // Create floating text effect
-    const harvestText = this.scene.add.text(x, y, '🎉 Harvested!', {
-      fontSize: '16px',
+    const harvestText = this.scene.add.text(x, y, '🎉 +10 Gold!', {
+      fontSize: '20px',
       color: '#FFD700',
       fontStyle: 'bold'
     });
     harvestText.setOrigin(0.5);
+    harvestText.setStroke('#000000', 4);
     
     // Animate the text
     this.scene.tweens.add({
@@ -472,5 +497,59 @@ export class CropSystem {
       this.removeCrop(crop.id);
     });
     localStorage.removeItem('defi-valley-crops');
+  }
+
+  /**
+   * Handle camera movement to update visible crops
+   * Call this when the camera moves significantly
+   */
+  onCameraMove() {
+    const viewportBounds = this.getViewportBounds();
+    
+    // Check all crops for viewport changes
+    this.crops.forEach((crop) => {
+      const isInView = this.isInViewport(crop.x, crop.y, viewportBounds);
+      const hasSprite = this.cropSprites.has(crop.id);
+
+      if (isInView && !hasSprite) {
+        // Crop entered viewport - create sprite
+        this.createCropSprite(crop);
+      } else if (!isInView && hasSprite) {
+        // Crop left viewport - destroy sprite
+        const sprite = this.cropSprites.get(crop.id);
+        if (sprite) {
+          sprite.destroy();
+          this.cropSprites.delete(crop.id);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get number of active sprites (for debugging)
+   */
+  getActiveSpriteCount(): number {
+    return this.cropSprites.size;
+  }
+
+  /**
+   * Get total number of crops
+   */
+  getTotalCropCount(): number {
+    return this.crops.size;
+  }
+
+  /**
+   * Get all crops as an array
+   */
+  getAllCrops(): CropData[] {
+    return Array.from(this.crops.values());
+  }
+
+  /**
+   * Get a specific crop by ID
+   */
+  getCropById(cropId: string): CropData | undefined {
+    return this.crops.get(cropId);
   }
 }

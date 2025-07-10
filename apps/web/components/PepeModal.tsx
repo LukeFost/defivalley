@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +50,7 @@ const PepeSprite = ({ size }: { size: number }) => {
  * PepeModal - Unified modal for Pepe character interaction and Flow pump launch
  * Combines character dialogue with token creation functionality
  */
-export function PepeModal({ isOpen, onClose }: PepeModalProps) {
+export const PepeModal = React.memo(function PepeModal({ isOpen, onClose }: PepeModalProps) {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [showLaunchForm, setShowLaunchForm] = useState(false);
@@ -227,4 +227,4 @@ export function PepeModal({ isOpen, onClose }: PepeModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+});

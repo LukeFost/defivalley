@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { parseUnits, formatUnits, type Address } from 'viem';
 import {
   Dialog,
@@ -24,7 +24,7 @@ interface MorphoDepositModalProps {
   onClose: () => void;
 }
 
-export function MorphoDepositModal({ isOpen, onClose }: MorphoDepositModalProps) {
+export const MorphoDepositModal = React.memo(function MorphoDepositModal({ isOpen, onClose }: MorphoDepositModalProps) {
   const [depositAmount, setDepositAmount] = useState('');
   const { address } = useAccount();
   
@@ -378,7 +378,7 @@ export function MorphoDepositModal({ isOpen, onClose }: MorphoDepositModalProps)
       </DialogContent>
     </Dialog>
   );
-}
+});
 
 // Vault Option Component with APY display
 function VaultOption({ 

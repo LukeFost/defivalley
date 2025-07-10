@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ interface FlowStakingModalProps {
   onClose: () => void;
 }
 
-export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
+function FlowStakingModalComponent({ isOpen, onClose }: FlowStakingModalProps) {
   const [amount, setAmount] = useState('');
   const {
     fvixBalance,
@@ -144,3 +144,5 @@ export function FlowStakingModal({ isOpen, onClose }: FlowStakingModalProps) {
     </Dialog>
   );
 }
+
+export const FlowStakingModal = React.memo(FlowStakingModalComponent);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ const TOKENS = {
 
 type TabType = 'menu' | 'swap' | 'wrap';
 
-export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
+export const MarketplaceModal = React.memo(function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('menu');
   const [swapAmount, setSwapAmount] = useState('');
   const [wrapAmount, setWrapAmount] = useState('');
@@ -636,7 +636,7 @@ export function MarketplaceModal({ isOpen, onClose }: MarketplaceModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+});
 
 // Helper function to get token display name
 function getTokenName(address: Address): string {

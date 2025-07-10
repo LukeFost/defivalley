@@ -1,7 +1,7 @@
 import { createStore, useStore as useZustandStore } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { AppState, AppActions, initialState } from './store-types';
 
 // Create a memory storage for the server-side rendering
@@ -349,51 +349,115 @@ export const useAppStore = <T>(selector: (state: AppState & AppActions) => T) =>
 };
 
 // Export individual hooks for convenience (backward compatibility)
-export const useTransactions = () => useAppStore(state => ({
-  active: state.activeTransactions || [],
-  history: state.transactionHistory || [],
-  add: state.addTransaction,
-  update: state.updateTransaction,
-  complete: state.completeTransaction,
-  fail: state.failTransaction,
-  retry: state.retryTransaction,
-  clearCompleted: state.clearCompletedTransactions
-}));
+export const useTransactions = () => {
+  const active = useAppStore(state => state.activeTransactions || []);
+  const history = useAppStore(state => state.transactionHistory || []);
+  const add = useAppStore(state => state.addTransaction);
+  const update = useAppStore(state => state.updateTransaction);
+  const complete = useAppStore(state => state.completeTransaction);
+  const fail = useAppStore(state => state.failTransaction);
+  const retry = useAppStore(state => state.retryTransaction);
+  const clearCompleted = useAppStore(state => state.clearCompletedTransactions);
+  
+  return useMemo(() => ({
+    active,
+    history,
+    add,
+    update,
+    complete,
+    fail,
+    retry,
+    clearCompleted
+  }), [active, history, add, update, complete, fail, retry, clearCompleted]);
+};
 
-export const usePlayerData = () => useAppStore(state => ({
-  playerState: state.playerState,
-  seedPositions: state.seedPositions,
-  vaultPosition: state.vaultPosition,
-  seedTypes: state.seedTypes,
-  setPlayerState: state.setPlayerState,
-  updateSeedPositions: state.updateSeedPositions,
-  setVaultPosition: state.setVaultPosition,
-  addOptimisticSeed: state.addOptimisticSeed
-}));
+export const usePlayerData = () => {
+  const playerState = useAppStore(state => state.playerState);
+  const seedPositions = useAppStore(state => state.seedPositions);
+  const vaultPosition = useAppStore(state => state.vaultPosition);
+  const seedTypes = useAppStore(state => state.seedTypes);
+  const setPlayerState = useAppStore(state => state.setPlayerState);
+  const updateSeedPositions = useAppStore(state => state.updateSeedPositions);
+  const setVaultPosition = useAppStore(state => state.setVaultPosition);
+  const addOptimisticSeed = useAppStore(state => state.addOptimisticSeed);
+  
+  return useMemo(() => ({
+    playerState,
+    seedPositions,
+    vaultPosition,
+    seedTypes,
+    setPlayerState,
+    updateSeedPositions,
+    setVaultPosition,
+    addOptimisticSeed
+  }), [playerState, seedPositions, vaultPosition, seedTypes, setPlayerState, updateSeedPositions, setVaultPosition, addOptimisticSeed]);
+};
 
-export const useUI = () => useAppStore(state => ({
+export const useUI = () => {
   // UI state values (boolean flags for modal visibility)
-  selectedSeedType: state.ui.selectedSeedType,
-  plantAmount: state.ui.plantAmount,
-  showTransactionTracker: state.ui.showTransactionTracker,
-  isPlantModalOpen: state.ui.showPlantModal,
-  isHarvestModalOpen: state.ui.showHarvestModal,
-  isSettingsModalOpen: state.ui.showSettingsModal,
-  notifications: state.ui.notifications,
+  const selectedSeedType = useAppStore(state => state.ui.selectedSeedType);
+  const plantAmount = useAppStore(state => state.ui.plantAmount);
+  const showTransactionTracker = useAppStore(state => state.ui.showTransactionTracker);
+  const isPlantModalOpen = useAppStore(state => state.ui.showPlantModal);
+  const isHarvestModalOpen = useAppStore(state => state.ui.showHarvestModal);
+  const isSettingsModalOpen = useAppStore(state => state.ui.showSettingsModal);
+  const notifications = useAppStore(state => state.ui.notifications);
   // UI action functions
-  setSelectedSeedType: state.setSelectedSeedType,
-  setPlantAmount: state.setPlantAmount,
-  toggleTransactionTracker: state.toggleTransactionTracker,
-  showPlantModal: state.showPlantModal,
-  hidePlantModal: state.hidePlantModal,
-  showHarvestModal: state.showHarvestModal,
-  hideHarvestModal: state.hideHarvestModal,
-  showSettingsModal: state.showSettingsModal,
-  hideSettingsModal: state.hideSettingsModal,
-  addNotification: state.addNotification,
-  removeNotification: state.removeNotification,
-  clearNotifications: state.clearNotifications
-}));
+  const setSelectedSeedType = useAppStore(state => state.setSelectedSeedType);
+  const setPlantAmount = useAppStore(state => state.setPlantAmount);
+  const toggleTransactionTracker = useAppStore(state => state.toggleTransactionTracker);
+  const showPlantModal = useAppStore(state => state.showPlantModal);
+  const hidePlantModal = useAppStore(state => state.hidePlantModal);
+  const showHarvestModal = useAppStore(state => state.showHarvestModal);
+  const hideHarvestModal = useAppStore(state => state.hideHarvestModal);
+  const showSettingsModal = useAppStore(state => state.showSettingsModal);
+  const hideSettingsModal = useAppStore(state => state.hideSettingsModal);
+  const addNotification = useAppStore(state => state.addNotification);
+  const removeNotification = useAppStore(state => state.removeNotification);
+  const clearNotifications = useAppStore(state => state.clearNotifications);
+  
+  return useMemo(() => ({
+    selectedSeedType,
+    plantAmount,
+    showTransactionTracker,
+    isPlantModalOpen,
+    isHarvestModalOpen,
+    isSettingsModalOpen,
+    notifications,
+    setSelectedSeedType,
+    setPlantAmount,
+    toggleTransactionTracker,
+    showPlantModal,
+    hidePlantModal,
+    showHarvestModal,
+    hideHarvestModal,
+    showSettingsModal,
+    hideSettingsModal,
+    addNotification,
+    removeNotification,
+    clearNotifications
+  }), [
+    selectedSeedType,
+    plantAmount,
+    showTransactionTracker,
+    isPlantModalOpen,
+    isHarvestModalOpen,
+    isSettingsModalOpen,
+    notifications,
+    setSelectedSeedType,
+    setPlantAmount,
+    toggleTransactionTracker,
+    showPlantModal,
+    hidePlantModal,
+    showHarvestModal,
+    hideHarvestModal,
+    showSettingsModal,
+    hideSettingsModal,
+    addNotification,
+    removeNotification,
+    clearNotifications
+  ]);
+};
 
 export const useConfig = () => useAppStore(state => state.config);
 
