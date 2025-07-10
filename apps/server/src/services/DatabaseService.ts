@@ -17,6 +17,8 @@ export interface Crop {
   seed_type: SeedType;
   x: number;
   y: number;
+  grid_x?: number;
+  grid_y?: number;
   planted_at: string;
   growth_time: number;
   investment_amount: number;
@@ -30,6 +32,7 @@ export interface Crop {
 export class DatabaseService {
   public db: Database.Database;
   private migrationService: MigrationService;
+  private readonly GRID_SIZE = 100; // Grid cell size in game units
 
   constructor() {
     // Create database in configurable location
@@ -86,7 +89,7 @@ export class DatabaseService {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_crops_player_id ON crops (player_id);
       CREATE INDEX IF NOT EXISTS idx_crops_harvested ON crops (harvested);
-      CREATE INDEX IF NOT EXISTS idx_crops_position ON crops (x, y);
+      -- Spatial grid indexes will be created by migration 002
       -- Additional optimized indexes for world queries
       CREATE INDEX IF NOT EXISTS idx_crops_player_harvested ON crops(player_id, harvested) WHERE harvested = FALSE;
       CREATE INDEX IF NOT EXISTS idx_players_updated_at ON players(updated_at DESC);
@@ -149,13 +152,25 @@ export class DatabaseService {
   }
 
   /**
+   * Calculate grid coordinates for a position
+   */
+  private calculateGridCoordinates(x: number, y: number): { grid_x: number; grid_y: number } {
+    return {
+      grid_x: Math.floor(x / this.GRID_SIZE),
+      grid_y: Math.floor(y / this.GRID_SIZE)
+    };
+  }
+
+  /**
    * Save a new crop
    */
-  saveCrop(crop: Omit<Crop, 'id' | 'created_at' | 'updated_at'>): string {
+  saveCrop(crop: Omit<Crop, 'id' | 'created_at' | 'updated_at' | 'grid_x' | 'grid_y'>): string {
     const cropId = `crop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const { grid_x, grid_y } = this.calculateGridCoordinates(crop.x, crop.y);
+    
     const insertStmt = this.db.prepare(`
-      INSERT INTO crops (id, player_id, seed_type, x, y, planted_at, growth_time, investment_amount, harvested, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO crops (id, player_id, seed_type, x, y, grid_x, grid_y, planted_at, growth_time, investment_amount, harvested, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
     
     insertStmt.run(
@@ -164,6 +179,8 @@ export class DatabaseService {
       crop.seed_type,
       crop.x,
       crop.y,
+      grid_x,
+      grid_y,
       crop.planted_at,
       crop.growth_time,
       crop.investment_amount,
@@ -195,16 +212,63 @@ export class DatabaseService {
 
   /**
    * Check if a position is occupied by a crop (with radius checking)
+   * Uses spatial grid indexing for optimized queries
    */
   isPositionOccupied(x: number, y: number, radius: number = 50): boolean {
-    // Check for crops within the collision radius
+    // Calculate which grid cells could contain overlapping crops
+    const { grid_x, grid_y } = this.calculateGridCoordinates(x, y);
+    const gridRadius = Math.ceil(radius / this.GRID_SIZE);
+    
+    // Query only crops in nearby grid cells
     const selectStmt = this.db.prepare(`
       SELECT COUNT(*) as count FROM crops 
       WHERE harvested = FALSE 
+      AND grid_x BETWEEN ? AND ?
+      AND grid_y BETWEEN ? AND ?
       AND ((x - ?) * (x - ?) + (y - ?) * (y - ?)) <= ? * ?
     `);
-    const result = selectStmt.get(x, x, y, y, radius, radius) as { count: number };
+    
+    const result = selectStmt.get(
+      grid_x - gridRadius,
+      grid_x + gridRadius,
+      grid_y - gridRadius,
+      grid_y + gridRadius,
+      x, x, y, y, radius, radius
+    ) as { count: number };
+    
     return result.count > 0;
+  }
+
+  /**
+   * Get crops in a specific area (optimized with spatial grid)
+   */
+  getCropsInArea(minX: number, minY: number, maxX: number, maxY: number, playerId?: string): Crop[] {
+    const minGrid = this.calculateGridCoordinates(minX, minY);
+    const maxGrid = this.calculateGridCoordinates(maxX, maxY);
+    
+    let query = `
+      SELECT * FROM crops 
+      WHERE harvested = FALSE 
+      AND grid_x BETWEEN ? AND ?
+      AND grid_y BETWEEN ? AND ?
+      AND x BETWEEN ? AND ?
+      AND y BETWEEN ? AND ?
+    `;
+    
+    const params: any[] = [
+      minGrid.grid_x, maxGrid.grid_x,
+      minGrid.grid_y, maxGrid.grid_y,
+      minX, maxX,
+      minY, maxY
+    ];
+    
+    if (playerId) {
+      query += ' AND player_id = ?';
+      params.push(playerId);
+    }
+    
+    const selectStmt = this.db.prepare(query);
+    return selectStmt.all(...params) as Crop[];
   }
 
   /**
@@ -342,6 +406,23 @@ export class DatabaseService {
       console.error(`❌ Error getting crops for player ${playerId}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Update grid coordinates for all existing crops (utility method)
+   * This is useful after changing GRID_SIZE or for maintenance
+   */
+  updateAllGridCoordinates(): void {
+    const updateStmt = this.db.prepare(`
+      UPDATE crops 
+      SET 
+        grid_x = CAST(x / ? AS INTEGER),
+        grid_y = CAST(y / ? AS INTEGER),
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    
+    const info = updateStmt.run(this.GRID_SIZE, this.GRID_SIZE);
+    console.log(`✅ Updated grid coordinates for ${info.changes} crops`);
   }
 
   /**
