@@ -89,7 +89,7 @@ export function usePunchSwap(tokenInAddress?: Address) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentQuote, setCurrentQuote] = useState<PunchSwapQuote | null>(null);
-  const quoteIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const quoteIntervalRef = useRef<number | null>(null);
   const { addNotification } = useUI();
 
   // Get allowance for the input token to PunchSwap Router
