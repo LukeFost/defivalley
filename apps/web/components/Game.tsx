@@ -13,6 +13,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useAccount, useChainId } from 'wagmi';
 import { BuildingInteractionManager } from '../lib/BuildingInteractionManager';
 import { EditorPanel, EditorObject } from './EditorPanel';
+import { DeviceDetector } from '../lib/utils/deviceDetection';
 
 interface GameProps {
   worldId?: string;
@@ -55,6 +56,13 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   }, [editorMode]);
 
   useEffect(() => {
+    // Get device capabilities for mobile optimization
+    const deviceDetector = DeviceDetector.getInstance();
+    const capabilities = deviceDetector.getCapabilities();
+    const isMobileDevice = deviceDetector.needsTouchControls();
+    
+    console.log('🔧 Initializing game with device capabilities:', capabilities);
+    
     // Calculate dimensions based on viewport minus bottom bar
     const BAR_HEIGHT = 64; // Must match CSS --bar-height
     const gameWidth = window.innerWidth;
@@ -75,17 +83,32 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         }
       },
       scale: {
-        mode: Phaser.Scale.RESIZE,
+        mode: isMobileDevice ? Phaser.Scale.FIT : Phaser.Scale.RESIZE,
         parent: 'game-container',
-        width: '100%',
-        height: '100%'
+        autoCenter: isMobileDevice ? Phaser.Scale.CENTER_BOTH : Phaser.Scale.NO_CENTER,
+        width: isMobileDevice ? 1024 : '100%',
+        height: isMobileDevice ? 768 : '100%',
+        min: {
+          width: 320,
+          height: 480
+        },
+        max: {
+          width: 1400,
+          height: 1050
+        }
       },
       render: {
         pixelArt: false,
-        antialias: true,
+        antialias: !isMobileDevice || capabilities.gpu === 'high', // Disable AA on low-end mobile
         transparent: false,
         clearBeforeRender: true,
-        preserveDrawingBuffer: false
+        preserveDrawingBuffer: false,
+        powerPreference: isMobileDevice ? 'low-power' : 'high-performance'
+      },
+      // Mobile-specific optimizations
+      fps: {
+        target: isMobileDevice && capabilities.gpu === 'low' ? 30 : 60,
+        forceSetTimeOut: isMobileDevice
       }
     };
 
@@ -153,6 +176,23 @@ function Game({ worldId, isOwnWorld }: GameProps) {
             }
           );
         }
+        
+        // Handle mobile chat events
+        const handleMobileChatOpen = () => {
+          setShowChat(true);
+        };
+        
+        // Listen for mobile chat events
+        if (typeof window !== 'undefined') {
+          (window as any).eventBus?.on('mobile:chat-open', handleMobileChatOpen);
+        }
+        
+        // Cleanup event listener
+        return () => {
+          if (typeof window !== 'undefined') {
+            (window as any).eventBus?.off('mobile:chat-open', handleMobileChatOpen);
+          }
+        };
       }
     }, 500);
 
@@ -286,7 +326,17 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         canPlantAt={canPlantAt}
         getCropAt={getCropAt}
       >
-        <div id="game-container" />
+        <div 
+          id="game-container" 
+          className="w-full h-full touch-none select-none"
+          style={{ 
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
+            touchAction: 'none'
+          }}
+        />
       </CropContextMenu>
       
       {/* Crop Info Panel */}
@@ -351,6 +401,9 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           height: 100%;
           overflow: hidden;
           position: relative;
+          -webkit-overflow-scrolling: touch;
+          -webkit-transform: translate3d(0,0,0);
+          transform: translate3d(0,0,0);
         }
 
         .modal-overlay {
