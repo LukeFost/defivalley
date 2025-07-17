@@ -118,7 +118,7 @@ export function useTokenAllowance(tokenAddress: Address, spenderAddress?: Addres
 
   // Poll allowance while approval is pending
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: number;
     
     if (isApproving && !isApprovalSuccess) {
       // Poll every 3 seconds while approval is pending
