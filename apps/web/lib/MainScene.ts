@@ -1461,7 +1461,7 @@ export class MainScene extends Phaser.Scene {
     
     // Initialize camera to follow player
     if (this.cameraSystem) {
-      this.cameraSystem.setTarget(localPlayer);
+      this.cameraSystem.startFollow(localPlayer);
     }
     
     console.log('✅ Offline mode initialized with local player');
