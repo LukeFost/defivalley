@@ -16,6 +16,9 @@ import { CollisionSystem } from './systems/CollisionSystem';
 import { CameraSystem } from './systems/CameraSystem';
 import { eventBus } from './systems/EventBus';
 import { katanaChain, flowMainnet } from '../app/wagmi';
+import { DeviceDetector } from './utils/deviceDetection';
+import { TouchInputManager, TouchControlsConfig, JoystickData } from './input/TouchInputManager';
+import { MobileOptimizer } from './performance/MobileOptimizer';
 
 // Network types are now imported from NetworkSystem
 
@@ -46,6 +49,13 @@ export class MainScene extends Phaser.Scene {
   private address?: string;
   private user?: any;
   private currentChainId?: number;
+  
+  // Mobile support properties
+  private deviceDetector: DeviceDetector;
+  private touchInputManager?: TouchInputManager;
+  private mobileOptimizer?: MobileOptimizer;
+  private isMobileDevice: boolean = false;
+  private touchMovement = { x: 0, y: 0 };
   
   // Editor properties
   private isEditorMode: boolean = false;
@@ -81,6 +91,8 @@ export class MainScene extends Phaser.Scene {
 
   constructor() {
     super({ key: 'MainScene' });
+    this.deviceDetector = DeviceDetector.getInstance();
+    this.isMobileDevice = this.deviceDetector.needsTouchControls();
   }
   
 
@@ -187,6 +199,9 @@ export class MainScene extends Phaser.Scene {
     // Initialize crop system
     this.cropSystem.create();
 
+    // Initialize mobile support
+    this.initializeMobileSupport();
+
     // Initialize building interaction manager
     this.buildingInteractionManager = new BuildingInteractionManager(this);
 
@@ -267,6 +282,89 @@ export class MainScene extends Phaser.Scene {
     // Character sprite sheet is now loaded directly as a spritesheet
   }
 
+  initializeMobileSupport() {
+    console.log('🔧 Initializing mobile support...');
+    
+    if (this.isMobileDevice) {
+      console.log('📱 Mobile device detected - setting up touch controls');
+      
+      // Initialize mobile optimizer
+      const capabilities = this.deviceDetector.getCapabilities();
+      this.mobileOptimizer = new MobileOptimizer(this, capabilities.gpu);
+      
+      // Configure touch controls
+      const touchConfig: TouchControlsConfig = {
+        joystick: {
+          enabled: true,
+          position: 'fixed',
+          x: 150,
+          y: this.cameras.main.height - 150,
+          radius: 75,
+          deadZone: 0.1
+        },
+        buttons: {
+          action: true,
+          chat: true,
+          menu: false
+        },
+        gestures: {
+          pinchZoom: capabilities.screenSize !== 'small', // Disable on small screens
+          swipePan: false, // Disabled to avoid conflicts with joystick
+          doubleTapZoom: false
+        }
+      };
+      
+      // Initialize touch input manager
+      this.touchInputManager = new TouchInputManager(this, touchConfig);
+      this.touchInputManager.createControls();
+      
+      // Set up touch event handlers
+      this.setupTouchEventHandlers();
+      
+      // Handle orientation changes
+      this.deviceDetector.on('orientationchange', (orientation: 'portrait' | 'landscape') => {
+        console.log(`📱 Orientation changed to: ${orientation}`);
+        if (this.touchInputManager) {
+          this.touchInputManager.updateLayout(orientation);
+        }
+      });
+      
+      // Enable battery optimizations
+      this.mobileOptimizer.enableBatteryOptimizations();
+      
+      console.log('✅ Mobile support initialized');
+    } else {
+      console.log('🖥️ Desktop device detected - using keyboard controls');
+    }
+  }
+
+  setupTouchEventHandlers() {
+    if (!this.touchInputManager) return;
+    
+    // Handle joystick input
+    this.touchInputManager.on('joystick', (data: JoystickData) => {
+      this.touchMovement.x = data.x;
+      this.touchMovement.y = data.y;
+    });
+    
+    // Handle action button
+    this.touchInputManager.on('action', () => {
+      // Try to plant a crop at current player position
+      if (this.currentPlayer && this.cropSystem) {
+        const { x, y } = this.currentPlayer;
+        if (this.cropSystem.canPlantAt(x, y)) {
+          this.cropSystem.plantCrop(x, y, 'potato'); // Default to potato
+          console.log('🌱 Planted crop via touch');
+        }
+      }
+    });
+    
+    // Handle chat button
+    this.touchInputManager.on('chat', () => {
+      // Emit event to open chat (handled by React component)
+      eventBus.emit('mobile:chat-open', {});
+    });
+  }
 
   // Safe localStorage access for SSR
   private static safeLocalStorage = {
@@ -1679,35 +1777,55 @@ export class MainScene extends Phaser.Scene {
     let newY = this.currentPlayer.y;
     let newDirection = this.lastDirection;
 
-    if (this.cursors.left.isDown || this.wasd.A.isDown) {
-      const potentialX = Math.max(20, newX - speed);
-      if (!this.collisionSystem.checkPlayerCollision(potentialX, newY)) {
-        newX = potentialX;
-        moved = true;
-        newDirection = 'left';
+    // Check for input from either keyboard or touch
+    let inputX = 0;
+    let inputY = 0;
+
+    // Touch input (mobile)
+    if (this.isMobileDevice && this.touchMovement) {
+      inputX = this.touchMovement.x;
+      inputY = this.touchMovement.y;
+    }
+    
+    // Keyboard input (desktop) - only if no touch input
+    if (!this.isMobileDevice || (Math.abs(inputX) < 0.1 && Math.abs(inputY) < 0.1)) {
+      if (this.cursors.left.isDown || this.wasd.A.isDown) {
+        inputX = -1;
+      } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+        inputX = 1;
       }
-    } else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-      const potentialX = Math.min(this.worldWidth - 20, newX + speed);
-      if (!this.collisionSystem.checkPlayerCollision(potentialX, newY)) {
-        newX = potentialX;
-        moved = true;
-        newDirection = 'right';
+
+      if (this.cursors.up.isDown || this.wasd.W.isDown) {
+        inputY = -1;
+      } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
+        inputY = 1;
       }
     }
 
-    if (this.cursors.up.isDown || this.wasd.W.isDown) {
-      const potentialY = Math.max(20, newY - speed);
-      if (!this.collisionSystem.checkPlayerCollision(newX, potentialY)) {
-        newY = potentialY;
+    // Apply movement based on input
+    if (Math.abs(inputX) > 0.1) {
+      const deltaX = inputX * speed;
+      const potentialX = inputX < 0 
+        ? Math.max(20, newX + deltaX) 
+        : Math.min(this.worldWidth - 20, newX + deltaX);
+      
+      if (!this.collisionSystem.checkPlayerCollision(potentialX, newY)) {
+        newX = potentialX;
         moved = true;
-        newDirection = 'up';
+        newDirection = inputX < 0 ? 'left' : 'right';
       }
-    } else if (this.cursors.down.isDown || this.wasd.S.isDown) {
-      const potentialY = newY + speed;
+    }
+
+    if (Math.abs(inputY) > 0.1) {
+      const deltaY = inputY * speed;
+      const potentialY = inputY < 0 
+        ? Math.max(20, newY + deltaY) 
+        : newY + deltaY;
+      
       if (!this.collisionSystem.checkPlayerCollision(newX, potentialY)) {
         newY = potentialY;
         moved = true;
-        newDirection = 'down';
+        newDirection = inputY < 0 ? 'up' : 'down';
       }
     }
 
