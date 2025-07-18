@@ -95,7 +95,7 @@ export function CropContextMenu({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger onContextMenu={handleContextMenu}>
+      <ContextMenuTrigger onContextMenu={handleContextMenu} style={{ width: '100%', height: '100%' }}>
         {children}
       </ContextMenuTrigger>
       

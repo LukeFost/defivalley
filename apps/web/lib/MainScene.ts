@@ -1426,7 +1426,38 @@ export class MainScene extends Phaser.Scene {
       
     } catch (error) {
       console.error('Failed to connect to server:', error);
+      
+      // Initialize offline mode
+      this.initializeOfflineMode(playerId, displayName);
     }
+  }
+  
+  private initializeOfflineMode(playerId: string, displayName: string) {
+    console.log('🎮 Initializing offline mode...');
+    
+    // Set a local session ID
+    this.sessionId = 'offline-' + playerId;
+    
+    // Create local player
+    const localPlayer = new Player(
+      this,
+      this.sessionId,
+      this.worldWidth / 2,  // Center of world
+      this.worldHeight / 2,
+      displayName,
+      0,  // Starting XP
+      true  // isCurrentPlayer
+    );
+    
+    this.players.set(this.sessionId, localPlayer);
+    this.currentPlayer = localPlayer;
+    
+    // Initialize camera to follow player
+    if (this.cameraSystem) {
+      this.cameraSystem.setTarget(localPlayer);
+    }
+    
+    console.log('✅ Offline mode initialized with local player');
   }
 
   addPlayer(sessionId: string, player: PlayerData) {
@@ -1583,7 +1614,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (!this.networkSystem.isConnectedToServer() || !this.currentPlayer) return;
+    // Allow updates in offline mode
+    if (!this.currentPlayer) return;
 
     // Update camera system
     if (this.cameraSystem) {
@@ -1719,7 +1751,10 @@ export class MainScene extends Phaser.Scene {
       this.currentPlayer.setPosition(newX, newY);
       const now = performance.now();
       if (now - this.lastPlayerSync > GameConfig.network.positionSyncInterval) {
-        this.networkSystem.sendMovement(newX, newY);
+        // Only send network updates when connected
+        if (this.networkSystem.isConnectedToServer()) {
+          this.networkSystem.sendMovement(newX, newY);
+        }
         this.lastPlayerSync = now;
         
         // Emit player moved event

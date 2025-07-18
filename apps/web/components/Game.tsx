@@ -286,7 +286,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         canPlantAt={canPlantAt}
         getCropAt={getCropAt}
       >
-        <div id="game-container" />
+        <div id="game-container" style={{ width: '100%', height: '100%' }} />
       </CropContextMenu>
       
       {/* Crop Info Panel */}

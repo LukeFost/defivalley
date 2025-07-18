@@ -170,6 +170,11 @@ export class NetworkSystem {
 
   // Private methods
   private buildEndpoint(): string {
+    // Check for environment variable first
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_GAME_SERVER_URL) {
+      return process.env.NEXT_PUBLIC_GAME_SERVER_URL;
+    }
+    
     const hostname = this.config.hostname === 'localhost' || this.config.hostname === '127.0.0.1' 
       ? 'localhost' 
       : this.config.hostname;
