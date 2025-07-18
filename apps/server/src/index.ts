@@ -1,6 +1,7 @@
 import { Server } from "colyseus";
 import { createServer } from "http";
 import express from "express";
+import cors from "cors";
 import path from "path";
 import { networkInterfaces } from "os";
 import rateLimit from "express-rate-limit";
@@ -10,6 +11,19 @@ import { sanitizeWorldId, validatePagination } from "./utils/validation";
 
 const port = Number(process.env.PORT || 2567);
 const app = express();
+
+// Configure CORS
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3005',
+    'https://defivalley.vercel.app',
+    /\.vercel\.app$/,  // Allow all Vercel preview deployments
+    // Add production domains here
+  ],
+  credentials: true
+}));
+
 const gameServer = new Server({
   server: createServer(app)
 });
@@ -31,6 +45,16 @@ const apiLimiter = rateLimit({
 
 // Apply rate limiting to API routes
 app.use('/api/', apiLimiter);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: port
+  });
+});
 
 // API endpoint to get active worlds with pagination
 app.get('/api/worlds', (req, res) => {

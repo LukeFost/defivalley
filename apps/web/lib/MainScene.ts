@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { Player, PlayerInfo } from './Player';
-import { CharacterType, CharacterDefinitions } from './character.config';
+import { CharacterType, CharacterDefinitions, Direction } from './character.config';
 import { TilesetConfig, TilemapUtils } from './tilemap.config';
 import { TilemapEditor } from './tilemap.editor';
 import { CropSystem, CropType, CropData } from './CropSystem';
@@ -1400,13 +1400,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   async connectToServer() {
+    // Get player ID from wallet address or user ID
+    const playerId = this.address || this.user?.id || this.networkSystem.generateGuestId();
+    
+    // Use wallet address as display name
+    const displayName = this.networkSystem.getDisplayName(this.address);
+    
     try {
-      // Get player ID from wallet address or user ID
-      const playerId = this.address || this.user?.id || this.networkSystem.generateGuestId();
-      
-      // Use wallet address as display name
-      const displayName = this.networkSystem.getDisplayName(this.address);
-      
       // Determine room type and options based on world configuration
       let roomType = 'game'; // fallback to generic room
       const roomOptions = {
@@ -1441,12 +1441,19 @@ export class MainScene extends Phaser.Scene {
     // Create local player
     const localPlayer = new Player(
       this,
-      this.sessionId,
-      this.worldWidth / 2,  // Center of world
-      this.worldHeight / 2,
-      displayName,
-      0,  // Starting XP
-      true  // isCurrentPlayer
+      this.worldWidth / 2,  // x position
+      this.worldHeight / 2,  // y position
+      {
+        id: this.sessionId,
+        name: displayName,
+        x: this.worldWidth / 2,
+        y: this.worldHeight / 2,
+        character: 'character1' as CharacterType,  // Default character
+        direction: 'down' as Direction,
+        isCurrentPlayer: true,
+        level: 1,
+        xp: 0
+      }
     );
     
     this.players.set(this.sessionId, localPlayer);
