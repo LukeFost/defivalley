@@ -593,12 +593,6 @@ export class CropSystem {
     return this.crops.size;
   }
 
-  /**
-   * Get all crops as an array
-   */
-  getAllCrops(): CropData[] {
-    return Array.from(this.crops.values());
-  }
 
   /**
    * Get a specific crop by ID

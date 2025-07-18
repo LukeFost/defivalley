@@ -463,7 +463,11 @@ export class BlockchainService {
     if (chainId) {
       await this.ensureNetwork(chainId);
     }
-    return getWalletClient(this.wagmiConfig) as WalletClient;
+    const client = await getWalletClient(this.wagmiConfig);
+    if (!client) {
+      throw new Error('No wallet client available');
+    }
+    return client as WalletClient;
   }
 
   // Private helper methods
