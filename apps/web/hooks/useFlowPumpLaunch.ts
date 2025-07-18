@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { useUI } from '../app/store';
-import { pump_factory, pump_factory_address } from 'contracts/abi/pump_flow';
+import { pump_factory, pump_factory_address } from '@/abi/pump_flow';
 
 // The creation fee is typically fixed by the contract, e.g., 3 FLOW
 const CREATION_FEE = parseEther('3');

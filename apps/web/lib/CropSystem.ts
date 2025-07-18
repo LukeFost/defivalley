@@ -14,7 +14,7 @@ export interface CropData {
   health: number;
 }
 
-export type CropType = 'potato';
+export type CropType = 'potato' | 'carrot' | 'lettuce' | 'cabbage' | 'tomato' | 'strawberry' | 'watermelon' | 'corn' | 'pumpkin' | 'pepper';
 
 export type GrowthStage = 
   | 'seed'
@@ -41,6 +41,60 @@ export const CROP_CONFIGS: Record<CropType, CropConfig> = {
     name: 'Potato',
     growthTime: 30, // 30 seconds for MVP demo
     spriteIndex: 0,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  carrot: {
+    name: 'Carrot',
+    growthTime: 25,
+    spriteIndex: 1,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  lettuce: {
+    name: 'Lettuce',
+    growthTime: 20,
+    spriteIndex: 2,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  cabbage: {
+    name: 'Cabbage',
+    growthTime: 35,
+    spriteIndex: 3,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  tomato: {
+    name: 'Tomato',
+    growthTime: 40,
+    spriteIndex: 4,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  strawberry: {
+    name: 'Strawberry',
+    growthTime: 45,
+    spriteIndex: 5,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  watermelon: {
+    name: 'Watermelon',
+    growthTime: 60,
+    spriteIndex: 6,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  corn: {
+    name: 'Corn',
+    growthTime: 50,
+    spriteIndex: 7,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  pumpkin: {
+    name: 'Pumpkin',
+    growthTime: 55,
+    spriteIndex: 8,
+    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+  },
+  pepper: {
+    name: 'Pepper',
+    growthTime: 30,
+    spriteIndex: 9,
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   }
 };

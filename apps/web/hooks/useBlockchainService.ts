@@ -232,10 +232,10 @@ export function useBlockchainService(config?: UseBlockchainServiceConfig) {
 
     // Create transaction in store
     const txId = addTransaction({
-      type: 'batch_harvest' as any,
+      type: 'harvest_seed',
       status: 'preparing',
       player: address,
-      seedIds
+      seedId: seedIds[0] // Use first seed ID for tracking
     });
 
     // Register tracker

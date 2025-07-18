@@ -97,8 +97,13 @@ export class GameRoom extends Room<GameState> {
     
     // Load player data from database (only load XP for the world owner)
     if (isHost) {
-      const dbPlayer = databaseService.getPlayer(playerId, player.name);
-      player.xp = dbPlayer.xp;
+      try {
+        const dbPlayer = databaseService.getPlayer(playerId, player.name);
+        player.xp = dbPlayer.xp;
+      } catch (error) {
+        console.error(`Failed to load player data for ${playerId}:`, error);
+        player.xp = 0;
+      }
     } else {
       // Visitors start with 0 XP in this world context
       player.xp = 0;
@@ -380,7 +385,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     // Verify ownership
-    if (crop.playerId !== client.sessionId) {
+    if (crop.playerId !== authClient.playerId) {
       this.sendError(client, {
         code: ERROR_CODES.INVALID_REQUEST,
         message: 'You can only harvest your own crops',
