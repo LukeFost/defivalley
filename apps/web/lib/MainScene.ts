@@ -1401,19 +1401,19 @@ export class MainScene extends Phaser.Scene {
       
       // All players are cowboys now - simplified character assignment
       const characterType: CharacterType = 'cowboy';
-      console.log(`🤠 Player ${player.name} assigned cowboy character`);
+      console.log(`🤠 Player ${player.displayName} assigned cowboy character`);
       
       // Create PlayerInfo object
       const playerInfo: PlayerInfo = {
         id: sessionId,
-        name: player.name,
+        name: player.displayName,
         x: player.x,
         y: player.y,
         character: characterType,
         direction: 'down',
         isCurrentPlayer,
         level: player.level || 1,
-        xp: player.xp || 0
+        xp: 0
       };
       
       // Create Player instance
@@ -1446,12 +1446,12 @@ export class MainScene extends Phaser.Scene {
         }
       }
       
-      console.log('Added player:', sessionId, player.name, 'with character:', characterType);
+      console.log('Added player:', sessionId, player.displayName, 'with character:', characterType);
       
       // Emit player joined event
       eventBus.emit('player:joined', {
         playerId: sessionId,
-        username: player.name,
+        username: player.displayName,
         character: characterType
       });
     } catch (error) {

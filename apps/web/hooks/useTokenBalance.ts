@@ -23,7 +23,7 @@ export function useTokenBalance(tokenAddress: Address | undefined, userAddress: 
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: userAddress ? [userAddress] : undefined,
-    chainId: targetChainId,
+    chainId: targetChainId as 747 | 747474 | 2751669528484000 | 421614 | undefined,
     query: {
       enabled: !!tokenAddress && !!userAddress && (forceChainId ? chainId === forceChainId : true),
     },

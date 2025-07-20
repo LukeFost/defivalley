@@ -109,10 +109,14 @@ export class EventBus {
     ...args: GameEvents[K] extends void ? [] : [GameEvents[K]]
   ): void {
     // Add to history
-    this.addToHistory(event, args[0]);
+    if (args[0] !== undefined) {
+      this.addToHistory(event, args[0]);
+    }
     
     // Emit the event
-    this.emitter.emit(event, args[0]);
+    if (args[0] !== undefined) {
+      this.emitter.emit(event, args[0]);
+    }
   }
   
   // Emit an event and wait for all handlers to complete
@@ -121,17 +125,21 @@ export class EventBus {
     ...args: GameEvents[K] extends void ? [] : [GameEvents[K]]
   ): Promise<void> {
     // Add to history
-    this.addToHistory(event, args[0]);
+    if (args[0] !== undefined) {
+      this.addToHistory(event, args[0]);
+    }
     
     // Get all listeners
     const listeners = this.emitter.listeners(event) as EventHandler[];
     
     // Execute all handlers and wait for completion
-    await Promise.all(
-      listeners.map(listener => 
-        Promise.resolve(listener(args[0]))
-      )
-    );
+    if (args[0] !== undefined) {
+      await Promise.all(
+        listeners.map(listener => 
+          Promise.resolve(listener(args[0]))
+        )
+      );
+    }
   }
   
   // Remove all listeners for an event

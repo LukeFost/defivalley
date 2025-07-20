@@ -221,7 +221,7 @@ export class CameraSystem extends Phaser.Events.EventEmitter {
    * Flash the camera with a color
    */
   public flash(duration: number = 100, color: number = 0xffffff, alpha: number = 1): void {
-    this.camera.flash(duration, color, color, color, true, alpha);
+    this.camera.flash(duration, color, alpha);
     this.emit('flash', { duration, color, alpha });
   }
 

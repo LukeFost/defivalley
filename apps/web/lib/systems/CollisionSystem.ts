@@ -244,7 +244,8 @@ export class CollisionSystem {
     }
     
     // Check collision with each crop in the cell
-    for (const cropId of cropsInCell) {
+    const cropIds = Array.from(cropsInCell);
+    for (const cropId of cropIds) {
       const crop = this.cropSystem.getCropById(cropId);
       if (crop && this.isPointInCrop(worldX, worldY, crop)) {
         return true;
