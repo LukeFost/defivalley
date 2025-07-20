@@ -47,7 +47,6 @@ export default function Home() {
         <div className="overlay-content">
           <h2>Farm Controls</h2>
           <p>🎮 WASD: Move</p>
-          <p>💬 Enter: Chat</p>
           <p>🌱 Right-click: Plant seeds</p>
         </div>
       </aside>

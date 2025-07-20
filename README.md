@@ -2,6 +2,32 @@
 
 A cozy farming game where your crops are powered by real DeFi protocols. Plant seeds, earn yield, and watch your digital farm grow with actual blockchain value.
 
+## 📋 Current Status
+
+**Version**: 2.0 - Refactored Local-Only Visualizer  
+**State**: Stable single-player farming game without blockchain dependencies
+
+### Recent Changes (v2.0)
+- ✅ **Removed broken components**: WorldBrowser, TransactionTracker, and multiplayer features
+- ✅ **Simplified planting UI**: Removed blockchain/USDC references, now uses local storage
+- ✅ **Removed chat system**: No longer includes multiplayer chat functionality  
+- ✅ **Local-only game loop**: Plant, grow, and harvest crops without any blockchain transactions
+- ✅ **Clean architecture**: Removed dead code and unused manager classes
+
+### Working Features
+- 🌱 **Local Farming**: Plant seeds via dialog, crops grow over time, harvest when ready
+- 🎮 **Player Movement**: WASD/Arrow keys for movement with collision detection
+- 🏗️ **Tilemap World**: Procedurally generated terrain with cliffs and grass
+- 🎨 **Character System**: Multiple character sprites with animations
+- 📊 **Crop Statistics**: Real-time counters for total, growing, and ready crops
+- 💰 **Gold System**: Earn gold by harvesting crops (local currency)
+
+### Known Limitations
+- No blockchain integration (removed for stability)
+- No multiplayer support (server components removed)
+- No DeFi yield generation (local-only game)
+- No cross-chain features (simplified to single-player)
+
 ## 🎯 Project Overview
 
 DeFi Valley is a multiplayer farming game that transforms complex DeFi yield farming into an intuitive, delightful gaming experience. Built for the hackathon with a focus on cross-chain interoperability and user experience.

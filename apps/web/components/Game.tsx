@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
-import { MainScene, type ChatMessage } from '../lib/MainScene';
+import { MainScene } from '../lib/MainScene';
 import { CropData, CropType } from '../lib/CropSystem';
 import { DialogueBox } from './DialogueBox';
 import { CropContextMenu } from './CropContextMenu';
@@ -21,9 +21,6 @@ interface GameProps {
 
 function Game({ worldId, isOwnWorld }: GameProps) {
   const gameRef = useRef<Phaser.Game | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [showChat, setShowChat] = useState(false);
   const sceneRef = useRef<MainScene | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropData | null>(null);
   const [showMorphoModal, setShowMorphoModal] = useState(false);
@@ -106,11 +103,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
           scene.setChainId(chainId);
         }
         
-        scene.init({
-          chatCallback: (message: ChatMessage) => {
-            setChatMessages(prev => [...prev, message]);
-          }
-        });
+        scene.init({});
 
         // Set up crop click event listener
         scene.events.on('cropClicked', (crop: CropData) => {
@@ -165,28 +158,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
     };
 
-    // Handle Enter key for chat
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't trigger if user is already typing in chat input
-      if (event.target instanceof HTMLInputElement) {
-        return;
-      }
-      
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        setShowChat(true);
-      }
-    };
 
     window.addEventListener('resize', handleResize);
-    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy(true);
       }
       window.removeEventListener('resize', handleResize);
-      document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -203,17 +182,6 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     }
   }, [chainId]);
 
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Chat submit:', chatInput, 'Scene ref:', sceneRef.current);
-    if (chatInput.trim() && sceneRef.current) {
-      sceneRef.current.sendChatMessage(chatInput);
-      setChatInput('');
-      setShowChat(false);
-    } else {
-      console.log('Cannot send chat - missing input or scene reference');
-    }
-  };
 
   // Crop system handlers
   const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
@@ -257,14 +225,8 @@ function Game({ worldId, isOwnWorld }: GameProps) {
 
   return (
     <div className="game-wrapper">
-      {/* Game UI overlay with chat, wallet, and network controls */}
+      {/* Game UI overlay with wallet and network controls */}
       <GameUI
-        chatMessages={chatMessages}
-        chatInput={chatInput}
-        showChat={showChat}
-        onChatSubmit={handleChatSubmit}
-        onChatInputChange={setChatInput}
-        onShowChatChange={setShowChat}
         getTotalCrops={getTotalCrops}
         getReadyCrops={getReadyCrops}
         getGrowingCrops={getGrowingCrops}

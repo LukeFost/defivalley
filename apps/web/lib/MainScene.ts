@@ -17,12 +17,6 @@ import { eventBus } from './systems/EventBus';
 import { katanaChain, flowMainnet } from '../app/wagmi';
 
 // Network types removed
-interface ChatMessage {
-  sessionId: string;
-  playerId: string;
-  message: string;
-  timestamp: number;
-}
 
 interface PlayerData {
   x: number;
@@ -42,7 +36,6 @@ export class MainScene extends Phaser.Scene {
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
   private oKey!: Phaser.Input.Keyboard.Key;
   private sessionId!: string;
-  private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down';
   private cliffTiles: Phaser.GameObjects.Image[] = [];
   private terrainLayout: string[][] = [];
@@ -97,8 +90,7 @@ export class MainScene extends Phaser.Scene {
   }
   
 
-  init(data: { chatCallback?: (message: ChatMessage) => void }) {
-    this.chatCallback = data.chatCallback;
+  init(data: {}) {
   }
 
   preload() {
@@ -874,9 +866,24 @@ export class MainScene extends Phaser.Scene {
           const centerY = y + plotSize/2;
           
           if (this.cropSystem.canPlantAt(centerX, centerY)) {
-            // Plant a potato (hardcoded for MVP)
-            this.cropSystem.plantCrop(centerX, centerY, 'potato');
-            console.log(`🌱 Planted potato at plot (${col}, ${row})`);
+            // Check for pending plant crop selection
+            let cropType: CropType = 'potato'; // default
+            
+            if (typeof window !== 'undefined') {
+              const pendingPlant = window.localStorage.getItem('pendingPlantCrop');
+              if (pendingPlant) {
+                try {
+                  const { cropType: selectedCropType } = JSON.parse(pendingPlant);
+                  cropType = selectedCropType as CropType;
+                  window.localStorage.removeItem('pendingPlantCrop');
+                } catch (e) {
+                  console.error('Failed to parse pending plant crop:', e);
+                }
+              }
+            }
+            
+            this.cropSystem.plantCrop(centerX, centerY, cropType);
+            console.log(`🌱 Planted ${cropType} at plot (${col}, ${row})`);
           } else {
             console.log(`❌ Cannot plant at plot (${col}, ${row}) - already occupied`);
           }
@@ -1691,10 +1698,6 @@ export class MainScene extends Phaser.Scene {
   }
 
 
-  sendChatMessage(message: string) {
-    // Chat functionality removed
-    console.log('Chat disabled:', message);
-  }
 
   destroy() {
     // Emit system shutdown event
@@ -1966,5 +1969,4 @@ buildings: ${JSON.stringify(config.buildings, null, 2)},
   }
 }
 
-export type { ChatMessage };
 export type { EditorObject } from '../components/EditorPanel';

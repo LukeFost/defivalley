@@ -1,17 +1,16 @@
 'use client';
 
-import React, { ReactNode } from 'react';
+import React from 'react';
 import Notifications from './Notifications';
 
 interface UIStackProps {
   getTotalCrops: () => number;
   getReadyCrops: () => number;
   getGrowingCrops: () => number;
-  chatContainer: ReactNode;
   playerGold?: number;
 }
 
-export function UIStack({ getTotalCrops, getReadyCrops, getGrowingCrops, chatContainer, playerGold = 0 }: UIStackProps) {
+export function UIStack({ getTotalCrops, getReadyCrops, getGrowingCrops, playerGold = 0 }: UIStackProps) {
   return (
     <div className="fixed top-4 left-4 flex flex-col gap-4 w-80 sm:w-96 md:w-80 lg:w-96 z-[1000] max-w-[calc(100vw-2rem)]">
       {/* Player Stats Panel */}
@@ -22,10 +21,6 @@ export function UIStack({ getTotalCrops, getReadyCrops, getGrowingCrops, chatCon
         </div>
       </div>
 
-      {/* Chat Container */}
-      <div className="bg-black/80 backdrop-blur-sm rounded-lg text-white">
-        {chatContainer}
-      </div>
 
       {/* Notifications Panel */}
       <div>
