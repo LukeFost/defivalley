@@ -14,7 +14,8 @@ import { BuildingInteractionManager } from './BuildingInteractionManager';
 import { CollisionSystem } from './systems/CollisionSystem';
 import { CameraSystem } from './systems/CameraSystem';
 import { eventBus } from './systems/EventBus';
-import { katanaChain, flowMainnet } from '../app/wagmi';
+import { katanaChain } from '../app/wagmi';
+import { flowMainnet } from '../app/lib/networks';
 import { EventBus, GameEvents } from '../game/EventBus';
 
 // Network types removed

@@ -1,37 +1,5 @@
 import { http, createConfig, cookieStorage, createStorage } from 'wagmi'
-import { arbitrumSepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
-
-// Define Saga Chainlet custom chain
-export const sagaChainlet = {
-  id: 2751669528484000,
-  name: 'Saga Chainlet',
-  network: 'saga-chainlet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'SAGA',
-    symbol: 'SAGA',
-  },
-  rpcUrls: {
-    default: { 
-      http: ['https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io'] 
-    },
-    public: { 
-      http: ['https://yieldfield-2751669528484000-1.jsonrpc.sagarpc.io'] 
-    },
-  },
-  blockExplorers: {
-    default: { 
-      name: 'Saga Explorer', 
-      url: 'https://explorer.saga.io' 
-    },
-  },
-  contracts: {
-    gameController: {
-      address: '0x896C39e19EcA825cE6bA66102E6752052049a4b1',
-    },
-  },
-} as const
 
 // Define Katana custom chain
 export const katanaChain = {
@@ -67,43 +35,10 @@ export const katanaChain = {
   },
 } as const
 
-// Define Flow Mainnet custom chain
-export const flowMainnet = {
-  id: 747,
-  name: 'Flow EVM',
-  network: 'flow-mainnet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Flow',
-    symbol: 'FLOW',
-  },
-  rpcUrls: {
-    default: { 
-      http: ['https://mainnet.evm.nodes.onflow.org'] 
-    },
-    public: { 
-      http: ['https://mainnet.evm.nodes.onflow.org'] 
-    },
-  },
-  blockExplorers: {
-    default: { 
-      name: 'Flow Explorer', 
-      url: 'https://evm.flowscan.io' 
-    },
-  },
-  contracts: {
-    punchSwapRouter: {
-      address: '0xf45AFe28fd5519d5f8C1d4787a4D5f724C0eFa4d',
-    },
-    pumpFlowFactory: {
-      address: '0x576Be17F4dFa0E4964034e2E3dD29465B225B8d4',
-    },
-  },
-} as const
 
 // Wagmi configuration
 export const config = createConfig({
-  chains: [sagaChainlet, arbitrumSepolia, katanaChain, flowMainnet],
+  chains: [katanaChain],
   connectors: [
     injected(),
     walletConnect({
@@ -111,10 +46,7 @@ export const config = createConfig({
     }),
   ],
   transports: {
-    [sagaChainlet.id]: http(),
-    [arbitrumSepolia.id]: http(),
     [katanaChain.id]: http(),
-    [flowMainnet.id]: http(),
   },
   ssr: true,
   storage: createStorage({

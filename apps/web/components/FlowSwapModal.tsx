@@ -13,7 +13,7 @@ import { useTokenAllowance } from '@/hooks/useTokenAllowance';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { FLOW_TOKENS, FLOW_PROTOCOLS, NATIVE_TOKEN_ADDRESS } from '@/constants/flow-tokens';
-import { flowMainnet } from '@/app/wagmi';
+import { flowMainnet } from '@/app/lib/networks';
 
 interface FlowSwapModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ const FlowSwapModal = React.memo(function FlowSwapModal({ isOpen, onClose }: Flo
   const { address, chainId } = useAccount();
   const { data: flowBalance, refetch: refetchFlowBalance } = useBalance({ 
     address,
-    chainId: flowMainnet.id // Force Flow mainnet chain ID
+    chainId: flowMainnet.id as any // Force Flow mainnet chain ID
   });
   const { balance: frothBalance, refetch: refetchFrothBalance } = useTokenBalance(FLOW_TOKENS.FROTH, address, flowMainnet.id);
   
