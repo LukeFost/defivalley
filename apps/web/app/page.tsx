@@ -2,78 +2,27 @@
 
 import { useState } from 'react';
 import GameWrapper from '@/components/GameWrapper';
-import WorldBrowser from '@/components/WorldBrowser';
 import { Auth } from '@/components/Auth';
 import PlantSeedDialog from '@/components/PlantSeedDialog';
 import SettingsDialog from '@/components/SettingsDialog';
-import TransactionTracker from '@/components/TransactionTracker';
 import Notifications from '@/components/Notifications';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'browser' | 'game'>('browser');
-  const [selectedWorldId, setSelectedWorldId] = useState<string>('');
-  const [isOwnWorld, setIsOwnWorld] = useState<boolean>(false);
   const [overlayOpen, setOverlayOpen] = useState<boolean>(false);
-
-  const handleEnterWorld = (worldId: string, isOwn: boolean) => {
-    setSelectedWorldId(worldId);
-    setIsOwnWorld(isOwn);
-    setCurrentView('game');
-  };
-
-  const handleBackToWorldBrowser = () => {
-    setCurrentView('browser');
-    setSelectedWorldId('');
-    setIsOwnWorld(false);
-  };
-
-  if (currentView === 'browser') {
-    return (
-      <div className="min-h-screen">
-        <WorldBrowser onEnterWorld={handleEnterWorld} />
-        {/* Auth component for world browser */}
-        <div className="fixed top-4 right-4 z-50">
-          <Auth />
-        </div>
-        {/* Global components that work across views */}
-        <PlantSeedDialog />
-        <SettingsDialog />
-        <TransactionTracker />
-        <Notifications />
-      </div>
-    );
-  }
 
   return (
     <div className="game-view-container">
       {/* Full viewport game wrapper */}
       <div className="game-viewport-wrapper">
-        <GameWrapper worldId={selectedWorldId} isOwnWorld={isOwnWorld} />
+        <GameWrapper worldId="local" isOwnWorld={true} />
       </div>
       
       {/* Bottom bar with toggle button */}
       <div className="bottom-bar">
-        <Button
-          onClick={handleBackToWorldBrowser}
-          variant="outline"
-          size="sm"
-          className="back-button"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Worlds
-        </Button>
-        
         <div className="farm-info">
           <span className="farm-title">
-            🌱 {isOwnWorld ? 'My Farm' : 'Visiting Farm'}
+            🌱 My Farm
           </span>
-          {!isOwnWorld && (
-            <span className="farm-id">
-              ID: {selectedWorldId.slice(0, 8)}...
-            </span>
-          )}
         </div>
         
         <button 
@@ -98,7 +47,6 @@ export default function Home() {
         <div className="overlay-content">
           <h2>Farm Controls</h2>
           <p>🎮 WASD: Move</p>
-          <p>💬 Enter: Chat</p>
           <p>🌱 Right-click: Plant seeds</p>
         </div>
       </aside>
@@ -270,7 +218,6 @@ export default function Home() {
       {/* DeFi Valley Modal Components */}
       <PlantSeedDialog />
       <SettingsDialog />
-      <TransactionTracker />
       
       {/* Global Notification System */}
       <Notifications />

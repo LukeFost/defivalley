@@ -116,7 +116,8 @@ export class BuildingInteractionManager {
    * Check if a position collides with any building
    */
   public checkCollision(x: number, y: number): boolean {
-    for (const building of this.buildings.values()) {
+    const buildings = Array.from(this.buildings.values());
+    for (const building of buildings) {
       if (building.checkCollision(x, y)) {
         return true;
       }

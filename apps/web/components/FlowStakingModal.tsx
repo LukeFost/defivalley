@@ -36,7 +36,7 @@ function FlowStakingModalComponent({ isOpen, onClose }: FlowStakingModalProps) {
     try {
       return parseUnits(amount || '0', 18);
     } catch {
-      return 0n;
+      return BigInt(0);
     }
   }, [amount]);
 
@@ -133,7 +133,7 @@ function FlowStakingModalComponent({ isOpen, onClose }: FlowStakingModalProps) {
               </p>
             )}
             
-            <Button onClick={handleDeposit} disabled={isApproving || isDepositing || !amount || (minimumDeposit && depositAmountBigInt < minimumDeposit)} className="mt-2 w-full">
+            <Button onClick={handleDeposit} disabled={isApproving || isDepositing || !amount || (minimumDeposit !== undefined && depositAmountBigInt < minimumDeposit)} className="mt-2 w-full">
               {(isApproving || isDepositing) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {approvalNeeded ? 'Approve FVIX' : 'Stake Now'}
             </Button>

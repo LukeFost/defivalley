@@ -75,7 +75,7 @@ const FlowSwapModal = React.memo(function FlowSwapModal({ isOpen, onClose }: Flo
   };
 
   const handleConvertToFvix = async () => {
-    if (frothBalance <= 0n) return;
+    if (frothBalance <= BigInt(0)) return;
 
     // Check if approval is needed first
     if (checkFrothApprovalNeeded(frothBalance)) {
@@ -107,7 +107,7 @@ const FlowSwapModal = React.memo(function FlowSwapModal({ isOpen, onClose }: Flo
             <Label htmlFor="flow-amount">FLOW Amount</Label>
             <Input id="flow-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.0" />
             <p className="text-xs text-muted-foreground mt-1">
-              Balance: {flowBalance && flowBalance.value > 0n ? formatUnits(flowBalance.value, 18) : '0'} FLOW
+              Balance: {flowBalance && flowBalance.value > BigInt(0) ? formatUnits(flowBalance.value, 18) : '0'} FLOW
               {chainId !== flowMainnet.id && ' (Switch to Flow network)'}
             </p>
             <Button 
@@ -125,7 +125,7 @@ const FlowSwapModal = React.memo(function FlowSwapModal({ isOpen, onClose }: Flo
             <h4 className="font-semibold mb-2">Step 2: Convert FROTH ➔ FVIX</h4>
             <p className="text-sm text-muted-foreground mb-2">Convert your FROTH into the stakeable token, FVIX. (Ratio: {conversionRatio.toString()}:1)</p>
             <p className="text-sm">Available to convert: {formatUnits(frothBalance, 18)} FROTH</p>
-            <Button onClick={handleConvertToFvix} disabled={isSwapping || isApprovingFroth || frothBalance === 0n} className="mt-2 w-full">
+            <Button onClick={handleConvertToFvix} disabled={isSwapping || isApprovingFroth || frothBalance === BigInt(0)} className="mt-2 w-full">
               {(isSwapping || isApprovingFroth) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {checkFrothApprovalNeeded(frothBalance) ? 'Approve FROTH' : 'Convert all FROTH to FVIX'}
             </Button>

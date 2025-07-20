@@ -11,25 +11,21 @@ import { FlowBankBuilding } from './FlowBankBuilding';
 import { FlowMarketplaceBuilding } from './FlowMarketplaceBuilding';
 import { PepeBuilding } from './PepeBuilding';
 import { BuildingInteractionManager } from './BuildingInteractionManager';
-import { NetworkSystem, ChatMessage, PlayerData } from './systems/NetworkSystem';
 import { CollisionSystem } from './systems/CollisionSystem';
 import { CameraSystem } from './systems/CameraSystem';
 import { eventBus } from './systems/EventBus';
 import { katanaChain, flowMainnet } from '../app/wagmi';
+import { EventBus, GameEvents } from '../game/EventBus';
 
-// Network types are now imported from NetworkSystem
+// Network types removed
 
 export class MainScene extends Phaser.Scene {
-  private networkSystem!: NetworkSystem;
   private collisionSystem!: CollisionSystem;
   private cameraSystem!: CameraSystem;
-  private players: Map<string, Player> = new Map();
   private currentPlayer!: Player;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
   private oKey!: Phaser.Input.Keyboard.Key;
-  private sessionId!: string;
-  private chatCallback?: (message: ChatMessage) => void;
   private lastDirection: string = 'down';
   private cliffTiles: Phaser.GameObjects.Image[] = [];
   private terrainLayout: string[][] = [];
@@ -70,22 +66,22 @@ export class MainScene extends Phaser.Scene {
   // Performance optimization properties
   private lastBuildingCheck: number = 0;
   private lastCropUpdate: number = 0;
-  private lastPlayerSync: number = 0;
-  private lastPlayerVisibilityCheck: number = 0;
   
   // Tile size
   private tileSize: number = 32;
   
   // Depth sorting group for 2.5D rendering
   private depthGroup!: Phaser.GameObjects.Group;
+  
+  // Queued crop for planting
+  private queuedCropType?: CropType;
 
   constructor() {
     super({ key: 'MainScene' });
   }
   
 
-  init(data: { chatCallback?: (message: ChatMessage) => void }) {
-    this.chatCallback = data.chatCallback;
+  init(data: {}) {
   }
 
   preload() {
@@ -160,6 +156,9 @@ export class MainScene extends Phaser.Scene {
       lerpFactor: GameConfig.camera.lerpFactor,
       debugMode: false
     });
+    
+    // Set up EventBus listeners
+    EventBus.on(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
     
     // Subscribe to camera events
     this.cameraSystem.on('viewport-update', (viewport: any) => {
@@ -244,13 +243,10 @@ export class MainScene extends Phaser.Scene {
     });
 
     // Initialize network system
-    this.networkSystem = new NetworkSystem();
     this.setupNetworkEventHandlers();
     
-    // Connect to Colyseus after scene is fully ready
-    this.time.delayedCall(100, () => {
-      this.connectToServer();
-    });
+    // Create local player immediately
+    this.createLocalPlayer();
     
     // Set up editor mode click handling
     this.setupEditorClickHandling();
@@ -587,7 +583,7 @@ export class MainScene extends Phaser.Scene {
       this.currentPlayer.setPosition(targetX, targetY);
       
       // Send position update to server
-      this.networkSystem.sendMovement(targetX, targetY);
+      // Movement sync removed
       
       console.log(`✅ Teleported to building area (${targetX}, ${targetY})`);
     };
@@ -614,17 +610,13 @@ export class MainScene extends Phaser.Scene {
       let visibleCount = 0;
       let hiddenCount = 0;
       
-      this.players.forEach((player, sessionId) => {
-        const isCurrentPlayer = sessionId === this.sessionId;
-        const playerInfo = player.getPlayerInfo();
-        console.log(`Player ${playerInfo.name} (${isCurrentPlayer ? 'YOU' : 'OTHER'}): x=${playerInfo.x}, y=${playerInfo.y}, visible=${player.visible}`);
-        
-        if (player.visible) visibleCount++;
-        else hiddenCount++;
-      });
+      if (this.currentPlayer) {
+        const playerInfo = this.currentPlayer.getPlayerInfo();
+        console.log(`Player ${playerInfo.name} (YOU): x=${playerInfo.x}, y=${playerInfo.y}, visible=${this.currentPlayer.visible}`);
+        visibleCount = 1;
+      }
       
-      console.log(`\nSummary: ${visibleCount} visible, ${hiddenCount} hidden players`);
-      console.log('Viewport culling is', this.lastPlayerVisibilityCheck > 0 ? 'ACTIVE' : 'INACTIVE');
+      console.log(`\nSummary: ${visibleCount} visible player (single-player mode)`);
     };
     
     // Camera debug commands
@@ -862,9 +854,19 @@ export class MainScene extends Phaser.Scene {
           const centerY = y + plotSize/2;
           
           if (this.cropSystem.canPlantAt(centerX, centerY)) {
-            // Plant a potato (hardcoded for MVP)
-            this.cropSystem.plantCrop(centerX, centerY, 'potato');
-            console.log(`🌱 Planted potato at plot (${col}, ${row})`);
+            if (this.queuedCropType) {
+              // Plant the queued crop
+              this.cropSystem.plantCrop(centerX, centerY, this.queuedCropType);
+              console.log(`🌱 Planted ${this.queuedCropType} at plot (${col}, ${row})`);
+              
+              // Clear the queue after planting
+              this.queuedCropType = undefined;
+              
+              // Emit event for UI feedback
+              EventBus.emit(GameEvents.CROP_PLANTED);
+            } else {
+              console.log(`💡 No seed selected. Use the menu to select a seed first.`);
+            }
           } else {
             console.log(`❌ Cannot plant at plot (${col}, ${row}) - already occupied`);
           }
@@ -1329,261 +1331,59 @@ export class MainScene extends Phaser.Scene {
   }
 
   setupNetworkEventHandlers() {
-    // Handle player join events
-    this.networkSystem.on('onPlayerJoin', (sessionId: string, player: PlayerData) => {
-      this.addPlayer(sessionId, player);
-    });
-
-    // Handle player leave events
-    this.networkSystem.on('onPlayerLeave', (sessionId: string) => {
-      this.removePlayer(sessionId);
-    });
-
-    // Handle player movement updates
-    this.networkSystem.on('onPlayerMove', (sessionId: string, x: number, y: number, level?: number) => {
-      const playerData = { x, y, level };
-      this.updatePlayer(sessionId, playerData);
-    });
-
-    // Handle chat messages
-    this.networkSystem.on('onChatMessage', (message: ChatMessage) => {
-      if (this.chatCallback) {
-        this.chatCallback(message);
-      }
-    });
-
-    // Handle state changes
-    this.networkSystem.on('onStateChange', (state) => {
-      // Make sure scene is initialized before handling players
-      if (!this.scene || !this.scene.isActive()) {
-        console.log('Scene not ready yet, skipping state update');
-        return;
-      }
-      
-      // Handle all players in the current state
-      if (state.players) {
-        // Clear existing players first
-        this.players.forEach((player, sessionId) => {
-          if (!state.players.has || !state.players.has(sessionId)) {
-            this.removePlayer(sessionId);
-          }
-        });
-        
-        // Add or update all current players
-        state.players.forEach((player: any, sessionId: string) => {
-          if (this.players.has(sessionId)) {
-            this.updatePlayer(sessionId, player);
-          } else {
-            this.addPlayer(sessionId, player);
-          }
-        });
-      }
-    });
-
-    // Handle connection events
-    this.networkSystem.on('onConnected', (room) => {
-      this.sessionId = this.networkSystem.getSessionId() || '';
-      console.log('✅ Connected to server with session ID:', this.sessionId);
-    });
-
-    this.networkSystem.on('onDisconnected', () => {
-      console.log('❌ Disconnected from server');
-      // Clear all players when disconnected
-      this.players.forEach((player, sessionId) => {
-        this.removePlayer(sessionId);
-      });
-    });
-
-    this.networkSystem.on('onError', (error) => {
-      console.error('Network error:', error);
-    });
+    // Network functionality removed
   }
 
-  async connectToServer() {
+  private createLocalPlayer() {
     try {
       // Get player ID from wallet address or user ID
-      const playerId = this.address || this.user?.id || this.networkSystem.generateGuestId();
+      const playerId = this.address || this.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
       
       // Use wallet address as display name
-      const displayName = this.networkSystem.getDisplayName(this.address);
-      
-      // Determine room type and options based on world configuration
-      let roomType = 'game'; // fallback to generic room
-      const roomOptions = {
-        name: displayName,
-        playerId: playerId,
-        worldOwnerId: undefined as string | undefined
-      };
-
-      if (this.worldId) {
-        roomType = 'world';
-        roomOptions.worldOwnerId = this.worldId;
-        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'}) with playerId: ${playerId}`);
-      }
-      
-      // Connect using the network system
-      await this.networkSystem.connect(roomType, roomOptions);
-      
-    } catch (error) {
-      console.error('Failed to connect to server:', error);
-    }
-  }
-
-  addPlayer(sessionId: string, player: PlayerData) {
-    try {
-      const isCurrentPlayer = sessionId === this.sessionId;
-      
-      // Check if scene is active and ready
-      if (!this.scene || !this.scene.isActive() || !this.add) {
-        console.log('Scene not ready for adding player');
-        return;
-      }
-      
-      // Don't add if player already exists
-      if (this.players.has(sessionId)) {
-        console.log('Player already exists:', sessionId);
-        return;
-      }
-      
-      // Force current player to spawn near buildings
-      if (isCurrentPlayer) {
-        // Spawn near the buildings area for easier access
-        player.x = GameConfig.player.spawnPosition.x;
-        player.y = GameConfig.player.spawnPosition.y;
-        console.log('🎯 Current player spawned near buildings:', player.x, player.y);
-      }
-      
-      // All players are cowboys now - simplified character assignment
-      const characterType: CharacterType = 'cowboy';
-      console.log(`🤠 Player ${player.name} assigned cowboy character`);
+      const displayName = this.address ? 
+        `${this.address.slice(0, 6)}...${this.address.slice(-4)}` : 
+        'Guest';
       
       // Create PlayerInfo object
       const playerInfo: PlayerInfo = {
-        id: sessionId,
-        name: player.name,
-        x: player.x,
-        y: player.y,
-        character: characterType,
+        id: playerId,
+        name: displayName,
+        x: GameConfig.player.spawnPosition.x,
+        y: GameConfig.player.spawnPosition.y,
+        level: 1,
+        character: 'character_1' as CharacterType,
         direction: 'down',
-        isCurrentPlayer,
-        level: player.level || 1,
-        xp: player.xp || 0
+        isCurrentPlayer: true
       };
       
-      // Create Player instance
-      const playerObject = new Player(this, player.x, player.y, playerInfo);
+      // Create the player object
+      this.currentPlayer = new Player(this, playerInfo.x, playerInfo.y, playerInfo);
       
       // Add player to depth group for proper 2.5D sorting
-      this.depthGroup.add(playerObject);
-      
-      // Store reference
-      this.players.set(sessionId, playerObject);
-      
-      if (isCurrentPlayer) {
-        this.currentPlayer = playerObject;
-        // Start camera following the current player
-        this.updateCameraFollow();
-        console.log('📷 Camera now following current player');
-      } else {
-        // For other players, check if they should be visible based on viewport
-        const camera = this.cameras.main;
-        const viewBounds = camera.worldView;
-        const margin = 100;
-        
-        const isInView = player.x >= viewBounds.x - margin &&
-                        player.x <= viewBounds.x + viewBounds.width + margin &&
-                        player.y >= viewBounds.y - margin &&
-                        player.y <= viewBounds.y + viewBounds.height + margin;
-        
-        if (!isInView) {
-          playerObject.setVisible(false);
-        }
+      if (this.depthGroup) {
+        this.depthGroup.add(this.currentPlayer);
       }
       
-      console.log('Added player:', sessionId, player.name, 'with character:', characterType);
+      this.updateCameraFollow();
       
-      // Emit player joined event
-      eventBus.emit('player:joined', {
-        playerId: sessionId,
-        username: player.name,
-        character: characterType
-      });
+      console.log('Created local player:', playerId, displayName);
+      
     } catch (error) {
-      console.error('Error adding player:', error);
+      console.error('Failed to create local player:', error);
     }
   }
-
-  removePlayer(sessionId: string) {
-    try {
-      const player = this.players.get(sessionId);
-      if (player) {
-        player.destroy();
-        this.players.delete(sessionId);
-        console.log('Removed player:', sessionId);
-        
-        // Emit player left event
-        eventBus.emit('player:left', { playerId: sessionId });
-      }
-    } catch (error) {
-      console.error('Error removing player:', error);
-    }
+  
+  /**
+   * Queue a crop type for planting on the next plot click
+   */
+  public queueCropForPlanting(cropType: CropType): void {
+    this.queuedCropType = cropType;
+    console.log(`🌱 Queued ${cropType} for planting`);
   }
 
-  updatePlayer(sessionId: string, playerData: any) {
-    try {
-      const player = this.players.get(sessionId);
-      if (player && playerData) {
-        // Skip updating current player (handled by local input)
-        if (sessionId === this.sessionId) {
-          return;
-        }
-
-        // Viewport culling: Only update players within view
-        const camera = this.cameras.main;
-        const viewBounds = camera.worldView;
-        
-        // Check if player is within expanded viewport bounds (with margin for smooth transitions)
-        const margin = 100; // Buffer zone around viewport
-        const isInView = playerData.x >= viewBounds.x - margin &&
-                        playerData.x <= viewBounds.x + viewBounds.width + margin &&
-                        playerData.y >= viewBounds.y - margin &&
-                        playerData.y <= viewBounds.y + viewBounds.height + margin;
-
-        if (!isInView) {
-          // Player is outside viewport - hide them to save performance
-          player.setVisible(false);
-          return;
-        }
-
-        // Player is in view - ensure they're visible and update position
-        player.setVisible(true);
-        player.updatePosition(playerData.x, playerData.y);
-        
-        // Update level if it changed
-        if (playerData.level && playerData.level !== player.getPlayerInfo().level) {
-          player.updateLevel(playerData.level);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating player:', error);
-    }
-  }
-
-  updatePlayerDirection(player: Player, direction: string) {
-    try {
-      // Only update if direction actually changed
-      const currentDirection = player.getPlayerInfo().direction;
-      if (currentDirection !== direction) {
-        player.updateDirection(direction as any);
-        // Remove spammy console log - was causing performance issues
-      }
-    } catch (error) {
-      console.error('Error updating player direction:', error);
-    }
-  }
 
   update(time: number, delta: number) {
-    if (!this.networkSystem.isConnectedToServer() || !this.currentPlayer) return;
+    if (!this.currentPlayer) return;
 
     // Update camera system
     if (this.cameraSystem) {
@@ -1622,35 +1422,8 @@ export class MainScene extends Phaser.Scene {
       this.lastCropUpdate = time;
     }
 
-    // Periodic player visibility check (every 250ms)
-    if (time - this.lastPlayerVisibilityCheck > 250) {
-      this.updatePlayerVisibility();
-      this.lastPlayerVisibilityCheck = time;
-    }
   }
 
-  private updatePlayerVisibility() {
-    // Use camera system for viewport bounds with margin
-    const margin = 100; // Buffer zone for smooth transitions
-
-    // Check visibility for all players except current player
-    this.players.forEach((player, sessionId) => {
-      if (sessionId === this.sessionId) {
-        // Current player is always visible
-        return;
-      }
-
-      const playerInfo = player.getPlayerInfo();
-      const isInView = this.cameraSystem.isPointInViewport(playerInfo.x, playerInfo.y, 100);
-
-      // Update visibility based on viewport position
-      if (isInView && !player.visible) {
-        player.setVisible(true);
-      } else if (!isInView && player.visible) {
-        player.setVisible(false);
-      }
-    });
-  }
 
   private handlePlayerInput(delta: number) {
     if (!this.currentPlayer) return;
@@ -1712,24 +1485,24 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.lastDirection = newDirection;
-    this.updatePlayerDirection(this.currentPlayer, this.lastDirection);
+    
+    // Update player direction if changed
+    const currentDirection = this.currentPlayer.getPlayerInfo().direction;
+    if (currentDirection !== this.lastDirection) {
+      this.currentPlayer.updateDirection(this.lastDirection as any);
+    }
+    
     this.currentPlayer.updateMovementState(moved);
 
     if (moved) {
       this.currentPlayer.setPosition(newX, newY);
-      const now = performance.now();
-      if (now - this.lastPlayerSync > GameConfig.network.positionSyncInterval) {
-        this.networkSystem.sendMovement(newX, newY);
-        this.lastPlayerSync = now;
-        
-        // Emit player moved event
-        eventBus.emit('player:moved', {
-          playerId: this.sessionId,
-          x: newX,
-          y: newY,
-          timestamp: Date.now()
-        });
-      }
+      // Emit player moved event
+      eventBus.emit('player:moved', {
+        playerId: this.currentPlayer.getPlayerInfo().id,
+        x: newX,
+        y: newY,
+        timestamp: Date.now()
+      });
     }
 
     this.updateCameraFollow();
@@ -1745,15 +1518,15 @@ export class MainScene extends Phaser.Scene {
   }
 
 
-  sendChatMessage(message: string) {
-    this.networkSystem.sendChat(message);
-  }
 
   destroy() {
+    // Clean up EventBus listeners
+    EventBus.off(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
+    
     // Emit system shutdown event
     eventBus.emit('system:shutdown', { systemName: 'MainScene' });
     
-    this.networkSystem.disconnect();
+    // Disconnect functionality removed
     this.scene.stop();
   }
 
@@ -1779,7 +1552,7 @@ export class MainScene extends Phaser.Scene {
       // Emit crop planted event
       eventBus.emit('crop:planted', {
         cropId: `crop_${Date.now()}`,
-        playerId: this.sessionId,
+        playerId: this.currentPlayer ? this.currentPlayer.getPlayerInfo().id : 'local',
         x: x,
         y: y,
         seedType: cropType
@@ -1804,7 +1577,7 @@ export class MainScene extends Phaser.Scene {
       // Emit crop harvested event
       eventBus.emit('crop:harvested', {
         cropId: crop.id,
-        playerId: this.sessionId,
+        playerId: this.currentPlayer ? this.currentPlayer.getPlayerInfo().id : 'local',
         yield: 1,
         experience: 10
       });
@@ -1862,14 +1635,14 @@ export class MainScene extends Phaser.Scene {
       }
     }
     
-    // Check players
-    this.players.forEach(player => {
-      const bounds = player.getBounds();
+    // Check current player
+    if (this.currentPlayer) {
+      const bounds = this.currentPlayer.getBounds();
       if (bounds.contains(x, y)) {
-        this.selectEditorObject(player);
+        this.selectEditorObject(this.currentPlayer);
         return;
       }
-    });
+    }
   }
   
   selectEditorObject(object: any) {
@@ -2019,5 +1792,4 @@ buildings: ${JSON.stringify(config.buildings, null, 2)},
   }
 }
 
-export type { ChatMessage };
 export type { EditorObject } from '../components/EditorPanel';

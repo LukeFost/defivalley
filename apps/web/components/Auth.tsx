@@ -5,7 +5,7 @@ import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
 import { sagaChainlet } from '../app/wagmi'
 import { arbitrumSepolia } from 'wagmi/chains'
 import { useEffect, useState } from 'react'
-import { useAppStore, useTransactions, usePlayerData, useConfig } from '../app/store'
+import { useAppStore, usePlayerData, useConfig } from '../app/store'
 import { NetworkSelector } from './NetworkSelector'
 import {
   Drawer,
@@ -26,11 +26,8 @@ export function Auth() {
   // Removed unused isDrawerOpen state - Drawer manages its own state internally
   
   // DeFi Valley state integration
-  const { active: activeTransactions } = useTransactions()
   // Use granular selectors for better performance
   const showPlantModal = useAppStore((state) => state.showPlantModal)
-  const showTransactionTracker = useAppStore((state) => state.ui.showTransactionTracker)
-  const toggleTransactionTracker = useAppStore((state) => state.toggleTransactionTracker)
   const showSettingsModal = useAppStore((state) => state.showSettingsModal)
   const { playerState, seedPositions, vaultPosition } = usePlayerData()
   const config = useConfig()
@@ -234,15 +231,6 @@ export function Auth() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </button>
-                  {activeTransactions.length > 0 && (
-                    <button 
-                      onClick={toggleTransactionTracker}
-                      className="tx-indicator"
-                    >
-                      <div className="tx-count">{activeTransactions.length}</div>
-                      <div className="tx-pulse"></div>
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -289,18 +277,6 @@ export function Auth() {
                   disabled={chainId !== config.sagaChainId}
                 >
                   🌱 Plant Seeds
-                </button>
-                
-                <button 
-                  onClick={() => {
-                    toggleTransactionTracker();
-                  }}
-                  className="action-btn transactions"
-                >
-                  📊 Transactions
-                  {activeTransactions.length > 0 && (
-                    <span className="tx-badge">{activeTransactions.length}</span>
-                  )}
                 </button>
               </div>
 

@@ -23,7 +23,7 @@ export const FLOW_PROTOCOLS = {
 // DeFi protocol configurations
 export const FLOW_DEFI_CONFIG = {
   // FROTH to FVIX conversion ratio
-  FROTH_TO_FVIX_RATIO: 10000n, // 10,000 FROTH = 1 FVIX
+  FROTH_TO_FVIX_RATIO: BigInt(10000), // 10,000 FROTH = 1 FVIX
   
   // PunchSwap configuration
   PUNCHSWAP: {

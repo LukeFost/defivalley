@@ -1,12 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAccount, useBalance } from 'wagmi';
-import { parseUnits, formatUnits } from 'viem';
-import { useCrossChainTx } from '../app/hooks/useCrossChainTx';
-import { useAppStore, usePlayerData, useConfig, SeedType } from '../app/store';
+import React from 'react';
+import { useAppStore, usePlayerData, SeedType } from '../app/store';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { EventBus, GameEvents } from '../game/EventBus';
 
 interface SeedCardProps {
   seed: SeedType;
@@ -52,18 +50,8 @@ function SeedCard({ seed, isSelected, onSelect }: SeedCardProps) {
       
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Minimum:</span>
-          <span className="font-medium">{Number(formatUnits(seed.minAmount, 6))} USDC</span>
-        </div>
-        
-        <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Growth Time:</span>
           <span className="font-medium">{getTimeString(seed.growthTime)}</span>
-        </div>
-        
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Est. APY:</span>
-          <span className="font-medium text-green-600">{seed.apy}%</span>
         </div>
       </div>
       
@@ -77,162 +65,66 @@ function SeedCard({ seed, isSelected, onSelect }: SeedCardProps) {
 }
 
 export default function FixedPlantSeedDialog() {
-  const { address } = useAccount();
-  const config = useConfig();
-  
-  // Get USDC balance on Saga chainlet
-  const { data: usdcBalance } = useBalance({
-    address,
-    token: config.usdcAddress,
-    chainId: config.sagaChainId
-  });
-  
   // Use granular selectors to prevent unnecessary re-renders
   const isPlantModalOpen = useAppStore((state) => state.ui.showPlantModal ?? false);
   const hidePlantModal = useAppStore((state) => state.hidePlantModal);
   const selectedSeedType = useAppStore((state) => state.ui.selectedSeedType);
   const setSelectedSeedType = useAppStore((state) => state.setSelectedSeedType);
-  const plantAmount = useAppStore((state) => state.ui.plantAmount);
-  const setPlantAmount = useAppStore((state) => state.setPlantAmount);
   const addNotification = useAppStore((state) => state.addNotification);
   
   const { seedTypes } = usePlayerData();
-  const { plantSeed, isLoading, estimateGas } = useCrossChainTx();
-  
-  const [estimatedGas, setEstimatedGas] = useState<bigint>(BigInt(0));
-  const [isValidAmount, setIsValidAmount] = useState(false);
-  const [amountError, setAmountError] = useState('');
   
   const selectedSeed = seedTypes.find(s => s.id === selectedSeedType);
   
-  // Debounced validation function
-  const validateAmount = useCallback(async (amount: string, seed: SeedType | undefined) => {
-    if (!amount || !seed) {
-      setIsValidAmount(false);
-      setAmountError('');
-      return;
-    }
-    
-    try {
-      const parsedAmount = parseUnits(amount, 6);
-      
-      // Check minimum amount
-      if (parsedAmount < seed.minAmount) {
-        setIsValidAmount(false);
-        setAmountError(`Minimum amount is ${Number(formatUnits(seed.minAmount, 6))} USDC`);
-        return;
-      }
-      
-      // Check balance
-      if (usdcBalance && parsedAmount > usdcBalance.value) {
-        setIsValidAmount(false);
-        setAmountError('Insufficient USDC balance');
-        return;
-      }
-      
-      // Estimate gas for cross-chain transaction
-      const gasEstimate = await estimateGas(selectedSeedType, amount);
-      setEstimatedGas(gasEstimate);
-      
-      setIsValidAmount(true);
-      setAmountError('');
-      
-    } catch (error) {
-      setIsValidAmount(false);
-      setAmountError('Invalid amount');
-    }
-  }, [usdcBalance, selectedSeedType, estimateGas]);
-  
-  // Debounced validation with 400ms delay
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      validateAmount(plantAmount, selectedSeed);
-    }, 400);
-    
-    return () => clearTimeout(timeoutId);
-  }, [plantAmount, selectedSeed, validateAmount]);
-  
-  const handlePlantSeed = async () => {
-    if (!isValidAmount || !selectedSeed || !plantAmount) {
+  const handlePlantSeed = () => {
+    if (!selectedSeed) {
       addNotification({
         type: 'error',
-        title: 'Invalid Input',
-        message: 'Please check your seed selection and amount'
+        title: 'No Seed Selected',
+        message: 'Please select a seed type to plant'
       });
       return;
     }
     
-    try {
-      const result = await plantSeed({
-        seedType: selectedSeedType,
-        amount: plantAmount,
-        gasEstimate: estimatedGas
-      });
-      
-      if (result.success) {
-        hidePlantModal();
-        addNotification({
-          type: 'success',
-          title: 'Seed Planting Started',
-          message: 'Your cross-chain transaction has been initiated!'
-        });
-      }
-    } catch (error) {
-      // Error handling is managed by the useCrossChainTx hook
-    }
-  };
-  
-  const handleAmountPreset = (percentage: number) => {
-    if (!usdcBalance || !selectedSeed) return;
+    // Map seed types to crop types
+    const seedToCropMap: Record<number, string> = {
+      1: 'carrot',    // USDC Sprout -> Carrot
+      2: 'potato',    // USDC Premium -> Potato  
+      3: 'wheat'      // USDC Whale Tree -> Wheat
+    };
     
-    const maxAmount = usdcBalance.value;
-    const presetAmount = (maxAmount * BigInt(percentage)) / BigInt(100);
-    const minAmount = selectedSeed.minAmount;
+    const cropType = seedToCropMap[selectedSeed.id] || 'potato';
     
-    const finalAmount = presetAmount < minAmount ? minAmount : presetAmount;
-    setPlantAmount(formatUnits(finalAmount, 6));
+    // Emit seed selection event to MainScene
+    EventBus.emit(GameEvents.SEED_SELECTED, cropType);
+    
+    hidePlantModal();
+    addNotification({
+      type: 'success',
+      title: 'Ready to Plant!',
+      message: `Right-click on a plot to plant your ${selectedSeed.name}!`
+    });
   };
   
   return (
     <DialogPrimitive.Root open={isPlantModalOpen} onOpenChange={hidePlantModal}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[1000] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-[1000] grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg max-h-[90vh] overflow-y-auto">
+        <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-[1000] grid w-full max-w-3xl translate-x-[-50%] translate-y-[-50%] gap-4 bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg max-h-[90vh] overflow-y-auto">
           
           <div className="flex flex-col space-y-2 text-center sm:text-left">
             <DialogPrimitive.Title className="text-2xl font-bold text-gray-900">
-              Plant Seeds for DeFi Yield
+              Choose Your Seed
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-gray-600">
-              Choose your seed type and investment amount to start earning real DeFi yields
+              Select a seed type to plant on your farm
             </DialogPrimitive.Description>
           </div>
           
           <div className="space-y-6">
-            {/* Wallet Status */}
-            {address && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-semibold text-blue-900 mb-2">Your Wallet</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-600">Address:</span>
-                    <p className="font-mono text-blue-800">
-                      {address.slice(0, 6)}...{address.slice(-4)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600">USDC Balance:</span>
-                    <p className="font-semibold text-blue-800">
-                      {usdcBalance ? `${Number(formatUnits(usdcBalance.value, 6)).toFixed(2)} USDC` : 'Loading...'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             {/* Seed Selection */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Your Seed Type</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Select a Seed Type</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {seedTypes.map((seed) => (
                   <SeedCard
@@ -242,111 +134,6 @@ export default function FixedPlantSeedDialog() {
                     onSelect={() => setSelectedSeedType(seed.id)}
                   />
                 ))}
-              </div>
-            </div>
-            
-            {/* Amount Input */}
-            {selectedSeed && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Investment Amount</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      USDC Amount
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={plantAmount || ''}
-                        onChange={(e) => setPlantAmount(e.target.value)}
-                        placeholder={`Min ${Number(formatUnits(selectedSeed.minAmount, 6))}`}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                          amountError ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                        <span className="text-gray-500 font-medium">USDC</span>
-                      </div>
-                    </div>
-                    {amountError && (
-                      <p className="mt-1 text-sm text-red-600">{amountError}</p>
-                    )}
-                  </div>
-                  
-                  {/* Preset Buttons */}
-                  {usdcBalance && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleAmountPreset(25)}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        25%
-                      </button>
-                      <button
-                        onClick={() => handleAmountPreset(50)}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        50%
-                      </button>
-                      <button
-                        onClick={() => handleAmountPreset(75)}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        75%
-                      </button>
-                      <button
-                        onClick={() => handleAmountPreset(100)}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        Max
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Transaction Summary */}
-            {selectedSeed && isValidAmount && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h3 className="font-semibold text-green-900 mb-3">Transaction Summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Seed Type:</span>
-                    <span className="font-medium text-green-800">{selectedSeed.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Investment:</span>
-                    <span className="font-medium text-green-800">{plantAmount} USDC</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Growth Time:</span>
-                    <span className="font-medium text-green-800">
-                      {Math.floor(selectedSeed.growthTime / 3600)} hours
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Estimated APY:</span>
-                    <span className="font-medium text-green-800">{selectedSeed.apy}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Cross-chain Gas:</span>
-                    <span className="font-medium text-green-800">
-                      {Number(formatUnits(estimatedGas, 18)).toFixed(4)} ETH
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Cross-chain Info */}
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="font-semibold text-yellow-900 mb-2">Cross-chain Process</h3>
-              <div className="text-sm text-yellow-800 space-y-1">
-                <p>• Transaction starts on Saga Chainlet (gasless gaming)</p>
-                <p>• Axelar Network bridges message to Arbitrum</p>
-                <p>• USDC deposited into EulerSwap vault for yield</p>
-                <p>• Process typically takes 2-5 minutes</p>
               </div>
             </div>
           </div>
@@ -362,21 +149,14 @@ export default function FixedPlantSeedDialog() {
             
             <button
               onClick={handlePlantSeed}
-              disabled={!isValidAmount || isLoading}
+              disabled={!selectedSeed}
               className={`px-8 py-3 rounded-lg font-semibold transition-all ${
-                isValidAmount && !isLoading
+                selectedSeed
                   ? 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Planting...</span>
-                </div>
-              ) : (
-                'Plant Seed & Start Earning'
-              )}
+              Select Seed
             </button>
           </div>
           
