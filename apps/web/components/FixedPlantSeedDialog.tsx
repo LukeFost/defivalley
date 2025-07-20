@@ -4,6 +4,7 @@ import React from 'react';
 import { useAppStore, usePlayerData, SeedType } from '../app/store';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { EventBus, GameEvents } from '../game/EventBus';
 
 interface SeedCardProps {
   seed: SeedType;
@@ -94,19 +95,14 @@ export default function FixedPlantSeedDialog() {
     
     const cropType = seedToCropMap[selectedSeed.id] || 'potato';
     
-    // Store the request to plant in local storage for MainScene to pick up
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('pendingPlantCrop', JSON.stringify({
-        cropType,
-        timestamp: Date.now()
-      }));
-    }
+    // Emit seed selection event to MainScene
+    EventBus.emit(GameEvents.SEED_SELECTED, cropType);
     
     hidePlantModal();
     addNotification({
       type: 'success',
       title: 'Ready to Plant!',
-      message: `Right-click on the ground to plant your ${selectedSeed.name}`
+      message: `Right-click on a plot to plant your ${selectedSeed.name}!`
     });
   };
   

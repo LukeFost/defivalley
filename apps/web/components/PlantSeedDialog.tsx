@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EventBus, GameEvents } from '../game/EventBus';
 
 interface SeedCardProps {
   seed: SeedType;
@@ -101,19 +102,14 @@ export default function PlantSeedDialog() {
     
     const cropType = seedToCropMap[selectedSeed.id] || 'potato';
     
-    // Store the request to plant in local storage for MainScene to pick up
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('pendingPlantCrop', JSON.stringify({
-        cropType,
-        timestamp: Date.now()
-      }));
-    }
+    // Emit seed selection event to MainScene
+    EventBus.emit(GameEvents.SEED_SELECTED, cropType);
     
     hidePlantModal();
     addNotification({
       type: 'success',
       title: 'Ready to Plant!',
-      message: `Right-click on the ground to plant your ${selectedSeed.name}`
+      message: `Right-click on a plot to plant your ${selectedSeed.name}!`
     });
   };
   

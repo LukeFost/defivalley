@@ -2,288 +2,167 @@
 
 ## System Overview
 
-DeFi Valley is a cross-chain multiplayer farming game that combines real-time gameplay with DeFi yield farming. The architecture is designed for scalability, security, and seamless user experience.
+DeFi Valley is a single-player farming visualization game built with modern web technologies. The architecture focuses on simplicity, performance, and a delightful user experience.
 
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              Frontend (Next.js)                          │
-│  ┌────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐ │
-│  │   Phaser   │  │    React    │  │    Privy    │  │     Wagmi      │ │
-│  │ Game Engine│  │ Components  │  │  Web3 Auth  │  │ Blockchain SDK │ │
-│  └────────────┘  └─────────────┘  └─────────────┘  └────────────────┘ │
-└─────────────────────────────────────┬───────────────────────────────────┘
-                                      │
-                    ┌─────────────────┴───────────────────┐
-                    │                                     │
-        ┌───────────▼────────────┐         ┌─────────────▼──────────────┐
-        │   Game Server          │         │    API Server              │
-        │   (Colyseus)           │         │    (Express)               │
-        │                        │         │                            │
-        │ • Real-time sync       │         │ • World discovery          │
-        │ • Player management    │         │ • Rate limiting            │
-        │ • Game state           │         │ • Input validation         │
-        │ • Authentication       │         │ • Pagination               │
-        └───────────┬────────────┘         └─────────────┬──────────────┘
-                    │                                     │
-                    └─────────────────┬───────────────────┘
-                                      │
-                          ┌───────────▼────────────┐
-                          │   Database (SQLite)    │
-                          │                        │
-                          │ • Player data          │
-                          │ • Crop information     │
-                          │ • World state          │
-                          │ • Optimized indexes    │
-                          └────────────────────────┘
-                                      
-        ┌─────────────────────────────┴───────────────────────────────┐
-        │                    Smart Contracts                           │
-        │                                                              │
-        │  ┌─────────────────────┐         ┌─────────────────────┐   │
-        │  │   GameController    │ Axelar  │     DeFiVault       │   │
-        │  │   (Saga Chainlet)   │◄────────►  (Arbitrum Sepolia) │   │
-        │  │                     │   GMP   │                     │   │
-        │  │ • Player registry   │         │ • USDC deposits      │   │
-        │  │ • Seed planting     │         │ • Yield farming      │   │
-        │  │ • Harvest tracking  │         │ • Circuit breaker    │   │
-        │  │ • XP system         │         │ • Deposit caps       │   │
-        │  └─────────────────────┘         └─────────────────────┘   │
-        └──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Web Application                          │
+│  ┌─────────────────┐      ┌────────────────────────────┐   │
+│  │   Next.js App   │      │    Phaser Game Engine     │   │
+│  │                 │◄─────►│                           │   │
+│  │  - React UI     │      │  - Player Movement       │   │
+│  │  - Dialogs      │      │  - Crop System           │   │
+│  │  - Auth (Privy) │      │  - Tilemap World         │   │
+│  │                 │      │  - Character Animation   │   │
+│  └─────────────────┘      └────────────────────────────┘   │
+│           ▲                           ▲                      │
+│           │                           │                      │
+│           └───────────┬───────────────┘                     │
+│                       │                                      │
+│                   EventBus                                   │
+│              (Communication Layer)                           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Component Details
+## Core Components
 
-### Frontend (Next.js + Phaser)
+### 1. Next.js Application (`apps/web`)
+- **Pages**: Single-page application with game view
+- **Components**: React components for UI elements
+- **Hooks**: Custom hooks for game integration
+- **Store**: Zustand store for application state
 
-**Technology Stack:**
-- Next.js 15 with App Router
-- Phaser 3.90.0 for game rendering
-- TypeScript for type safety
-- Tailwind CSS for UI styling
+### 2. Phaser Game Engine
+- **MainScene**: Core game scene managing the world
+- **Player System**: Character movement and animations
+- **Crop System**: Local farming mechanics
+- **Tilemap System**: Procedural world generation
+- **Building System**: Interactive farm buildings
 
-**Key Features:**
-- Server-side rendering for SEO
-- Dynamic game loading (no SSR for Phaser)
-- Responsive design
-- Real-time WebSocket communication
+### 3. Communication Layer
+- **EventBus**: Clean event-driven communication between React and Phaser
+- **Type-safe Events**: Defined event types for all game actions
 
-**Authentication Flow:**
-```typescript
-1. User connects wallet/email via Privy
-2. Frontend obtains user ID/wallet address
-3. Player ID sent with game room join request
-4. Server validates and stores authentication
-```
+## Key Systems
 
-### Game Server (Colyseus)
+### Player System
+- Single local player with customizable character
+- Smooth movement with WASD/Arrow keys
+- Character animations (idle, walk, run)
+- Collision detection with world boundaries
 
-**Technology Stack:**
-- Colyseus 0.16 framework
-- Node.js runtime
-- WebSocket for real-time communication
+### Crop System
+- Local crop planting and harvesting
+- Multiple crop types with growth timers
+- Visual growth stages
+- Context menu interactions
 
-**Room Architecture:**
-```typescript
-// Dynamic room creation based on world owner
-gameServer.define('world', GameRoom).filterBy(['worldOwnerId']);
-
-// Room stores authenticated clients
-private authenticatedClients = new Map<string, AuthenticatedClient>();
-```
-
-**Security Features:**
-- Player ID validation
-- Permission-based actions
-- Secure session management
-- Memory cleanup on disconnect
-
-### API Server (Express)
-
-**Endpoints:**
-```
-GET /api/worlds
-  Query params: page, limit, search
-  Returns: Paginated world list with metadata
-
-GET /api/worlds/:worldId/exists
-  Validates world ID format
-  Returns: World existence status
-```
-
-**Security Middleware:**
-- Rate limiting (100 req/15min)
-- Input validation
-- JSON size limits (10MB)
-- CORS configuration
-
-### Database Layer (SQLite)
-
-**Schema Design:**
-```sql
--- Players table
-CREATE TABLE players (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  xp INTEGER DEFAULT 0,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
-
--- Crops table
-CREATE TABLE crops (
-  id TEXT PRIMARY KEY,
-  player_id TEXT REFERENCES players(id),
-  seed_type TEXT,
-  x REAL,
-  y REAL,
-  planted_at TIMESTAMP,
-  growth_time INTEGER,
-  investment_amount REAL,
-  harvested BOOLEAN DEFAULT FALSE,
-  yield_amount REAL,
-  harvested_at TIMESTAMP
-);
-
--- Performance indexes
-CREATE INDEX idx_crops_player_harvested ON crops(player_id, harvested);
-CREATE INDEX idx_players_updated_at ON players(updated_at DESC);
-```
-
-**Query Optimization:**
-- Transactions for atomic operations
-- Parameterized queries for security
-- Optimized indexes for common queries
-- Connection pooling via WAL mode
-
-### Smart Contract Architecture
-
-**Cross-Chain Communication:**
-```
-Saga Chainlet          Axelar Network         Arbitrum Sepolia
-     │                      │                        │
-     ├─plantSeed()─────────►│                        │
-     │                      ├─────DEPOSIT msg───────►│
-     │                      │                        ├─depositToVault()
-     │                      │                        │
-     ├─harvestSeed()───────►│                        │
-     │                      ├─────HARVEST msg───────►│
-     │                      │                        ├─claimYield()
-     │                      │◄────UPDATE msg─────────┤
-     │◄─────────────────────┤                        │
-```
-
-**Security Features:**
-- Circuit breaker pattern
-- Deposit cap validation
-- Command routing validation
-- Emergency pause functionality
-- Multi-operator system
+### UI System
+- Modal dialogs for seed selection
+- Real-time notifications
+- Crop statistics display
+- Settings and configuration
 
 ## Data Flow
 
-### Game State Synchronization
-```
-1. Player performs action (move/plant/harvest)
-2. Client sends message to Colyseus server
-3. Server validates permissions
-4. Server updates game state
-5. State changes broadcast to all clients
-6. Clients update local rendering
-```
+### Planting Flow
+1. User opens plant seed dialog (React)
+2. User selects seed type
+3. EventBus emits `seedSelected` event
+4. MainScene queues the crop type
+5. User clicks on farm plot
+6. Crop is planted locally
 
-### Farm World System
-```
-1. Player requests world browser
-2. API queries active worlds with pagination
-3. Player selects a world to visit
-4. Game client connects to specific world room
-5. Server loads world-specific data
-6. Permissions set based on ownership
-```
+### Game State
+- Player position and character stored in Phaser
+- UI state managed by Zustand
+- No server persistence (local-only)
 
-### Cross-Chain Transaction Flow
-```
-1. Player initiates plant/harvest in game
-2. Frontend calls smart contract on Saga
-3. Contract sends cross-chain message via Axelar
-4. DeFiVault on Arbitrum processes request
-5. Transaction status tracked in frontend
-6. Game state updated on completion
-```
+## Security Considerations
 
-## Performance Considerations
+### Input Validation
+- All user inputs validated on the client
+- Safe string handling for player names
+- Sanitized event payloads
 
-### Database Performance
-- SQLite with WAL mode for concurrency
-- Optimized indexes on frequently queried columns
-- Transactions for batch operations
-- Query result caching where appropriate
+### Performance
+- Efficient sprite batching
+- Viewport culling for off-screen objects
+- Optimized tilemap rendering
+- Frame-rate independent movement
 
-### Network Optimization
-- WebSocket connection pooling
-- Message batching for state updates
-- Compression for large payloads
-- Reconnection logic with exponential backoff
+## Development Workflow
 
-### Frontend Performance
-- Lazy loading of game assets
-- Sprite sheet optimization
-- Efficient animation management
-- React component memoization
+### Local Development
+```bash
+# Install dependencies
+pnpm install
 
-## Deployment Architecture
+# Start development server
+pnpm dev
 
-### Development Environment
-```
-Frontend: http://localhost:3000
-Game Server: http://localhost:2567
-API Server: http://localhost:2567/api
+# Build for production
+pnpm build
 ```
 
-### Production Considerations
-- Frontend: Vercel/Netlify with CDN
-- Game Server: Node.js on cloud VPS
-- Database: PostgreSQL for production
-- Smart Contracts: Mainnet deployment
-- Monitoring: OpenTelemetry integration
+### Project Structure
+```
+apps/
+  web/              # Next.js application
+    app/            # App router pages
+    components/     # React components
+    lib/            # Game engine code
+    hooks/          # Custom React hooks
+    game/           # Game-specific modules (EventBus)
+```
 
-## Security Architecture
+## Technical Stack
 
-See [SECURITY.md](./SECURITY.md) for detailed security implementation.
+### Frontend
+- **Framework**: Next.js 15 with React 19
+- **Game Engine**: Phaser 3.90.0
+- **State Management**: Zustand
+- **Styling**: Tailwind CSS
+- **UI Components**: Radix UI
+- **TypeScript**: For type safety
 
-### Key Security Features
-- Input validation on all endpoints
-- Rate limiting for API protection
-- Secure authentication system
-- Permission-based access control
-- Smart contract security patterns
+### Authentication
+- **Privy**: Web3 authentication with email/social login support
+- **Wagmi**: Ethereum library for wallet connections (optional)
 
-## Scalability Roadmap
+### Build Tools
+- **Turbo**: Monorepo management
+- **pnpm**: Package management
+- **ESBuild**: Fast bundling
 
-### Horizontal Scaling
-- Multiple game server instances
-- Load balancer for distribution
-- Redis for shared state
-- Database read replicas
+## Performance Optimizations
 
-### Vertical Scaling
-- Optimized database queries
-- Caching layer (Redis)
-- CDN for static assets
-- Worker threads for heavy computation
+### Rendering
+- WebGL acceleration via Phaser
+- Texture atlases for sprites
+- Batch rendering for similar objects
+- Depth sorting for 2.5D effect
 
-## Monitoring & Observability
+### Memory Management
+- Object pooling for frequently created objects
+- Texture cleanup on scene transitions
+- Event listener cleanup on unmount
 
-### Metrics Collection
-- Request latency tracking
-- Error rate monitoring
-- Player activity analytics
-- Smart contract event logs
+### Network
+- No network requests during gameplay
+- All assets loaded upfront
+- Local-only game state
 
-### Logging Strategy
-- Structured logging (JSON)
-- Log aggregation service
-- Error tracking (Sentry)
-- Performance monitoring (APM)
+## Future Considerations
+
+While the current architecture is focused on single-player local gameplay, the modular design allows for future enhancements:
+
+- Save/Load game state to localStorage
+- Export farm layouts as images
+- Additional crop types and buildings
+- Achievement system
+- Seasonal events
+
+The architecture prioritizes maintainability and user experience over complexity, making it easy to understand and extend.
