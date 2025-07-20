@@ -1,47 +1,3 @@
-// Transaction status types
-export type TxStatus = 
-  | 'idle'
-  | 'preparing'
-  | 'wallet_confirm' 
-  | 'saga_pending'
-  | 'axelar_processing'
-  | 'arbitrum_pending' 
-  | 'completed'
-  | 'failed';
-
-// Cross-chain transaction type
-export interface CrossChainTx {
-  id: string;
-  type: 'plant_seed' | 'harvest_seed' | 'claim_yield';
-  status: TxStatus;
-  player: `0x${string}`;
-  
-  // Seed planting details
-  seedType?: number;
-  seedId?: number;
-  amount?: string; // BigInt as string
-  gasEstimate?: string; // BigInt as string
-  
-  // Transaction hashes
-  sagaTxHash?: string;
-  arbitrumTxHash?: string;
-  axelarTxId?: string;
-  axelarTxHash?: string; // Added for TransactionTracker compatibility
-  
-  // Timing
-  startTime: number;
-  lastUpdated: number;
-  estimatedCompletionTime?: number;
-  
-  // Error handling
-  error?: string;
-  retryCount: number;
-  
-  // Optimistic updates
-  optimisticSeedId?: number;
-  optimisticYield?: string;
-}
-
 // Seed types configuration
 export interface SeedType {
   id: number;
@@ -89,7 +45,6 @@ export interface VaultPosition {
 export interface UIState {
   selectedSeedType: number;
   plantAmount: string;
-  showTransactionTracker: boolean;
   showPlantModal: boolean;
   showHarvestModal: boolean;
   showSettingsModal: boolean;
@@ -107,10 +62,6 @@ export interface Notification {
 
 // Complete app state
 export interface AppState {
-  // Transaction management
-  activeTransactions: CrossChainTx[];
-  transactionHistory: CrossChainTx[];
-  
   // Game data
   playerState: PlayerState | null;
   seedPositions: SeedPosition[];
@@ -133,14 +84,6 @@ export interface AppState {
 
 // Store actions
 export interface AppActions {
-  // Transaction management
-  addTransaction: (tx: Omit<CrossChainTx, 'id' | 'startTime' | 'lastUpdated' | 'retryCount'>) => string;
-  updateTransaction: (id: string, updates: Partial<CrossChainTx>) => void;
-  completeTransaction: (id: string) => void;
-  failTransaction: (id: string, error: string) => void;
-  retryTransaction: (id: string) => void;
-  clearCompletedTransactions: () => void;
-  
   // Game state management
   setPlayerState: (state: PlayerState) => void;
   updateSeedPositions: (positions: SeedPosition[]) => void;
@@ -152,7 +95,6 @@ export interface AppActions {
   // UI actions
   setSelectedSeedType: (type: number) => void;
   setPlantAmount: (amount: string) => void;
-  toggleTransactionTracker: () => void;
   showPlantModal: () => void;
   hidePlantModal: () => void;
   showHarvestModal: () => void;
@@ -171,8 +113,6 @@ export interface AppActions {
 
 // Initial state
 export const initialState: AppState = {
-  activeTransactions: [],
-  transactionHistory: [],
   playerState: null,
   seedPositions: [],
   vaultPosition: null,
@@ -208,7 +148,6 @@ export const initialState: AppState = {
   ui: {
     selectedSeedType: 1,
     plantAmount: '',
-    showTransactionTracker: false,
     showPlantModal: false,
     showHarvestModal: false,
     showSettingsModal: false,

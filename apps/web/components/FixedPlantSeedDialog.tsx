@@ -98,7 +98,6 @@ export default function FixedPlantSeedDialog() {
   const { seedTypes } = usePlayerData();
   const isLoading = false;
   
-  const [estimatedGas, setEstimatedGas] = useState<bigint>(BigInt(0));
   const [isValidAmount, setIsValidAmount] = useState(false);
   const [amountError, setAmountError] = useState('');
   
@@ -130,7 +129,6 @@ export default function FixedPlantSeedDialog() {
       }
       
       // Gas estimation removed with cross-chain functionality
-      setEstimatedGas(BigInt(0));
       
       setIsValidAmount(true);
       setAmountError('');
@@ -316,26 +314,10 @@ export default function FixedPlantSeedDialog() {
                     <span className="text-green-600">Estimated APY:</span>
                     <span className="font-medium text-green-800">{selectedSeed.apy}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-600">Cross-chain Gas:</span>
-                    <span className="font-medium text-green-800">
-                      {Number(formatUnits(estimatedGas, 18)).toFixed(4)} ETH
-                    </span>
-                  </div>
                 </div>
               </div>
             )}
             
-            {/* Cross-chain Info */}
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h3 className="font-semibold text-yellow-900 mb-2">Cross-chain Process</h3>
-              <div className="text-sm text-yellow-800 space-y-1">
-                <p>• Transaction starts on Saga Chainlet (gasless gaming)</p>
-                <p>• Axelar Network bridges message to Arbitrum</p>
-                <p>• USDC deposited into EulerSwap vault for yield</p>
-                <p>• Process typically takes 2-5 minutes</p>
-              </div>
-            </div>
           </div>
           
           {/* Footer */}

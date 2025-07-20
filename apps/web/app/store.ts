@@ -52,90 +52,6 @@ export const makeStore = () => {
         immer((set, get) => ({
           ...initialState,
           
-          // Transaction management
-          addTransaction: (tx) => {
-            const id = `${tx.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const newTx = {
-              ...tx,
-              id,
-              startTime: Date.now(),
-              lastUpdated: Date.now(),
-              retryCount: 0
-            };
-            
-            set((state) => {
-              state.activeTransactions.push(newTx);
-            });
-            
-            return id;
-          },
-          
-          updateTransaction: (id, updates) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                Object.assign(tx, updates);
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          completeTransaction: (id) => {
-            set((state) => {
-              const txIndex = state.activeTransactions.findIndex(t => t.id === id);
-              if (txIndex !== -1) {
-                const tx = state.activeTransactions[txIndex];
-                tx.status = 'completed';
-                tx.lastUpdated = Date.now();
-                
-                // Move to history
-                state.transactionHistory.unshift(tx);
-                state.activeTransactions.splice(txIndex, 1);
-                
-                // Keep only last 50 transactions in history
-                if (state.transactionHistory.length > 50) {
-                  state.transactionHistory = state.transactionHistory.slice(0, 50);
-                }
-              }
-            });
-          },
-          
-          failTransaction: (id, error) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                tx.status = 'failed';
-                tx.error = error;
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          retryTransaction: (id) => {
-            set((state) => {
-              const tx = state.activeTransactions.find(t => t.id === id);
-              if (tx) {
-                tx.retryCount += 1;
-                tx.status = 'preparing';
-                tx.error = undefined;
-                tx.lastUpdated = Date.now();
-              }
-            });
-          },
-          
-          clearCompletedTransactions: () => {
-            set((state) => {
-              // Clear transaction history
-              state.transactionHistory = [];
-              
-              // Also clear any active transactions that are completed/failed
-              // This handles transactions that got stuck in active state
-              state.activeTransactions = state.activeTransactions.filter(
-                tx => tx.status !== 'completed' && tx.status !== 'failed'
-              );
-            });
-          },
-          
           // Game state management
           setPlayerState: (playerState) => {
             set((state) => {
@@ -207,12 +123,6 @@ export const makeStore = () => {
           setPlantAmount: (amount) => {
             set((state) => {
               state.ui.plantAmount = amount;
-            });
-          },
-          
-          toggleTransactionTracker: () => {
-            set((state) => {
-              state.ui.showTransactionTracker = !state.ui.showTransactionTracker;
             });
           },
           
@@ -349,28 +259,6 @@ export const useAppStore = <T>(selector: (state: AppState & AppActions) => T) =>
 };
 
 // Export individual hooks for convenience (backward compatibility)
-export const useTransactions = () => {
-  const active = useAppStore(state => state.activeTransactions || []);
-  const history = useAppStore(state => state.transactionHistory || []);
-  const add = useAppStore(state => state.addTransaction);
-  const update = useAppStore(state => state.updateTransaction);
-  const complete = useAppStore(state => state.completeTransaction);
-  const fail = useAppStore(state => state.failTransaction);
-  const retry = useAppStore(state => state.retryTransaction);
-  const clearCompleted = useAppStore(state => state.clearCompletedTransactions);
-  
-  return useMemo(() => ({
-    active,
-    history,
-    add,
-    update,
-    complete,
-    fail,
-    retry,
-    clearCompleted
-  }), [active, history, add, update, complete, fail, retry, clearCompleted]);
-};
-
 export const usePlayerData = () => {
   const playerState = useAppStore(state => state.playerState);
   const seedPositions = useAppStore(state => state.seedPositions);
@@ -397,7 +285,6 @@ export const useUI = () => {
   // UI state values (boolean flags for modal visibility)
   const selectedSeedType = useAppStore(state => state.ui.selectedSeedType);
   const plantAmount = useAppStore(state => state.ui.plantAmount);
-  const showTransactionTracker = useAppStore(state => state.ui.showTransactionTracker);
   const isPlantModalOpen = useAppStore(state => state.ui.showPlantModal);
   const isHarvestModalOpen = useAppStore(state => state.ui.showHarvestModal);
   const isSettingsModalOpen = useAppStore(state => state.ui.showSettingsModal);
@@ -405,7 +292,6 @@ export const useUI = () => {
   // UI action functions
   const setSelectedSeedType = useAppStore(state => state.setSelectedSeedType);
   const setPlantAmount = useAppStore(state => state.setPlantAmount);
-  const toggleTransactionTracker = useAppStore(state => state.toggleTransactionTracker);
   const showPlantModal = useAppStore(state => state.showPlantModal);
   const hidePlantModal = useAppStore(state => state.hidePlantModal);
   const showHarvestModal = useAppStore(state => state.showHarvestModal);
@@ -419,14 +305,12 @@ export const useUI = () => {
   return useMemo(() => ({
     selectedSeedType,
     plantAmount,
-    showTransactionTracker,
     isPlantModalOpen,
     isHarvestModalOpen,
     isSettingsModalOpen,
     notifications,
     setSelectedSeedType,
     setPlantAmount,
-    toggleTransactionTracker,
     showPlantModal,
     hidePlantModal,
     showHarvestModal,
@@ -439,14 +323,12 @@ export const useUI = () => {
   }), [
     selectedSeedType,
     plantAmount,
-    showTransactionTracker,
     isPlantModalOpen,
     isHarvestModalOpen,
     isSettingsModalOpen,
     notifications,
     setSelectedSeedType,
     setPlantAmount,
-    toggleTransactionTracker,
     showPlantModal,
     hidePlantModal,
     showHarvestModal,
@@ -462,4 +344,4 @@ export const useUI = () => {
 export const useConfig = () => useAppStore(state => state.config);
 
 // Export types for backward compatibility
-export type { SeedType, CrossChainTx, TxStatus, Notification } from './store-types';
+export type { SeedType, Notification } from './store-types';
