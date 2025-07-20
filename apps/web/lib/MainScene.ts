@@ -11,16 +11,29 @@ import { FlowBankBuilding } from './FlowBankBuilding';
 import { FlowMarketplaceBuilding } from './FlowMarketplaceBuilding';
 import { PepeBuilding } from './PepeBuilding';
 import { BuildingInteractionManager } from './BuildingInteractionManager';
-import { NetworkSystem, ChatMessage, PlayerData } from './systems/NetworkSystem';
 import { CollisionSystem } from './systems/CollisionSystem';
 import { CameraSystem } from './systems/CameraSystem';
 import { eventBus } from './systems/EventBus';
 import { katanaChain, flowMainnet } from '../app/wagmi';
 
-// Network types are now imported from NetworkSystem
+// Network types removed
+interface ChatMessage {
+  sessionId: string;
+  playerId: string;
+  message: string;
+  timestamp: number;
+}
+
+interface PlayerData {
+  x: number;
+  y: number;
+  character: CharacterType;
+  playerId: string;
+  displayName: string;
+  level?: number;
+}
 
 export class MainScene extends Phaser.Scene {
-  private networkSystem!: NetworkSystem;
   private collisionSystem!: CollisionSystem;
   private cameraSystem!: CameraSystem;
   private players: Map<string, Player> = new Map();
@@ -244,7 +257,6 @@ export class MainScene extends Phaser.Scene {
     });
 
     // Initialize network system
-    this.networkSystem = new NetworkSystem();
     this.setupNetworkEventHandlers();
     
     // Connect to Colyseus after scene is fully ready
@@ -587,7 +599,7 @@ export class MainScene extends Phaser.Scene {
       this.currentPlayer.setPosition(targetX, targetY);
       
       // Send position update to server
-      this.networkSystem.sendMovement(targetX, targetY);
+      // Movement sync removed
       
       console.log(`✅ Teleported to building area (${targetX}, ${targetY})`);
     };
@@ -1329,103 +1341,37 @@ export class MainScene extends Phaser.Scene {
   }
 
   setupNetworkEventHandlers() {
-    // Handle player join events
-    this.networkSystem.on('onPlayerJoin', (sessionId: string, player: PlayerData) => {
-      this.addPlayer(sessionId, player);
-    });
-
-    // Handle player leave events
-    this.networkSystem.on('onPlayerLeave', (sessionId: string) => {
-      this.removePlayer(sessionId);
-    });
-
-    // Handle player movement updates
-    this.networkSystem.on('onPlayerMove', (sessionId: string, x: number, y: number, level?: number) => {
-      const playerData = { x, y, level };
-      this.updatePlayer(sessionId, playerData);
-    });
-
-    // Handle chat messages
-    this.networkSystem.on('onChatMessage', (message: ChatMessage) => {
-      if (this.chatCallback) {
-        this.chatCallback(message);
-      }
-    });
-
-    // Handle state changes
-    this.networkSystem.on('onStateChange', (state) => {
-      // Make sure scene is initialized before handling players
-      if (!this.scene || !this.scene.isActive()) {
-        console.log('Scene not ready yet, skipping state update');
-        return;
-      }
-      
-      // Handle all players in the current state
-      if (state.players) {
-        // Clear existing players first
-        this.players.forEach((player, sessionId) => {
-          if (!state.players.has || !state.players.has(sessionId)) {
-            this.removePlayer(sessionId);
-          }
-        });
-        
-        // Add or update all current players
-        state.players.forEach((player: any, sessionId: string) => {
-          if (this.players.has(sessionId)) {
-            this.updatePlayer(sessionId, player);
-          } else {
-            this.addPlayer(sessionId, player);
-          }
-        });
-      }
-    });
-
-    // Handle connection events
-    this.networkSystem.on('onConnected', (room) => {
-      this.sessionId = this.networkSystem.getSessionId() || '';
-      console.log('✅ Connected to server with session ID:', this.sessionId);
-    });
-
-    this.networkSystem.on('onDisconnected', () => {
-      console.log('❌ Disconnected from server');
-      // Clear all players when disconnected
-      this.players.forEach((player, sessionId) => {
-        this.removePlayer(sessionId);
-      });
-    });
-
-    this.networkSystem.on('onError', (error) => {
-      console.error('Network error:', error);
-    });
+    // Network functionality removed
   }
 
   async connectToServer() {
+    // Server connection removed
     try {
       // Get player ID from wallet address or user ID
-      const playerId = this.address || this.user?.id || this.networkSystem.generateGuestId();
+      const playerId = this.address || this.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
       
       // Use wallet address as display name
-      const displayName = this.networkSystem.getDisplayName(this.address);
+      const displayName = this.address ? 
+        `${this.address.slice(0, 6)}...${this.address.slice(-4)}` : 
+        'Guest';
       
-      // Determine room type and options based on world configuration
-      let roomType = 'game'; // fallback to generic room
-      const roomOptions = {
-        name: displayName,
+      // Create local player only
+      this.sessionId = playerId;
+      
+      // Create the current player locally
+      const playerData: PlayerData = {
+        x: GameConfig.player.spawnPosition.x,
+        y: GameConfig.player.spawnPosition.y,
+        character: 'character_1' as CharacterType,
         playerId: playerId,
-        worldOwnerId: undefined as string | undefined
+        displayName: displayName,
+        level: 1
       };
-
-      if (this.worldId) {
-        roomType = 'world';
-        roomOptions.worldOwnerId = this.worldId;
-        console.log(`Joining world: ${this.worldId} (${this.isOwnWorld ? 'as owner' : 'as visitor'}) with playerId: ${playerId}`);
-      }
       
-      // Connect using the network system
-      await this.networkSystem.connect(roomType, roomOptions);
+      this.addPlayer(this.sessionId, playerData);
       
     } catch (error) {
-      console.error('Failed to connect to server:', error);
+      console.error('Failed to create local player:', error);
     }
   }
 
@@ -1583,7 +1529,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (!this.networkSystem.isConnectedToServer() || !this.currentPlayer) return;
+    if (!this.currentPlayer) return;
 
     // Update camera system
     if (this.cameraSystem) {
@@ -1719,7 +1665,7 @@ export class MainScene extends Phaser.Scene {
       this.currentPlayer.setPosition(newX, newY);
       const now = performance.now();
       if (now - this.lastPlayerSync > GameConfig.network.positionSyncInterval) {
-        this.networkSystem.sendMovement(newX, newY);
+        // Movement sync removed
         this.lastPlayerSync = now;
         
         // Emit player moved event
@@ -1746,14 +1692,15 @@ export class MainScene extends Phaser.Scene {
 
 
   sendChatMessage(message: string) {
-    this.networkSystem.sendChat(message);
+    // Chat functionality removed
+    console.log('Chat disabled:', message);
   }
 
   destroy() {
     // Emit system shutdown event
     eventBus.emit('system:shutdown', { systemName: 'MainScene' });
     
-    this.networkSystem.disconnect();
+    // Disconnect functionality removed
     this.scene.stop();
   }
 

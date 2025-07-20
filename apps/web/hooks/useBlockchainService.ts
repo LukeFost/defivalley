@@ -121,43 +121,14 @@ export function useBlockchainService(config?: UseBlockchainServiceConfig) {
     amount: string,
     gasEstimate?: bigint
   ): Promise<TransactionResult> => {
-    if (!serviceRef.current) {
-      throw new Error('Blockchain service not initialized');
-    }
-
-    if (!address) {
-      addNotification({
-        type: 'error',
-        title: 'Wallet Required',
-        message: 'Please connect your wallet to continue'
-      });
-      return { success: false, error: 'No wallet connected' };
-    }
-
-    // Create transaction in store
-    const txId = addTransaction({
-      type: 'plant_seed',
-      status: 'preparing',
-      player: address,
-      seedType,
-      amount: amount,
-      gasEstimate: gasEstimate?.toString()
+    // Plant seed functionality removed with cross-chain logic
+    addNotification({
+      type: 'info',
+      title: 'Feature Disabled',
+      message: 'Plant seed functionality has been removed'
     });
-
-    // Register tracker
-    const tracker = createTracker(txId, 'plant_seed');
-    serviceRef.current.registerTracker(txId, tracker);
-    config?.onTransactionStart?.(txId, 'plant_seed');
-
-    // Execute transaction
-    return serviceRef.current.plantSeed({
-      seedType,
-      amount,
-      gasEstimate,
-      from: address,
-      trackerId: txId
-    });
-  }, [address, addTransaction, createTracker, config, addNotification]);
+    return { success: false, error: 'Feature disabled' };
+  }, [addNotification]);
 
   /**
    * Harvest a single crop
@@ -208,85 +179,27 @@ export function useBlockchainService(config?: UseBlockchainServiceConfig) {
     seedIds: number[],
     gasEstimate?: bigint
   ): Promise<TransactionResult> => {
-    if (!serviceRef.current) {
-      throw new Error('Blockchain service not initialized');
-    }
-
-    if (!address) {
-      addNotification({
-        type: 'error',
-        title: 'Wallet Required',
-        message: 'Please connect your wallet to continue'
-      });
-      return { success: false, error: 'No wallet connected' };
-    }
-
-    if (seedIds.length === 0) {
-      addNotification({
-        type: 'error',
-        title: 'No Seeds Selected',
-        message: 'Please select seeds to harvest'
-      });
-      return { success: false, error: 'No seeds selected' };
-    }
-
-    // Create transaction in store
-    const txId = addTransaction({
-      type: 'batch_harvest' as any,
-      status: 'preparing',
-      player: address,
-      seedIds
+    // Batch harvest functionality removed with cross-chain logic
+    addNotification({
+      type: 'info',
+      title: 'Feature Disabled',
+      message: 'Batch harvest functionality has been removed'
     });
-
-    // Register tracker
-    const tracker = createTracker(txId, 'batch_harvest');
-    serviceRef.current.registerTracker(txId, tracker);
-    config?.onTransactionStart?.(txId, 'batch_harvest');
-
-    // Execute transaction
-    return serviceRef.current.batchHarvest({
-      seedIds,
-      gasEstimate,
-      from: address,
-      trackerId: txId
-    });
-  }, [address, addTransaction, createTracker, config, addNotification]);
+    return { success: false, error: 'Feature disabled' };
+  }, [addNotification]);
 
   /**
    * Claim accumulated yield
    */
   const claimYield = useCallback(async (): Promise<TransactionResult> => {
-    if (!serviceRef.current) {
-      throw new Error('Blockchain service not initialized');
-    }
-
-    if (!address) {
-      addNotification({
-        type: 'error',
-        title: 'Wallet Required',
-        message: 'Please connect your wallet to continue'
-      });
-      return { success: false, error: 'No wallet connected' };
-    }
-
-    // Create transaction in store
-    const txId = addTransaction({
-      type: 'claim_yield',
-      status: 'preparing',
-      player: address
+    // Claim yield functionality removed with cross-chain logic
+    addNotification({
+      type: 'info',
+      title: 'Feature Disabled',
+      message: 'Claim yield functionality has been removed'
     });
-
-    // Register tracker
-    const tracker = createTracker(txId, 'claim_yield');
-    serviceRef.current.registerTracker(txId, tracker);
-    config?.onTransactionStart?.(txId, 'claim_yield');
-
-    // Execute transaction
-    return serviceRef.current.claimYield({
-      from: address,
-      trackerId: txId
-    });
-  }, [address, addTransaction, createTracker, config, addNotification]);
+    return { success: false, error: 'Feature disabled' };
+  }, [addNotification]);
 
   /**
    * Estimate gas for an operation

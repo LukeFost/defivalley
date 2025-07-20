@@ -89,7 +89,7 @@ export function usePunchSwap(tokenInAddress?: Address) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentQuote, setCurrentQuote] = useState<PunchSwapQuote | null>(null);
-  const quoteIntervalRef = useRef<number | null>(null);
+  const quoteIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { addNotification } = useUI();
 
   // Get allowance for the input token to PunchSwap Router
@@ -156,7 +156,7 @@ export function usePunchSwap(tokenInAddress?: Address) {
       
       // Calculate minimum output with slippage
       const slippageBps = BigInt(Math.floor(slippagePercentage * 100));
-      const amountOutMin = expectedOutput - (expectedOutput * slippageBps / 10000n);
+      const amountOutMin = expectedOutput - (expectedOutput * slippageBps / BigInt(10000));
       
       // Calculate price impact (simplified)
       const priceImpact = slippagePercentage;

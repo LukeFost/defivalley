@@ -84,9 +84,9 @@ describe('BlockchainService', () => {
   describe('estimateCrossChainGas', () => {
     test('should estimate gas for plant_seed', async () => {
       const estimate = await service.estimateCrossChainGas('plant_seed');
-      expect(estimate).toBeGreaterThan(0n);
+      expect(estimate).toBeGreaterThan(BigInt(0));
       // Should include 20% buffer
-      expect(estimate).toBe(12000000000000000n); // 0.012 ETH (0.01 * 1.2)
+      expect(estimate).toBe(BigInt('12000000000000000')); // 0.012 ETH (0.01 * 1.2)
     });
 
     test('should estimate gas for batch_harvest', async () => {
@@ -95,7 +95,7 @@ describe('BlockchainService', () => {
       });
       
       // Should scale with number of seeds
-      expect(estimate).toBeGreaterThan(12000000000000000n);
+      expect(estimate).toBeGreaterThan(BigInt('12000000000000000'));
     });
   });
 

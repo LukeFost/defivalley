@@ -45,7 +45,7 @@ export function useSushiSwap(tokenInAddress?: Address) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentQuote, setCurrentQuote] = useState<SwapQuote | null>(null);
-  const quoteIntervalRef = useRef<number | null>(null);
+  const quoteIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get allowance for the input token to SushiSwap RouteProcessor
   const {

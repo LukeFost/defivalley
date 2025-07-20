@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { useCrossChainTx } from '../app/hooks/useCrossChainTx';
 import { useAppStore, usePlayerData, useConfig, SeedType } from '../app/store';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -97,7 +96,7 @@ export default function FixedPlantSeedDialog() {
   const addNotification = useAppStore((state) => state.addNotification);
   
   const { seedTypes } = usePlayerData();
-  const { plantSeed, isLoading, estimateGas } = useCrossChainTx();
+  const isLoading = false;
   
   const [estimatedGas, setEstimatedGas] = useState<bigint>(BigInt(0));
   const [isValidAmount, setIsValidAmount] = useState(false);
@@ -130,9 +129,8 @@ export default function FixedPlantSeedDialog() {
         return;
       }
       
-      // Estimate gas for cross-chain transaction
-      const gasEstimate = await estimateGas(selectedSeedType, amount);
-      setEstimatedGas(gasEstimate);
+      // Gas estimation removed with cross-chain functionality
+      setEstimatedGas(BigInt(0));
       
       setIsValidAmount(true);
       setAmountError('');
@@ -141,7 +139,7 @@ export default function FixedPlantSeedDialog() {
       setIsValidAmount(false);
       setAmountError('Invalid amount');
     }
-  }, [usdcBalance, selectedSeedType, estimateGas]);
+  }, [usdcBalance, selectedSeedType]);
   
   // Debounced validation with 400ms delay
   useEffect(() => {
@@ -162,24 +160,13 @@ export default function FixedPlantSeedDialog() {
       return;
     }
     
-    try {
-      const result = await plantSeed({
-        seedType: selectedSeedType,
-        amount: plantAmount,
-        gasEstimate: estimatedGas
-      });
-      
-      if (result.success) {
-        hidePlantModal();
-        addNotification({
-          type: 'success',
-          title: 'Seed Planting Started',
-          message: 'Your cross-chain transaction has been initiated!'
-        });
-      }
-    } catch (error) {
-      // Error handling is managed by the useCrossChainTx hook
-    }
+    // Plant seed functionality removed with cross-chain logic
+    hidePlantModal();
+    addNotification({
+      type: 'info',
+      title: 'Feature Disabled',
+      message: 'Seed planting functionality has been removed'
+    });
   };
   
   const handleAmountPreset = (percentage: number) => {

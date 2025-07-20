@@ -42,7 +42,7 @@ export function GameUI({
       <div className="chat-messages">
         {chatMessages.slice(-5).map((msg, index) => (
           <div key={index} className="chat-message">
-            <span className="chat-name">{msg.name}:</span>
+            <span className="chat-name">{msg.playerId}:</span>
             <span className="chat-text">{msg.message}</span>
           </div>
         ))}
