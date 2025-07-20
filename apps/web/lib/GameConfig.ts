@@ -15,7 +15,7 @@ export const GameConfig = {
   player: {
     baseSpeed: 540, // pixels per second
     collisionBoxSize: 16, // half the player's collision box
-    spawnPosition: { x: 650, y: 500 }, // near buildings
+    spawnPosition: { x: 300, y: 300 }, // Safe, open area
   },
 
   // Camera settings
