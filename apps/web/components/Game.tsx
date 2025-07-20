@@ -5,7 +5,6 @@ import * as Phaser from 'phaser';
 import { MainScene } from '../lib/MainScene';
 import { CropData, CropType } from '../lib/CropSystem';
 import { DialogueBox } from './DialogueBox';
-import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { GameModals } from './GameModals';
 import { GameUI } from './GameUI';
@@ -13,6 +12,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useAccount, useChainId } from 'wagmi';
 import { BuildingInteractionManager } from '../lib/BuildingInteractionManager';
 import { EditorPanel, EditorObject } from './EditorPanel';
+import { usePortfolio } from '../hooks/usePortfolio';
 
 interface GameProps {
   worldId?: string;
@@ -43,6 +43,9 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const { user } = usePrivy();
   const { address } = useAccount();
   const chainId = useChainId();
+  
+  // Get portfolio data from on-chain
+  const { portfolioData, totalValueUsd } = usePortfolio(address);
   
   // Update scene editor mode when it changes
   useEffect(() => {
@@ -182,33 +185,15 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     }
   }, [chainId]);
 
-
-  // Crop system handlers
-  const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.plantCrop(cropType, x, y);
+  // Sync portfolio data with the game scene
+  useEffect(() => {
+    if (sceneRef.current && portfolioData) {
+      console.log('📊 Syncing portfolio data with game:', { portfolioData, totalValueUsd });
+      sceneRef.current.syncPortfolio({ portfolioData, totalValueUsd });
     }
-  };
+  }, [portfolioData, totalValueUsd]);
 
-  const handleRemoveCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.removeCropAtPosition(x, y);
-    }
-  };
 
-  const handleHarvestCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.harvestCropAtPosition(x, y);
-    }
-  };
-
-  const canPlantAt = (x: number, y: number): boolean => {
-    return sceneRef.current ? sceneRef.current.canPlantAt(x, y) : false;
-  };
-
-  const getCropAt = (x: number, y: number) => {
-    return sceneRef.current ? sceneRef.current.getCropAt(x, y) : null;
-  };
 
   const getTotalCrops = (): number => {
     return sceneRef.current ? sceneRef.current.getTotalCrops() : 0;
@@ -241,15 +226,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         characterName={dialogueCharacterName}
       />
       
-      <CropContextMenu
-        onPlantCrop={handlePlantCrop}
-        onRemoveCrop={handleRemoveCrop}
-        onHarvestCrop={handleHarvestCrop}
-        canPlantAt={canPlantAt}
-        getCropAt={getCropAt}
-      >
-        <div id="game-container" />
-      </CropContextMenu>
+      <div id="game-container" />
       
       {/* Crop Info Panel */}
       <CropInfo 
