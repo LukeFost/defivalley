@@ -157,8 +157,7 @@ export class MainScene extends Phaser.Scene {
       debugMode: false
     });
     
-    // Set up EventBus listeners
-    EventBus.on(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
+    // EventBus listeners removed - portfolio visualizer is read-only
     
     // Subscribe to camera events
     this.cameraSystem.on('viewport-update', (viewport: any) => {
@@ -1495,8 +1494,7 @@ export class MainScene extends Phaser.Scene {
 
 
   destroy() {
-    // Clean up EventBus listeners
-    EventBus.off(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
+    // EventBus listeners already removed - portfolio visualizer is read-only
     
     // Emit system shutdown event
     eventBus.emit('system:shutdown', { systemName: 'MainScene' });

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { type Address } from 'viem';
+import { useConfig } from 'wagmi';
 import { getMorphoPosition } from '@/services/PortfolioService';
 
 interface PortfolioData {
@@ -24,6 +25,8 @@ interface UsePortfolioReturn {
  * @returns Formatted portfolio data with loading and error states
  */
 export function usePortfolio(userAddress: Address | undefined): UsePortfolioReturn {
+  const config = useConfig();
+  
   const { data, isLoading, error } = useQuery({
     queryKey: ['portfolio', userAddress],
     queryFn: async () => {
@@ -31,7 +34,7 @@ export function usePortfolio(userAddress: Address | undefined): UsePortfolioRetu
         throw new Error('User address is required');
       }
       
-      const { marketId, positionData } = await getMorphoPosition(userAddress);
+      const { marketId, positionData } = await getMorphoPosition(config, userAddress);
       
       // Process the raw position data
       const supplyShares = positionData.supplyShares;

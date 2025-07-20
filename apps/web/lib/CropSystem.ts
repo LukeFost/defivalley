@@ -356,7 +356,7 @@ export class CropSystem {
 
       // Portfolio crops don't grow - they're always ready
       if (crop.id.startsWith('morpho_')) {
-        continue;
+        return;
       }
       
       // Legacy growth logic for any remaining non-portfolio crops
