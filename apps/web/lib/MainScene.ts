@@ -244,8 +244,8 @@ export class MainScene extends Phaser.Scene {
     // Initialize network system
     this.setupNetworkEventHandlers();
     
-    // Create local player immediately
-    this.createLocalPlayer();
+    // Don't create local player here - wait for initializePlayer to be called
+    // this.createLocalPlayer();
     
     // Set up editor mode click handling
     this.setupEditorClickHandling();
@@ -1199,10 +1199,6 @@ export class MainScene extends Phaser.Scene {
     this.isOwnWorld = isOwnWorld;
   }
   
-  setAuthInfo(address?: string, user?: any) {
-    this.address = address;
-    this.user = user;
-  }
 
   setChainId(chainId: number) {
     const oldChainId = this.currentChainId;
@@ -1315,14 +1311,20 @@ export class MainScene extends Phaser.Scene {
     // Network functionality removed
   }
 
-  private createLocalPlayer() {
+  public initializePlayer(authData: { address: string; user?: any }) {
     try {
+      // Prevent duplicate initialization
+      if (this.currentPlayer) {
+        console.log('Player already initialized');
+        return;
+      }
+
       // Get player ID from wallet address or user ID
-      const playerId = this.address || this.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
+      const playerId = authData.address || authData.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
       
       // Use wallet address as display name
-      const displayName = this.address ? 
-        `${this.address.slice(0, 6)}...${this.address.slice(-4)}` : 
+      const displayName = authData.address ? 
+        `${authData.address.slice(0, 6)}...${authData.address.slice(-4)}` : 
         'Guest';
       
       // Create PlayerInfo object

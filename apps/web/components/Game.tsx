@@ -97,9 +97,8 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       if (scene) {
         sceneRef.current = scene;
         
-        // Configure world settings and auth info
+        // Configure world settings
         scene.setWorldConfiguration(worldId, isOwnWorld);
-        scene.setAuthInfo(address, user);
         
         // Set chain ID for network-specific buildings
         if (chainId) {
@@ -184,6 +183,14 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       sceneRef.current.setChainId(chainId);
     }
   }, [chainId]);
+
+  // Initialize player once authentication data is available
+  useEffect(() => {
+    if (address && sceneRef.current) {
+      console.log('🎮 Initializing player with address:', address);
+      sceneRef.current.initializePlayer({ address, user });
+    }
+  }, [address, user, sceneRef]);
 
   // Sync portfolio data with the game scene
   useEffect(() => {
