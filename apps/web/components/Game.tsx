@@ -55,6 +55,12 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   }, [editorMode]);
 
   useEffect(() => {
+    // Wait for chainId to be available before initializing game
+    if (!chainId) {
+      console.log('⛓️ Waiting for chainId to initialize game...');
+      return;
+    }
+
     // Calculate dimensions based on viewport minus bottom bar
     const BAR_HEIGHT = 64; // Must match CSS --bar-height
     const gameWidth = window.innerWidth;
@@ -169,7 +175,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [chainId]);
 
   const handleDialogueContinue = () => {
     setIsDialogueOpen(false);

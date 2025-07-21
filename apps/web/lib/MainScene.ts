@@ -1277,20 +1277,6 @@ export class MainScene extends Phaser.Scene {
       this.buildingInteractionManager.registerBuilding('pepe', this.pepeBuilding);
       
       console.log('🟣 Created Flow buildings');
-    } else {
-      // Default case - create Katana buildings
-      console.log('⚪ Unknown network, creating default Katana buildings');
-      const katanaPos = GameConfig.buildings.katana;
-      this.bankBuilding = new BankBuilding(this, katanaPos.bank.x, katanaPos.bank.y);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, katanaPos.marketplace.x, katanaPos.marketplace.y);
-      
-      // Add buildings to depth group for 2.5D sorting
-      this.depthGroup.add(this.bankBuilding);
-      this.depthGroup.add(this.marketplaceBuilding);
-      
-      // Register with manager
-      this.buildingInteractionManager.registerBuilding('bank', this.bankBuilding);
-      this.buildingInteractionManager.registerBuilding('marketplace', this.marketplaceBuilding);
     }
 
     // Set up event listeners for new buildings
