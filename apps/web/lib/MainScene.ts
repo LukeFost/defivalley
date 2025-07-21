@@ -14,7 +14,8 @@ import { BuildingInteractionManager } from './BuildingInteractionManager';
 import { CollisionSystem } from './systems/CollisionSystem';
 import { CameraSystem } from './systems/CameraSystem';
 import { eventBus } from './systems/EventBus';
-import { katanaChain, flowMainnet } from '../app/wagmi';
+import { katanaChain } from '../app/wagmi';
+import { flowMainnet } from '../app/lib/networks';
 import { EventBus, GameEvents } from '../game/EventBus';
 
 // Network types removed
@@ -74,7 +75,6 @@ export class MainScene extends Phaser.Scene {
   private depthGroup!: Phaser.GameObjects.Group;
   
   // Queued crop for planting
-  private queuedCropType?: CropType;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -157,8 +157,7 @@ export class MainScene extends Phaser.Scene {
       debugMode: false
     });
     
-    // Set up EventBus listeners
-    EventBus.on(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
+    // EventBus listeners removed - portfolio visualizer is read-only
     
     // Subscribe to camera events
     this.cameraSystem.on('viewport-update', (viewport: any) => {
@@ -245,8 +244,8 @@ export class MainScene extends Phaser.Scene {
     // Initialize network system
     this.setupNetworkEventHandlers();
     
-    // Create local player immediately
-    this.createLocalPlayer();
+    // Don't create local player here - wait for initializePlayer to be called
+    // this.createLocalPlayer();
     
     // Set up editor mode click handling
     this.setupEditorClickHandling();
@@ -845,32 +844,7 @@ export class MainScene extends Phaser.Scene {
         // Reset line style for next plot
         plotGraphics.lineStyle(2, 0x8B4513, 0.8);
         
-        // Make plot clickable for planting
-        const plotArea = this.add.rectangle(x + plotSize/2, y + plotSize/2, plotSize, plotSize, 0x000000, 0);
-        plotArea.setInteractive();
-        plotArea.on('pointerdown', () => {
-          // Check if we can plant at this position
-          const centerX = x + plotSize/2;
-          const centerY = y + plotSize/2;
-          
-          if (this.cropSystem.canPlantAt(centerX, centerY)) {
-            if (this.queuedCropType) {
-              // Plant the queued crop
-              this.cropSystem.plantCrop(centerX, centerY, this.queuedCropType);
-              console.log(`🌱 Planted ${this.queuedCropType} at plot (${col}, ${row})`);
-              
-              // Clear the queue after planting
-              this.queuedCropType = undefined;
-              
-              // Emit event for UI feedback
-              EventBus.emit(GameEvents.CROP_PLANTED);
-            } else {
-              console.log(`💡 No seed selected. Use the menu to select a seed first.`);
-            }
-          } else {
-            console.log(`❌ Cannot plant at plot (${col}, ${row}) - already occupied`);
-          }
-        });
+        // Plot areas are now non-interactive (read-only portfolio visualizer)
       }
     }
     
@@ -1225,10 +1199,6 @@ export class MainScene extends Phaser.Scene {
     this.isOwnWorld = isOwnWorld;
   }
   
-  setAuthInfo(address?: string, user?: any) {
-    this.address = address;
-    this.user = user;
-  }
 
   setChainId(chainId: number) {
     const oldChainId = this.currentChainId;
@@ -1237,6 +1207,13 @@ export class MainScene extends Phaser.Scene {
     // If chain ID changed, recreate buildings
     if (oldChainId !== chainId) {
       this.createNetworkSpecificBuildings();
+    }
+  }
+
+  syncPortfolio(data: { portfolioData: any; totalValueUsd: number }) {
+    console.log('📊 MainScene: Syncing portfolio data', data);
+    if (this.cropSystem) {
+      this.cropSystem.syncPositions(data.portfolioData);
     }
   }
 
@@ -1300,20 +1277,6 @@ export class MainScene extends Phaser.Scene {
       this.buildingInteractionManager.registerBuilding('pepe', this.pepeBuilding);
       
       console.log('🟣 Created Flow buildings');
-    } else {
-      // Default case - create Katana buildings
-      console.log('⚪ Unknown network, creating default Katana buildings');
-      const katanaPos = GameConfig.buildings.katana;
-      this.bankBuilding = new BankBuilding(this, katanaPos.bank.x, katanaPos.bank.y);
-      this.marketplaceBuilding = new MarketplaceBuilding(this, katanaPos.marketplace.x, katanaPos.marketplace.y);
-      
-      // Add buildings to depth group for 2.5D sorting
-      this.depthGroup.add(this.bankBuilding);
-      this.depthGroup.add(this.marketplaceBuilding);
-      
-      // Register with manager
-      this.buildingInteractionManager.registerBuilding('bank', this.bankBuilding);
-      this.buildingInteractionManager.registerBuilding('marketplace', this.marketplaceBuilding);
     }
 
     // Set up event listeners for new buildings
@@ -1334,14 +1297,20 @@ export class MainScene extends Phaser.Scene {
     // Network functionality removed
   }
 
-  private createLocalPlayer() {
+  public initializePlayer(authData: { address: string; user?: any }) {
     try {
+      // Prevent duplicate initialization
+      if (this.currentPlayer) {
+        console.log('Player already initialized');
+        return;
+      }
+
       // Get player ID from wallet address or user ID
-      const playerId = this.address || this.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
+      const playerId = authData.address || authData.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
       
       // Use wallet address as display name
-      const displayName = this.address ? 
-        `${this.address.slice(0, 6)}...${this.address.slice(-4)}` : 
+      const displayName = authData.address ? 
+        `${authData.address.slice(0, 6)}...${authData.address.slice(-4)}` : 
         'Guest';
       
       // Create PlayerInfo object
@@ -1373,13 +1342,6 @@ export class MainScene extends Phaser.Scene {
     }
   }
   
-  /**
-   * Queue a crop type for planting on the next plot click
-   */
-  public queueCropForPlanting(cropType: CropType): void {
-    this.queuedCropType = cropType;
-    console.log(`🌱 Queued ${cropType} for planting`);
-  }
 
 
   update(time: number, delta: number) {
@@ -1520,8 +1482,7 @@ export class MainScene extends Phaser.Scene {
 
 
   destroy() {
-    // Clean up EventBus listeners
-    EventBus.off(GameEvents.SEED_SELECTED, this.queueCropForPlanting, this);
+    // EventBus listeners already removed - portfolio visualizer is read-only
     
     // Emit system shutdown event
     eventBus.emit('system:shutdown', { systemName: 'MainScene' });
@@ -1535,54 +1496,6 @@ export class MainScene extends Phaser.Scene {
     return this.cropSystem || null;
   }
 
-  canPlantAt(x: number, y: number): boolean {
-    return this.cropSystem ? this.cropSystem.canPlantAt(x, y) : false;
-  }
-
-  getCropAt(x: number, y: number): { id: string; type: CropType; stage: string } | null {
-    if (!this.cropSystem) return null;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    return crop ? { id: crop.id, type: crop.type, stage: crop.stage } : null;
-  }
-
-  plantCrop(cropType: CropType, x: number, y: number): void {
-    if (this.cropSystem) {
-      this.cropSystem.plantCrop(x, y, cropType);
-      
-      // Emit crop planted event
-      eventBus.emit('crop:planted', {
-        cropId: `crop_${Date.now()}`,
-        playerId: this.currentPlayer ? this.currentPlayer.getPlayerInfo().id : 'local',
-        x: x,
-        y: y,
-        seedType: cropType
-      });
-    }
-  }
-
-  removeCropAtPosition(x: number, y: number): void {
-    if (!this.cropSystem) return;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    if (crop) {
-      this.cropSystem.removeCrop(crop.id);
-    }
-  }
-
-  harvestCropAtPosition(x: number, y: number): void {
-    if (!this.cropSystem) return;
-    const crop = this.cropSystem.getCropAtPosition(x, y);
-    if (crop) {
-      this.cropSystem.harvestCrop(crop.id);
-      
-      // Emit crop harvested event
-      eventBus.emit('crop:harvested', {
-        cropId: crop.id,
-        playerId: this.currentPlayer ? this.currentPlayer.getPlayerInfo().id : 'local',
-        yield: 1,
-        experience: 10
-      });
-    }
-  }
 
   getTotalCrops(): number {
     return this.cropSystem ? this.cropSystem.getAllCrops().length : 0;

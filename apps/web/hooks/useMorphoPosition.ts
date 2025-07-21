@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { type Address } from "viem";
-import { morpho_abi, morpho_katana_address } from "@/abi/morpho_abi";
+import { morpho_abi, morpho_katana_address } from '../../../packages/contracts/abi/morpho_abi';
 import { MORPHO_VAULTS } from "@/constants/katana-tokens";
 import { type VaultType } from "@/hooks/useMorphoDeposit";
 

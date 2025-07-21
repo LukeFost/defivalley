@@ -5,7 +5,6 @@ import * as Phaser from 'phaser';
 import { MainScene } from '../lib/MainScene';
 import { CropData, CropType } from '../lib/CropSystem';
 import { DialogueBox } from './DialogueBox';
-import { CropContextMenu } from './CropContextMenu';
 import { CropInfo } from './CropInfo';
 import { GameModals } from './GameModals';
 import { GameUI } from './GameUI';
@@ -13,6 +12,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useAccount, useChainId } from 'wagmi';
 import { BuildingInteractionManager } from '../lib/BuildingInteractionManager';
 import { EditorPanel, EditorObject } from './EditorPanel';
+import { usePortfolio } from '../hooks/usePortfolio';
 
 interface GameProps {
   worldId?: string;
@@ -44,6 +44,9 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   const { address } = useAccount();
   const chainId = useChainId();
   
+  // Get portfolio data from on-chain
+  const { portfolioData, totalValueUsd } = usePortfolio(address);
+  
   // Update scene editor mode when it changes
   useEffect(() => {
     if (sceneRef.current) {
@@ -52,6 +55,12 @@ function Game({ worldId, isOwnWorld }: GameProps) {
   }, [editorMode]);
 
   useEffect(() => {
+    // Wait for chainId to be available before initializing game
+    if (!chainId) {
+      console.log('⛓️ Waiting for chainId to initialize game...');
+      return;
+    }
+
     // Calculate dimensions based on viewport minus bottom bar
     const BAR_HEIGHT = 64; // Must match CSS --bar-height
     const gameWidth = window.innerWidth;
@@ -94,9 +103,8 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       if (scene) {
         sceneRef.current = scene;
         
-        // Configure world settings and auth info
+        // Configure world settings
         scene.setWorldConfiguration(worldId, isOwnWorld);
-        scene.setAuthInfo(address, user);
         
         // Set chain ID for network-specific buildings
         if (chainId) {
@@ -167,7 +175,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
       }
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [chainId]);
 
   const handleDialogueContinue = () => {
     setIsDialogueOpen(false);
@@ -182,33 +190,23 @@ function Game({ worldId, isOwnWorld }: GameProps) {
     }
   }, [chainId]);
 
-
-  // Crop system handlers
-  const handlePlantCrop = (cropType: CropType, x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.plantCrop(cropType, x, y);
+  // Initialize player once authentication data is available
+  useEffect(() => {
+    if (address && sceneRef.current) {
+      console.log('🎮 Initializing player with address:', address);
+      sceneRef.current.initializePlayer({ address, user });
     }
-  };
+  }, [address, user, sceneRef]);
 
-  const handleRemoveCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.removeCropAtPosition(x, y);
+  // Sync portfolio data with the game scene
+  useEffect(() => {
+    if (sceneRef.current && portfolioData) {
+      console.log('📊 Syncing portfolio data with game:', { portfolioData, totalValueUsd });
+      sceneRef.current.syncPortfolio({ portfolioData, totalValueUsd });
     }
-  };
+  }, [portfolioData, totalValueUsd]);
 
-  const handleHarvestCrop = (x: number, y: number) => {
-    if (sceneRef.current) {
-      sceneRef.current.harvestCropAtPosition(x, y);
-    }
-  };
 
-  const canPlantAt = (x: number, y: number): boolean => {
-    return sceneRef.current ? sceneRef.current.canPlantAt(x, y) : false;
-  };
-
-  const getCropAt = (x: number, y: number) => {
-    return sceneRef.current ? sceneRef.current.getCropAt(x, y) : null;
-  };
 
   const getTotalCrops = (): number => {
     return sceneRef.current ? sceneRef.current.getTotalCrops() : 0;
@@ -241,15 +239,7 @@ function Game({ worldId, isOwnWorld }: GameProps) {
         characterName={dialogueCharacterName}
       />
       
-      <CropContextMenu
-        onPlantCrop={handlePlantCrop}
-        onRemoveCrop={handleRemoveCrop}
-        onHarvestCrop={handleHarvestCrop}
-        canPlantAt={canPlantAt}
-        getCropAt={getCropAt}
-      >
-        <div id="game-container" />
-      </CropContextMenu>
+      <div id="game-container" />
       
       {/* Crop Info Panel */}
       <CropInfo 

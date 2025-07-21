@@ -1,6 +1,6 @@
 /**
- * Crop System - Manages crop planting, growth, and harvesting
- * Handles crop state, sprite management, and interaction logic
+ * Portfolio Visualizer - Displays on-chain DeFi positions as crops
+ * Read-only visualization of Morpho vault positions
  */
 
 export interface CropData {
@@ -12,6 +12,9 @@ export interface CropData {
   stage: GrowthStage;
   lastWatered?: number;
   health: number;
+  // Portfolio-specific data
+  positionValue?: number; // in USD
+  vbUSDCAmount?: number;
 }
 
 export type CropType = 'potato' | 'carrot' | 'lettuce' | 'cabbage' | 'tomato' | 'strawberry' | 'watermelon' | 'corn' | 'pumpkin' | 'pepper';
@@ -161,39 +164,107 @@ export class CropSystem {
   }
 
   /**
-   * Plant a crop at the specified position
+   * Sync portfolio positions with on-chain data
+   * Creates/updates/removes crops based on current positions
    */
-  plantCrop(x: number, y: number, cropType: CropType = 'potato'): string {
-    const cropId = `crop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  syncPositions(portfolioData: any) {
+    if (!portfolioData) return;
     
-    const cropData: CropData = {
-      id: cropId,
-      type: cropType,
-      x,
-      y,
-      plantedAt: Date.now(),
-      stage: 'seed',
-      health: 100
-    };
-
-    this.crops.set(cropId, cropData);
+    console.log('🔄 Syncing portfolio positions:', portfolioData);
     
-    // Only create sprite if within viewport
-    const viewportBounds = this.getViewportBounds();
-    if (this.isInViewport(x, y, viewportBounds)) {
-      this.createCropSprite(cropData);
+    // For now, we'll visualize the vbUSDC position as a single crop
+    const positionId = 'morpho_vbETH_position';
+    const existingCrop = this.crops.get(positionId);
+    
+    if (portfolioData.vbUSDCAmount > 0) {
+      // Position exists - create or update crop
+      if (!existingCrop) {
+        // Find an empty plot for the new position
+        const emptyPlot = this.findEmptyPlot();
+        if (emptyPlot) {
+          const cropData: CropData = {
+            id: positionId,
+            type: this.getCropTypeByValue(portfolioData.vbUSDCAmount),
+            x: emptyPlot.x,
+            y: emptyPlot.y,
+            plantedAt: Date.now(),
+            stage: 'ready', // Portfolio positions are always "ready"
+            health: 100,
+            positionValue: portfolioData.vbUSDCAmount,
+            vbUSDCAmount: portfolioData.vbUSDCAmount
+          };
+          
+          this.crops.set(positionId, cropData);
+          this.createCropSprite(cropData);
+          console.log(`🌱 Created portfolio crop at (${emptyPlot.x}, ${emptyPlot.y})`);
+        }
+      } else {
+        // Update existing crop
+        existingCrop.positionValue = portfolioData.vbUSDCAmount;
+        existingCrop.vbUSDCAmount = portfolioData.vbUSDCAmount;
+        
+        // Update crop appearance based on value
+        const sprite = this.cropSprites.get(positionId);
+        if (sprite) {
+          // Scale based on position value (1x to 2x scale)
+          const scale = 1 + Math.min(portfolioData.vbUSDCAmount / 1000, 1);
+          sprite.setScale(scale);
+        }
+      }
+    } else if (existingCrop) {
+      // Position closed - remove crop
+      this.removePortfolioCrop(positionId);
     }
     
     this.saveCropsToStorage();
-    
-    console.log(`🌱 Planted ${cropType} at (${x}, ${y})`);
-    return cropId;
   }
 
   /**
-   * Remove a crop from the field
+   * Find an empty plot for a new position
    */
-  removeCrop(cropId: string): boolean {
+  private findEmptyPlot(): { x: number; y: number } | null {
+    // Define farm plot grid
+    const plotSize = 64;
+    const startX = 200;
+    const startY = 300;
+    const cols = 5;
+    const rows = 3;
+    
+    // Check each plot position
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = startX + col * plotSize + plotSize / 2;
+        const y = startY + row * plotSize + plotSize / 2;
+        
+        // Check if this position is empty
+        if (!this.getCropAtPosition(x, y, 32)) {
+          return { x, y };
+        }
+      }
+    }
+    
+    return null; // No empty plots
+  }
+  
+  /**
+   * Get crop type based on position value
+   */
+  private getCropTypeByValue(value: number): CropType {
+    // Map value ranges to different crop types
+    if (value < 10) return 'potato';
+    if (value < 50) return 'carrot';
+    if (value < 100) return 'lettuce';
+    if (value < 500) return 'tomato';
+    if (value < 1000) return 'watermelon';
+    if (value < 5000) return 'corn';
+    if (value < 10000) return 'pumpkin';
+    return 'pepper'; // Highest value crops
+  }
+  
+  /**
+   * Remove a portfolio crop
+   */
+  private removePortfolioCrop(cropId: string): boolean {
     const crop = this.crops.get(cropId);
     if (!crop) return false;
 
@@ -212,35 +283,26 @@ export class CropSystem {
     return true;
   }
 
-  /**
-   * Harvest a crop (only if ready)
-   */
+  // Deprecated - portfolio visualizer is read-only
   harvestCrop(cropId: string): { success: boolean; reward?: string; goldReward?: number } {
+    return { success: false };
+  }
+  
+  // Deprecated - portfolio visualizer is read-only
+  removeCrop(cropId: string): boolean {
+    // For legacy compatibility only
     const crop = this.crops.get(cropId);
-    if (!crop) return { success: false };
+    if (!crop) return false;
     
-    if (crop.stage !== 'ready') {
-      console.log(`🚫 Cannot harvest ${crop.type} - not ready yet (${crop.stage})`);
-      return { success: false };
+    const sprite = this.cropSprites.get(cropId);
+    if (sprite) {
+      sprite.destroy();
+      this.cropSprites.delete(cropId);
     }
-
-    // Remove the crop
-    this.removeCrop(cropId);
     
-    // Calculate harvest reward - simple MVP: 10 gold per potato
-    const config = CROP_CONFIGS[crop.type];
-    const goldReward = 10; // Hardcoded for MVP
-    const reward = `Harvested ${config.name}! +${goldReward} Gold`;
-    
-    console.log(`🚜 Harvested ${crop.type}: ${reward}`);
-    
-    // Show harvest animation at crop location
-    this.showHarvestEffect(crop.x, crop.y);
-    
-    // Emit harvest event with gold reward
-    this.scene.events.emit('cropHarvested', { cropId, goldReward });
-    
-    return { success: true, reward, goldReward };
+    this.crops.delete(cropId);
+    this.saveCropsToStorage();
+    return true;
   }
 
   /**
@@ -292,6 +354,12 @@ export class CropSystem {
         return; // Skip animation updates for off-screen crops
       }
 
+      // Portfolio crops don't grow - they're always ready
+      if (crop.id.startsWith('morpho_')) {
+        return;
+      }
+      
+      // Legacy growth logic for any remaining non-portfolio crops
       const config = CROP_CONFIGS[crop.type];
       const timeElapsed = (now - crop.plantedAt) / 1000; // Convert to seconds
       const growthProgress = Math.min(timeElapsed / config.growthTime, 1);
@@ -406,29 +474,9 @@ export class CropSystem {
     });
   }
 
-  /**
-   * Check if position is suitable for planting
-   */
+  // Deprecated - portfolio visualizer is read-only
   canPlantAt(x: number, y: number): boolean {
-    // Check if there's already a crop nearby
-    const existingCrop = this.getCropAtPosition(x, y, 32);
-    if (existingCrop) return false;
-
-    // Check if position is within farming area bounds
-    // Updated to match our 4x4 plot grid location
-    const farmingArea = {
-      minX: 600,
-      maxX: 960,
-      minY: 400,
-      maxY: 760
-    };
-
-    return (
-      x >= farmingArea.minX &&
-      x <= farmingArea.maxX &&
-      y >= farmingArea.minY &&
-      y <= farmingArea.maxY
-    );
+    return false;
   }
 
   /**
@@ -548,7 +596,12 @@ export class CropSystem {
   clearAllCrops() {
     const crops = Array.from(this.crops.values());
     crops.forEach((crop) => {
-      this.removeCrop(crop.id);
+      // Use removePortfolioCrop for portfolio positions
+      if (crop.id.startsWith('morpho_')) {
+        this.removePortfolioCrop(crop.id);
+      } else {
+        this.removeCrop(crop.id);
+      }
     });
     localStorage.removeItem('defi-valley-crops');
   }

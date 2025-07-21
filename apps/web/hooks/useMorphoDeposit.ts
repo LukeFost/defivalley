@@ -8,7 +8,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { parseUnits, type Address } from "viem";
-import { morpho_abi, morpho_katana_address } from "@/abi/morpho_abi";
+import { morpho_abi, morpho_katana_address } from '../../../packages/contracts/abi/morpho_abi';
 import { KATANA_TOKENS, MORPHO_VAULTS } from "@/constants/katana-tokens";
 
 // vbUSDC address on Katana (bridged USDC for lending)

@@ -2,11 +2,9 @@
 
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { useAccount, useBalance, useChainId, useSwitchChain } from 'wagmi'
-import { sagaChainlet } from '../app/wagmi'
-import { arbitrumSepolia } from 'wagmi/chains'
+import { katanaChain } from '../app/wagmi'
 import { useEffect, useState } from 'react'
 import { useAppStore, usePlayerData, useConfig } from '../app/store'
-import { NetworkSelector } from './NetworkSelector'
 import {
   Drawer,
   DrawerClose,
@@ -86,9 +84,7 @@ export function Auth() {
     )
   }
 
-  const currentChain = chainId === sagaChainlet.id ? sagaChainlet : arbitrumSepolia
-  const isOnSaga = chainId === sagaChainlet.id
-  const isOnArbitrum = chainId === arbitrumSepolia.id
+  const isOnKatana = chainId === katanaChain.id
   const embeddedWallet = wallets.find(wallet => wallet.walletClientType === 'privy')
 
   // Render floating trigger button for all users
@@ -163,8 +159,8 @@ export function Auth() {
               <div className="chain-info">
                 <div className="current-chain">
                   <span className="chain-label">Network:</span>
-                  <span className={`chain-name ${isOnSaga ? 'saga' : 'arbitrum'}`}>
-                    {currentChain.name}
+                  <span className={`chain-name katana`}>
+                    {isOnKatana ? katanaChain.name : 'Not Connected'}
                   </span>
                 </div>
                 {balance && (
@@ -177,35 +173,16 @@ export function Auth() {
                 )}
               </div>
 
-              {/* Network Selector */}
-              <div className="network-selector-section">
-                <div className="network-selector-label">Switch Network:</div>
-                <NetworkSelector 
-                  variant="dropdown"
-                  className="network-selector-widget"
-                  showTestnets={true}
-                  categoryFilter="all"
-                />
-              </div>
-
-              <div className="chain-actions">
-                {!isOnSaga && (
+              {!isOnKatana && (
+                <div className="chain-actions">
                   <button
-                    onClick={() => switchChain({ chainId: sagaChainlet.id })}
-                    className="switch-chain-btn saga"
+                    onClick={() => switchChain({ chainId: katanaChain.id })}
+                    className="switch-chain-btn katana"
                   >
-                    🎮 Switch to Saga (Gaming)
+                    ⚔️ Switch to Katana
                   </button>
-                )}
-                {!isOnArbitrum && (
-                  <button
-                    onClick={() => switchChain({ chainId: arbitrumSepolia.id })}
-                    className="switch-chain-btn arbitrum"
-                  >
-                    💰 Switch to Arbitrum (DeFi)
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="no-wallet">
@@ -274,15 +251,15 @@ export function Auth() {
                     showPlantModal();
                   }}
                   className="action-btn plant"
-                  disabled={chainId !== config.sagaChainId}
+                  disabled={!isOnKatana}
                 >
                   🌱 Plant Seeds
                 </button>
               </div>
 
-              {chainId !== config.sagaChainId && (
+              {!isOnKatana && (
                 <div className="switch-prompt">
-                  <p>Switch to Saga network to plant seeds</p>
+                  <p>Switch to Katana network to plant seeds</p>
                 </div>
               )}
             </div>
@@ -311,7 +288,7 @@ export function Auth() {
             <div className="feature">🌾 Plant virtual seeds</div>
             <div className="feature">💰 Earn real DeFi yields</div>
             <div className="feature">👥 Play with friends</div>
-            <div className="feature">⛓️ Cross-chain farming</div>
+            <div className="feature">⚔️ Powered by Katana</div>
           </div>
         </div>
       )}
@@ -491,33 +468,14 @@ export function Auth() {
           font-size: 12px;
         }
         
-        .chain-name.saga {
-          background: #d4edda;
-          color: #155724;
-        }
-        
-        .chain-name.arbitrum {
-          background: #d1ecf1;
-          color: #0c5460;
+        .chain-name.katana {
+          background: #f0e6ff;
+          color: #4a148c;
         }
         
         .balance-value {
           font-weight: 500;
           color: #333;
-        }
-        
-        .network-selector-section {
-          margin: 12px 0;
-        }
-        
-        .network-selector-label {
-          font-size: 12px;
-          color: #666;
-          margin-bottom: 6px;
-        }
-        
-        .network-selector-widget {
-          width: 100%;
         }
         
         .chain-actions {
@@ -537,13 +495,8 @@ export function Auth() {
           transition: all 0.2s;
         }
         
-        .switch-chain-btn.saga {
-          background: #28a745;
-          color: white;
-        }
-        
-        .switch-chain-btn.arbitrum {
-          background: #007bff;
+        .switch-chain-btn.katana {
+          background: #7b1fa2;
           color: white;
         }
         

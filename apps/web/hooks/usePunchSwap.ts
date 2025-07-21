@@ -9,7 +9,7 @@ import {
   useReadContract,
 } from "wagmi";
 import { parseUnits, formatUnits, type Address } from "viem";
-import { flowMainnet } from "@/app/wagmi";
+import { flowMainnet } from "@/app/lib/networks";
 import { FLOW_PROTOCOLS, FLOW_DEFI_CONFIG } from "@/constants/flow-tokens";
 import { useTokenAllowance } from "./useTokenAllowance";
 import { useUI } from "@/app/store";

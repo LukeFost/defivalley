@@ -3,7 +3,6 @@
 import React from 'react';
 import { UIStack } from './UIStack';
 import { ConnectWalletButton } from './ConnectWalletButton';
-import { NetworkSelector } from './NetworkSelector';
 
 interface GameUIProps {
   // Crop stats functions
@@ -24,10 +23,9 @@ export function GameUI({
 
   return (
     <>
-      {/* Top-right wallet and network controls */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
+      {/* Top-right wallet control */}
+      <div className="fixed top-4 right-4 z-50">
         <ConnectWalletButton />
-        <NetworkSelector />
       </div>
 
       {/* Left-side UI stack with notifications */}

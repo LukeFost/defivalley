@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import GameWrapper from '@/components/GameWrapper';
 import { Auth } from '@/components/Auth';
-import PlantSeedDialog from '@/components/PlantSeedDialog';
 import SettingsDialog from '@/components/SettingsDialog';
 import Notifications from '@/components/Notifications';
 
@@ -216,7 +215,6 @@ export default function Home() {
       `}</style>
       
       {/* DeFi Valley Modal Components */}
-      <PlantSeedDialog />
       <SettingsDialog />
       
       {/* Global Notification System */}
