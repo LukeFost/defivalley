@@ -26,6 +26,11 @@ const createWrapper = () => {
         staleTime: 0,
       },
     },
+    logger: {
+      log: () => {},
+      warn: () => {},
+      error: () => {},
+    },
   });
   
   return ({ children }: { children: React.ReactNode }) => (
@@ -109,9 +114,28 @@ describe('usePortfolio', () => {
     expect(result.current.totalValueUsd).toBe(123.456789);
   });
 
-  it.skip('should handle errors from the service', async () => {
-    // Skipping due to React Query timing issues in test environment
-    // In production, errors are properly handled and set in the error state
+  it('should handle errors from the service', async () => {
+    // Mock the service to throw an error
+    const mockError = new Error('Blockchain RPC failed');
+    (getMorphoPosition as any).mockRejectedValue(mockError);
+
+    const { result } = renderHook(() => usePortfolio(mockUserAddress), {
+      wrapper: createWrapper(),
+    });
+
+    // Wait for the query to settle and error state to be set
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.error).toBeTruthy();
+      },
+      { timeout: 3000 }
+    );
+
+    // After loading is complete, check the error state
+    expect(result.current.error?.message).toBe('Blockchain RPC failed');
+    expect(result.current.portfolioData).toBe(null);
+    expect(result.current.totalValueUsd).toBe(0);
   });
 
   it('should not fetch if no user address is provided', () => {
@@ -145,5 +169,37 @@ describe('usePortfolio', () => {
     // Rerender within stale time - should not refetch
     rerender();
     expect(getMorphoPosition).toHaveBeenCalledTimes(1);
+  });
+
+  it('should correctly format data for a zero-value position', async () => {
+    // Mock response with zero values
+    const zeroPositionData = {
+      supplyShares: BigInt(0),
+      borrowShares: BigInt(0),
+      collateral: BigInt(0),
+    };
+
+    (getMorphoPosition as any).mockResolvedValue({
+      marketId: mockMarketId,
+      positionData: zeroPositionData,
+    });
+
+    const { result } = renderHook(() => usePortfolio(mockUserAddress), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Verify zero values are handled correctly
+    expect(result.current.portfolioData).toEqual({
+      supplyShares: BigInt(0),
+      borrowShares: BigInt(0),
+      collateral: BigInt(0),
+      vbUSDCAmount: 0,
+    });
+    expect(result.current.totalValueUsd).toBe(0);
+    expect(result.current.error).toBe(null);
   });
 });
