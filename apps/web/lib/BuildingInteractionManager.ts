@@ -46,6 +46,7 @@ export class BuildingInteractionManager {
   private dialogueCallbacks?: DialogueCallbacks;
   private modalSetters?: ModalSetters;
   private eventListeners: Map<string, Function> = new Map();
+  private isGuestModeGetter?: () => boolean;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -61,6 +62,13 @@ export class BuildingInteractionManager {
     
     // Register event listeners for all configured interactions
     this.registerEventListeners();
+  }
+
+  /**
+   * Set the guest mode getter function
+   */
+  public setGuestModeGetter(getter: () => boolean): void {
+    this.isGuestModeGetter = getter;
   }
 
   /**
@@ -222,20 +230,32 @@ export class BuildingInteractionManager {
     const listener = () => {
       console.log(`[BuildingInteractionManager] Handling ${config.eventName}`);
       
-      // Set dialogue content
-      this.dialogueCallbacks!.setDialogueCharacterName(config.characterName);
-      this.dialogueCallbacks!.setDialogueContent(config.dialogueContent);
+      // Check if user is in guest mode
+      const isGuestMode = this.isGuestModeGetter?.() ?? false;
       
-      // Set continue callback
-      if (config.modalSetter) {
+      if (isGuestMode) {
+        // Show guest mode message
+        this.dialogueCallbacks!.setDialogueCharacterName('System');
+        this.dialogueCallbacks!.setDialogueContent('🔒 You need to connect your wallet to interact with buildings. Click "Connect & Play" in the menu to get started!');
         this.dialogueCallbacks!.setOnDialogueContinue(() => () => {
-          config.modalSetter!(true);
-          config.onInteraction?.();
+          // Just close the dialogue, no further action
         });
-      } else if (config.onInteraction) {
-        this.dialogueCallbacks!.setOnDialogueContinue(() => () => {
-          config.onInteraction!();
-        });
+      } else {
+        // Normal interaction flow
+        this.dialogueCallbacks!.setDialogueCharacterName(config.characterName);
+        this.dialogueCallbacks!.setDialogueContent(config.dialogueContent);
+        
+        // Set continue callback
+        if (config.modalSetter) {
+          this.dialogueCallbacks!.setOnDialogueContinue(() => () => {
+            config.modalSetter!(true);
+            config.onInteraction?.();
+          });
+        } else if (config.onInteraction) {
+          this.dialogueCallbacks!.setOnDialogueContinue(() => () => {
+            config.onInteraction!();
+          });
+        }
       }
       
       // Open dialogue

@@ -49,14 +49,7 @@ export class MarketplaceBuilding extends BaseInteractiveBuilding {
 
   // Override getCollisionBounds for custom collision area
   public getCollisionBounds(): Phaser.Geom.Rectangle {
-    // Return a rectangle slightly smaller than the sprite for better collision feel
-    const width = this.buildingSprite.displayWidth * 0.8;
-    const height = this.buildingSprite.displayHeight * 0.8;
-    return new Phaser.Geom.Rectangle(
-      this.x - width / 2,
-      this.y - height / 2,
-      width,
-      height
-    );
+    // Use the base implementation which now provides better bounds
+    return super.getCollisionBounds();
   }
 }

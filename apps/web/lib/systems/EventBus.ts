@@ -15,12 +15,22 @@ export interface GameEvents {
   'crop:growth': { cropId: string; stage: number; progress: number };
   'crop:watered': { cropId: string; playerId: string };
   
+  // Plot events
+  'plot:contextMenu': { plotId: string; x: number; y: number; screenX: number; screenY: number; isEmpty: boolean; crop?: any; gridX: number; gridY: number };
+  'plot:selected': { plotId: string; isSelected: boolean; gridX: number; gridY: number };
+  'plot:planted': { plotId: string; cropType: string; cropData: any };
+  'plot:harvested': { plotId: string; cropData: any };
+  'plot:watered': { plotId: string; cropData: any };
+  
   // UI events
   'ui:menuOpened': { menuType: string; position?: { x: number; y: number } };
   'ui:menuClosed': { menuType: string };
   'ui:dialogOpened': { dialogType: string; data?: any };
   'ui:dialogClosed': { dialogType: string; result?: any };
   'ui:notificationShown': { message: string; type: 'info' | 'success' | 'warning' | 'error' };
+  'ui:plantCrop': { plotId: string; seedType: string; cost: number };
+  'ui:waterCrop': { plotId: string };
+  'ui:harvestCrop': { plotId: string };
   
   // Chat events
   'chat:message': { playerId: string; message: string; timestamp: number };

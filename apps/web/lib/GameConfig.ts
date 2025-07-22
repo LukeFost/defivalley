@@ -39,13 +39,23 @@ export const GameConfig = {
   buildings: {
     katana: {
       bank: { x: 800, y: 600 },
-      marketplace: { x: 800, y: 400 },
+      marketplace: { x: 1600, y: 600 }, // Increased spacing between buildings
     },
     flow: {
-      bank: { x: 500, y: 350 },
-      marketplace: { x: 500, y: 750 },
-      pepe: { x: 750, y: 800 },
+      bank: { x: 400, y: 1000 }, // Better vertical and horizontal spacing
+      marketplace: { x: 1200, y: 1000 }, // More space between buildings
+      pepe: { x: 800, y: 1600 }, // Further down with more space
     },
+  },
+
+  // Farm plot configuration
+  farmPlots: {
+    gridStartX: 1200,
+    gridStartY: 600,
+    plotSize: 80,
+    plotSpacing: 10,
+    rows: 4,
+    cols: 4,
   },
 
   // Terrain generation

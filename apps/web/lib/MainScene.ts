@@ -17,6 +17,9 @@ import { eventBus } from './systems/EventBus';
 import { katanaChain } from '../app/wagmi';
 import { flowMainnet } from '../app/lib/networks';
 import { EventBus, GameEvents } from '../game/EventBus';
+import { InteractiveFarmPlot } from './InteractiveFarmPlot';
+import { BuildingLayoutManager } from './BuildingLayoutManager';
+import { GamePersistence } from './GamePersistence';
 
 // Network types removed
 
@@ -43,6 +46,7 @@ export class MainScene extends Phaser.Scene {
   private address?: string;
   private user?: any;
   private currentChainId?: number;
+  public isGuestMode: boolean = false;
   
   // Editor properties
   private isEditorMode: boolean = false;
@@ -50,6 +54,7 @@ export class MainScene extends Phaser.Scene {
   private selectedEditorObject: any = null;
   private editorOverlay?: Phaser.GameObjects.Graphics;
   private backtickKey!: Phaser.Input.Keyboard.Key;
+  private editorModeText?: Phaser.GameObjects.Text;
   private moveTargetGraphics?: Phaser.GameObjects.Graphics;
   
   // Camera system properties
@@ -67,6 +72,7 @@ export class MainScene extends Phaser.Scene {
   // Performance optimization properties
   private lastBuildingCheck: number = 0;
   private lastCropUpdate: number = 0;
+  private lastGrowthCheck: number = 0;
   
   // Tile size
   private tileSize: number = 32;
@@ -75,6 +81,19 @@ export class MainScene extends Phaser.Scene {
   private depthGroup!: Phaser.GameObjects.Group;
   
   // Queued crop for planting
+  
+  // Farm plot management
+  private farmPlots: InteractiveFarmPlot[] = [];
+  private layoutManager!: BuildingLayoutManager;
+
+  // Interaction prompt management
+  private interactionPrompt?: Phaser.GameObjects.Text;
+  private nearbyInteractables: Map<string, { distance: number; message: string }> = new Map();
+
+  // Game state for persistence
+  private playerGold: number = 100; // Starting gold
+  private playerLevel: number = 1;
+  private playerExperience: number = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -84,7 +103,28 @@ export class MainScene extends Phaser.Scene {
   init(data: {}) {
   }
 
+  private emitGameError(message: string, error?: Error) {
+    console.error(`[MainScene Error] ${message}`, error);
+    
+    // Emit custom event for ErrorModal
+    window.dispatchEvent(new CustomEvent('game:error', {
+      detail: { message, error }
+    }));
+  }
+
   preload() {
+    // Track loading progress
+    this.load.on('progress', (value: number) => {
+      // Emit progress event
+      window.dispatchEvent(new CustomEvent('game:loadProgress', {
+        detail: { progress: Math.round(value * 100) }
+      }));
+    });
+    
+    this.load.on('complete', () => {
+      window.dispatchEvent(new CustomEvent('game:loadComplete'));
+    });
+    
     // Add load event listeners for debugging
     this.load.on('filecomplete', (key: string, type: string, data: any) => {
     });
@@ -140,22 +180,38 @@ export class MainScene extends Phaser.Scene {
       '/sprites/Pepe/_building_pepe/building_pepe.json'
     );
     
+    // Load crop spritesheet directly in MainScene to ensure it's available
+    this.load.spritesheet('crops', '/sprites/crops-v2/crops.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    
     // Initialize and preload crop system
     this.cropSystem = new CropSystem(this);
     this.cropSystem.preload();
   }
 
   async create() {
-    // Initialize collision system
-    this.collisionSystem = new CollisionSystem(this, this.worldWidth, this.worldHeight, this.tileSize);
-    
-    // Initialize camera system
-    this.cameraSystem = new CameraSystem(this, {
-      worldWidth: this.worldWidth,
-      worldHeight: this.worldHeight,
-      lerpFactor: GameConfig.camera.lerpFactor,
-      debugMode: false
-    });
+    try {
+      // Initialize layout manager
+      this.layoutManager = new BuildingLayoutManager(this.worldWidth, this.worldHeight);
+      
+      // Initialize building interaction manager FIRST (before creating any buildings)
+      this.buildingInteractionManager = new BuildingInteractionManager(this);
+      
+      // Initialize collision system
+      this.collisionSystem = new CollisionSystem(this, this.worldWidth, this.worldHeight, this.tileSize);
+      
+      // Initialize camera system
+      this.cameraSystem = new CameraSystem(this, {
+        worldWidth: this.worldWidth,
+        worldHeight: this.worldHeight,
+        lerpFactor: GameConfig.camera.lerpFactor,
+        debugMode: false
+      });
+      
+      // Prevent browser context menu on right-click
+      this.input.mouse?.disableContextMenu();
     
     // EventBus listeners removed - portfolio visualizer is read-only
     
@@ -184,9 +240,6 @@ export class MainScene extends Phaser.Scene {
 
     // Initialize crop system
     this.cropSystem.create();
-
-    // Initialize building interaction manager
-    this.buildingInteractionManager = new BuildingInteractionManager(this);
 
     // Create network-specific buildings (will be created based on chain ID)
     this.createNetworkSpecificBuildings();
@@ -244,17 +297,51 @@ export class MainScene extends Phaser.Scene {
     // Initialize network system
     this.setupNetworkEventHandlers();
     
-    // Don't create local player here - wait for initializePlayer to be called
-    // this.createLocalPlayer();
+    // Create guest player immediately for instant gameplay
+    this.initializeGuestPlayer();
     
     // Set up editor mode click handling
     this.setupEditorClickHandling();
+    } catch (error) {
+      this.emitGameError('Failed to initialize game scene', error as Error);
+    }
   }
 
   updateCameraFollow() {
     // Follow the current player smoothly
     if (this.currentPlayer) {
       this.cameras.main.startFollow(this.currentPlayer, true, this.cameraLerpFactor, this.cameraLerpFactor);
+    }
+  }
+
+  private initializeGuestPlayer() {
+    // Create a guest player if no authenticated player exists
+    if (!this.currentPlayer) {
+      this.isGuestMode = true;
+      const guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
+      
+      const guestInfo: PlayerInfo = {
+        id: guestId,
+        name: 'Guest Player',
+        x: GameConfig.player.spawnPosition.x,
+        y: GameConfig.player.spawnPosition.y,
+        level: 1,
+        character: 'cowboy' as CharacterType,
+        direction: 'down',
+        isCurrentPlayer: true
+      };
+      
+      this.currentPlayer = new Player(this, guestInfo.x, guestInfo.y, guestInfo);
+      
+      // Add player to depth group for proper 2.5D sorting
+      if (this.depthGroup) {
+        this.depthGroup.add(this.currentPlayer);
+      }
+      
+      this.updateCameraFollow();
+      
+      // Show welcome message for guest
+      console.log('🎮 Welcome! Move with WASD. Connect wallet to save progress.');
     }
   }
 
@@ -341,6 +428,44 @@ export class MainScene extends Phaser.Scene {
         if (validation.warnings.length > 0) {
           console.warn('Warnings:', validation.warnings);
         }
+      };
+      
+      (window as any).clearAllCrops = () => {
+        console.log('🧹 Clearing all crops from storage and game...');
+        this.cropSystem.clearAllCrops();
+        console.log('✅ All crops cleared! Refresh the page to see changes.');
+      };
+      
+      (window as any).clearPotatoesNearBuildings = () => {
+        console.log('🥔 Removing potatoes near buildings...');
+        const buildingPositions = [
+          { x: 800, y: 600 }, // Katana bank
+          { x: 1400, y: 600 }, // Katana marketplace
+          { x: 500, y: 800 }, // Flow bank
+          { x: 1100, y: 800 }, // Flow marketplace
+          { x: 800, y: 1400 }, // Pepe building
+        ];
+        
+        let removedCount = 0;
+        const crops = this.cropSystem.getAllCrops();
+        
+        crops.forEach(crop => {
+          // Check if crop is too close to any building (within 200 pixels)
+          const tooClose = buildingPositions.some(building => {
+            const distance = Math.sqrt(
+              Math.pow(crop.x - building.x, 2) + 
+              Math.pow(crop.y - building.y, 2)
+            );
+            return distance < 200;
+          });
+          
+          if (tooClose && crop.type === 'potato') {
+            this.cropSystem.removeCrop(crop.id);
+            removedCount++;
+          }
+        });
+        
+        console.log(`✅ Removed ${removedCount} potatoes near buildings!`);
       };
       
       (window as any).exportTerrain = () => {
@@ -551,6 +676,11 @@ export class MainScene extends Phaser.Scene {
       console.log('  - debugCharacters(): Debug character loading issues');
       console.log('  🔍 TILEMAP DEBUGGING:');
       console.log('  - debugTilemap(): Complete tilemap diagnostic');
+      console.log('');
+      console.log('🏪 BUILDING INTERACTIONS:');
+      console.log('  - Press E near buildings to interact');
+      console.log('  - Press ` (backtick) to toggle Editor Mode');
+      console.log('  - In Editor Mode: Click to select, click again to move');
       console.log('  - testTileVisibility(): Test basic tile rendering');
       console.log('  📍 TELEPORTATION:');
       console.log('  - teleportToBuildings(): Teleport to the buildings area');
@@ -567,6 +697,9 @@ export class MainScene extends Phaser.Scene {
       console.log('  🎢 COLLISION DEBUGGING:');
       console.log('  - toggleCollisionDebug(): Toggle collision grid visualization');
       console.log('  - getCollisionStats(): Show collision system statistics');
+      console.log('  💾 SAVE GAME MANAGEMENT:');
+      console.log('  - clearSaveData(): Clear all saved game data');
+      console.log('  - showSaveData(): Display current save data');
     }
     
     // Add teleportation commands
@@ -678,6 +811,40 @@ export class MainScene extends Phaser.Scene {
       console.log(`  Static collision cells: ${stats.static}`);
       console.log(`  Dynamic crops: ${stats.crops}`);
       console.log(`  Total collision objects: ${stats.total}`);
+    };
+    
+    // Save game management commands
+    (window as any).clearSaveData = () => {
+      GamePersistence.clearSaveData();
+      console.log('💾 Save data cleared! Refresh the page to start fresh.');
+    };
+    
+    (window as any).showSaveData = () => {
+      const saveData = GamePersistence.loadGameState();
+      if (!saveData) {
+        console.log('💾 No save data found');
+        return;
+      }
+      
+      console.log('💾 Current Save Data:');
+      console.log(`  Last saved: ${new Date(saveData.lastSaved).toLocaleString()}`);
+      console.log(`  Player gold: ${saveData.player.gold}`);
+      console.log(`  Player level: ${saveData.player.level}`);
+      console.log(`  Player XP: ${saveData.player.experience}`);
+      console.log(`  Total plots: ${saveData.plots.length}`);
+      
+      const plantsCount = saveData.plots.filter(p => p.crop).length;
+      console.log(`  Planted crops: ${plantsCount}`);
+      
+      if (plantsCount > 0) {
+        console.log('\n  Crop details:');
+        saveData.plots.forEach(plot => {
+          if (plot.crop) {
+            const stage = GamePersistence.calculateGrowthStage(plot.crop.plantedAt, plot.crop.type);
+            console.log(`    - ${plot.crop.type} at (${plot.gridX},${plot.gridY}): ${stage}`);
+          }
+        });
+      }
     };
   }
   
@@ -804,62 +971,162 @@ export class MainScene extends Phaser.Scene {
   }
   
   createPlotGrid() {
-    // Create a 4x4 grid of plots for MVP
-    const plotSize = 80; // Size of each plot
-    const plotSpacing = 10; // Space between plots
-    const gridStartX = 600; // Starting X position for the grid
-    const gridStartY = 400; // Starting Y position for the grid
+    // Clear existing plots
+    this.farmPlots.forEach(plot => plot.destroy());
+    this.farmPlots = [];
     
-    // Visual representation of plots
-    const plotGraphics = this.add.graphics();
-    plotGraphics.lineStyle(2, 0x8B4513, 0.8); // Brown color for plot borders
-    plotGraphics.fillStyle(0x654321, 0.3); // Dark brown fill
+    // Use config for plot layout
+    const config = GameConfig.farmPlots;
     
-    // Create 16 plots (4x4 grid)
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 4; col++) {
-        const x = gridStartX + col * (plotSize + plotSpacing);
-        const y = gridStartY + row * (plotSize + plotSpacing);
+    // Create interactive farm plots
+    for (let row = 0; row < config.rows; row++) {
+      for (let col = 0; col < config.cols; col++) {
+        const x = config.gridStartX + col * (config.plotSize + config.plotSpacing);
+        const y = config.gridStartY + row * (config.plotSize + config.plotSpacing);
         
-        // Draw plot background
-        plotGraphics.fillRect(x, y, plotSize, plotSize);
-        plotGraphics.strokeRect(x, y, plotSize, plotSize);
+        const plot = new InteractiveFarmPlot(
+          this,
+          x + config.plotSize / 2,  // Center the plot
+          y + config.plotSize / 2,
+          col,
+          row,
+          config.plotSize
+        );
         
-        // Add subtle grid lines within each plot
-        plotGraphics.lineStyle(1, 0x8B4513, 0.3);
-        // Vertical lines
-        for (let i = 1; i < 4; i++) {
-          const lineX = x + (plotSize / 4) * i;
-          plotGraphics.moveTo(lineX, y);
-          plotGraphics.lineTo(lineX, y + plotSize);
-        }
-        // Horizontal lines
-        for (let i = 1; i < 4; i++) {
-          const lineY = y + (plotSize / 4) * i;
-          plotGraphics.moveTo(x, lineY);
-          plotGraphics.lineTo(x + plotSize, lineY);
-        }
-        plotGraphics.strokePath();
-        
-        // Reset line style for next plot
-        plotGraphics.lineStyle(2, 0x8B4513, 0.8);
-        
-        // Plot areas are now non-interactive (read-only portfolio visualizer)
+        // Add to depth group for proper sorting
+        this.depthGroup.add(plot);
+        this.farmPlots.push(plot);
       }
     }
     
-    // Add a sign near the plots
-    const signX = gridStartX - 50;
-    const signY = gridStartY - 50;
-    const sign = this.add.rectangle(signX, signY, 100, 40, 0xD2691E, 0.9);
+    // Add a decorative sign near the plots
+    const signX = config.gridStartX - 50;
+    const signY = config.gridStartY - 50;
+    const sign = this.add.rectangle(signX, signY, 120, 40, 0xD2691E, 0.9);
     sign.setStrokeStyle(2, 0x8B4513);
     
-    const signText = this.add.text(signX, signY, 'Farm Plots', {
+    const signText = this.add.text(signX, signY, 'Interactive Farm', {
       fontSize: '16px',
       color: '#FFFFFF',
-      fontFamily: 'Arial'
+      fontFamily: 'Arial',
+      fontStyle: 'bold'
     });
     signText.setOrigin(0.5);
+    
+    // Setup plot event handlers
+    this.setupPlotEventHandlers();
+    
+    // Load saved game state after plots are created
+    this.loadGameState();
+  }
+  
+  private setupPlotEventHandlers() {
+    // Handle right-click context menu
+    eventBus.on('plot:contextMenu', (data: any) => {
+      console.log('Plot context menu requested:', data);
+      // You can emit this to React UI to show a context menu
+      EventBus.emit('show-plot-menu', data);
+    });
+    
+    // Handle plot selection
+    eventBus.on('plot:selected', (data: any) => {
+      console.log('Plot selected:', data);
+    });
+    
+    // Handle planting
+    eventBus.on('plot:planted', (data: any) => {
+      console.log('Crop planted:', data);
+    });
+    
+    // Handle harvesting
+    eventBus.on('plot:harvested', (data: any) => {
+      console.log('Crop harvested:', data);
+    });
+    
+    // Handle UI plant crop event from React
+    eventBus.on('ui:plantCrop', (data: any) => {
+      console.log('🌱 UI Plant crop request:', data);
+      
+      // Find the plot by ID
+      const plot = this.farmPlots.find(p => p.getPlotState().id === data.plotId);
+      if (!plot) {
+        console.error('Plot not found:', data.plotId);
+        return;
+      }
+      
+      // Create crop data
+      const cropData: CropData = {
+        id: `crop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: data.cropType,
+        x: plot.x,
+        y: plot.y,
+        plantedAt: Date.now(),
+        stage: 'seed',
+        health: 100
+      };
+      
+      // Plant the crop in the plot
+      plot.plantCrop(data.cropType, cropData);
+      
+      // Save game state after planting
+      this.saveGameState();
+      
+      // Emit success event
+      this.events.emit('cropPlanted', { cropType: data.cropType, plotId: data.plotId });
+    });
+    
+    // Handle UI water crop event from React
+    eventBus.on('ui:waterCrop', (data: any) => {
+      console.log('💧 UI Water crop request:', data);
+      
+      // Find the plot by ID
+      const plot = this.farmPlots.find(p => p.getPlotState().id === data.plotId);
+      if (!plot) {
+        console.error('Plot not found:', data.plotId);
+        return;
+      }
+      
+      // Water the crop
+      plot.waterCrop();
+    });
+    
+    // Handle UI harvest crop event from React
+    eventBus.on('ui:harvestCrop', (data: any) => {
+      console.log('🌾 UI Harvest crop request:', data);
+      
+      // Find the plot by ID
+      const plot = this.farmPlots.find(p => p.getPlotState().id === data.plotId);
+      if (!plot) {
+        console.error('Plot not found:', data.plotId);
+        return;
+      }
+      
+      // Harvest the crop
+      const harvestedCrop = plot.harvestCrop();
+      if (harvestedCrop) {
+        // Import economy config and get the gold reward
+        import('./EconomyConfig').then(({ CropEconomyConfig }) => {
+          const goldReward = CropEconomyConfig[harvestedCrop.type]?.harvestYield || 10;
+          
+          // Add gold to player
+          this.playerGold += goldReward;
+          
+          // Emit harvest event with gold reward
+          this.events.emit('cropHarvested', { 
+            cropId: harvestedCrop.id, 
+            goldReward: goldReward
+          });
+          
+          // Emit gold update event for UI
+          this.events.emit('goldUpdated', this.playerGold);
+          
+          // Save game state after harvesting
+          this.saveGameState();
+          
+          console.log(`💰 Harvested ${harvestedCrop.type} for ${goldReward} gold! Total gold: ${this.playerGold}`);
+        });
+      }
+    });
   }
   
   
@@ -1218,8 +1485,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   createNetworkSpecificBuildings() {
-    // Destroy existing buildings from the manager
-    if (this.buildingInteractionManager) {
+    // Ensure BuildingInteractionManager exists before creating any buildings
+    if (!this.buildingInteractionManager) {
+      this.buildingInteractionManager = new BuildingInteractionManager(this);
+    } else {
+      // If it exists, destroy and recreate it
       this.buildingInteractionManager.destroy();
       this.buildingInteractionManager = new BuildingInteractionManager(this);
     }
@@ -1249,9 +1519,11 @@ export class MainScene extends Phaser.Scene {
       this.bankBuilding = new BankBuilding(this, katanaPos.bank.x, katanaPos.bank.y);
       this.marketplaceBuilding = new MarketplaceBuilding(this, katanaPos.marketplace.x, katanaPos.marketplace.y);
       
-      // Add buildings to depth group for 2.5D sorting
-      this.depthGroup.add(this.bankBuilding);
-      this.depthGroup.add(this.marketplaceBuilding);
+      // Add buildings to depth group for 2.5D sorting (with null check)
+      if (this.depthGroup) {
+        this.depthGroup.add(this.bankBuilding);
+        this.depthGroup.add(this.marketplaceBuilding);
+      }
       
       // Register with manager
       this.buildingInteractionManager.registerBuilding('bank', this.bankBuilding);
@@ -1266,10 +1538,12 @@ export class MainScene extends Phaser.Scene {
       // Create Pepe building only on Flow network
       this.pepeBuilding = new PepeBuilding(this, flowPos.pepe.x, flowPos.pepe.y);
       
-      // Add buildings to depth group for 2.5D sorting
-      this.depthGroup.add(this.flowBankBuilding);
-      this.depthGroup.add(this.flowMarketplaceBuilding);
-      this.depthGroup.add(this.pepeBuilding);
+      // Add buildings to depth group for 2.5D sorting (with null check)
+      if (this.depthGroup) {
+        this.depthGroup.add(this.flowBankBuilding);
+        this.depthGroup.add(this.flowMarketplaceBuilding);
+        this.depthGroup.add(this.pepeBuilding);
+      }
       
       // Register with manager
       this.buildingInteractionManager.registerBuilding('flowBank', this.flowBankBuilding);
@@ -1299,46 +1573,87 @@ export class MainScene extends Phaser.Scene {
 
   public initializePlayer(authData: { address: string; user?: any }) {
     try {
-      // Prevent duplicate initialization
-      if (this.currentPlayer) {
-        console.log('Player already initialized');
-        return;
+      // If we have a guest player, transition them to authenticated
+      if (this.currentPlayer && this.isGuestMode) {
+        // Preserve current position and state
+        const currentPos = {
+          x: this.currentPlayer.x,
+          y: this.currentPlayer.y
+        };
+        const currentDirection = this.currentPlayer.getPlayerInfo().direction;
+        
+        // Remove guest player from depth group
+        if (this.depthGroup) {
+          this.depthGroup.remove(this.currentPlayer);
+        }
+        
+        // Destroy guest player
+        this.currentPlayer.destroy();
+        this.currentPlayer = null as any;
+        this.isGuestMode = false;
+        
+        // Create authenticated player with preserved position
+        const playerId = authData.address || authData.user?.id;
+        const displayName = authData.address ? 
+          `${authData.address.slice(0, 6)}...${authData.address.slice(-4)}` : 
+          authData.user?.name || 'Player';
+        
+        const playerInfo: PlayerInfo = {
+          id: playerId,
+          name: displayName,
+          x: currentPos.x,
+          y: currentPos.y,
+          level: 1,
+          character: 'cowboy' as CharacterType,
+          direction: currentDirection,
+          isCurrentPlayer: true
+        };
+        
+        this.currentPlayer = new Player(this, playerInfo.x, playerInfo.y, playerInfo);
+        
+        // Add player to depth group for proper 2.5D sorting
+        if (this.depthGroup) {
+          this.depthGroup.add(this.currentPlayer);
+        }
+        
+        this.updateCameraFollow();
+        
+        // Show success message
+        console.log(`✅ Welcome back, ${displayName}! Your progress is now saved.`);
+        
+      } else if (!this.currentPlayer) {
+        // No existing player, create new authenticated player
+        const playerId = authData.address || authData.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
+        
+        const displayName = authData.address ? 
+          `${authData.address.slice(0, 6)}...${authData.address.slice(-4)}` : 
+          'Guest';
+        
+        const playerInfo: PlayerInfo = {
+          id: playerId,
+          name: displayName,
+          x: GameConfig.player.spawnPosition.x,
+          y: GameConfig.player.spawnPosition.y,
+          level: 1,
+          character: 'cowboy' as CharacterType,
+          direction: 'down',
+          isCurrentPlayer: true
+        };
+        
+        this.currentPlayer = new Player(this, playerInfo.x, playerInfo.y, playerInfo);
+        
+        // Add player to depth group for proper 2.5D sorting
+        if (this.depthGroup) {
+          this.depthGroup.add(this.currentPlayer);
+        }
+        
+        this.updateCameraFollow();
+        
+        console.log('Created authenticated player:', playerId, displayName);
       }
-
-      // Get player ID from wallet address or user ID
-      const playerId = authData.address || authData.user?.id || 'guest_' + Math.random().toString(36).substr(2, 9);
-      
-      // Use wallet address as display name
-      const displayName = authData.address ? 
-        `${authData.address.slice(0, 6)}...${authData.address.slice(-4)}` : 
-        'Guest';
-      
-      // Create PlayerInfo object
-      const playerInfo: PlayerInfo = {
-        id: playerId,
-        name: displayName,
-        x: GameConfig.player.spawnPosition.x,
-        y: GameConfig.player.spawnPosition.y,
-        level: 1,
-        character: 'character_1' as CharacterType,
-        direction: 'down',
-        isCurrentPlayer: true
-      };
-      
-      // Create the player object
-      this.currentPlayer = new Player(this, playerInfo.x, playerInfo.y, playerInfo);
-      
-      // Add player to depth group for proper 2.5D sorting
-      if (this.depthGroup) {
-        this.depthGroup.add(this.currentPlayer);
-      }
-      
-      this.updateCameraFollow();
-      
-      console.log('Created local player:', playerId, displayName);
       
     } catch (error) {
-      console.error('Failed to create local player:', error);
+      console.error('Failed to create authenticated player:', error);
     }
   }
   
@@ -1382,6 +1697,12 @@ export class MainScene extends Phaser.Scene {
     if (time - this.lastCropUpdate > GameConfig.updateIntervals.cropUpdate) {
       this.cropSystem?.update();
       this.lastCropUpdate = time;
+    }
+    
+    // Check crop growth stages every 5 seconds
+    if (time - this.lastGrowthCheck > 5000) {
+      this.updateCropGrowthStages();
+      this.lastGrowthCheck = time;
     }
 
   }
@@ -1472,17 +1793,158 @@ export class MainScene extends Phaser.Scene {
 
   private updateBuildingInteractions() {
     if (!this.currentPlayer) return;
+    
+    // Don't check building interactions in editor mode
+    if (this.isEditorMode) return;
+    
     const { x, y } = this.currentPlayer;
 
     // Use the centralized manager for all building interactions
     this.buildingInteractionManager.checkPlayerProximity(x, y);
     this.buildingInteractionManager.checkInteractions();
+    
+    // Update interaction prompts
+    this.updateInteractionPrompts();
+  }
+
+  private updateInteractionPrompts() {
+    // Define interactable zones
+    const interactables = [
+      { 
+        id: 'marketplace',
+        x: this.marketplaceBuilding?.x || 1000, 
+        y: this.marketplaceBuilding?.y || 200, 
+        radius: 100, 
+        message: 'Press E to enter marketplace' 
+      },
+      { 
+        id: 'bank',
+        x: this.bankBuilding?.x || 1000, 
+        y: this.bankBuilding?.y || 600, 
+        radius: 100, 
+        message: 'Press E to enter bank' 
+      },
+      { 
+        id: 'flowBank',
+        x: this.flowBankBuilding?.x || 300, 
+        y: this.flowBankBuilding?.y || 200, 
+        radius: 100, 
+        message: 'Press E to enter Flow bank' 
+      },
+      { 
+        id: 'flowMarketplace',
+        x: this.flowMarketplaceBuilding?.x || 300, 
+        y: this.flowMarketplaceBuilding?.y || 600, 
+        radius: 100, 
+        message: 'Press E to enter Flow marketplace' 
+      },
+      { 
+        id: 'pepe',
+        x: this.pepeBuilding?.x || 500, 
+        y: this.pepeBuilding?.y || 800, 
+        radius: 100, 
+        message: 'Press E to enter Pepe building' 
+      }
+    ];
+    
+    // Clear previous state
+    this.nearbyInteractables.clear();
+    
+    // Check distance to each interactable
+    interactables.forEach(item => {
+      // Skip if building doesn't exist (wrong network)
+      if ((item.id === 'marketplace' && !this.marketplaceBuilding) ||
+          (item.id === 'bank' && !this.bankBuilding) ||
+          (item.id === 'flowBank' && !this.flowBankBuilding) ||
+          (item.id === 'flowMarketplace' && !this.flowMarketplaceBuilding) ||
+          (item.id === 'pepe' && !this.pepeBuilding)) {
+        return;
+      }
+      
+      const distance = Phaser.Math.Distance.Between(
+        this.currentPlayer.x, 
+        this.currentPlayer.y,
+        item.x, 
+        item.y
+      );
+      
+      if (distance <= item.radius) {
+        this.nearbyInteractables.set(item.id, { distance, message: item.message });
+      }
+    });
+    
+    // Update UI with closest interactable
+    if (this.nearbyInteractables.size > 0) {
+      // Get closest
+      const closest = Array.from(this.nearbyInteractables.entries())
+        .sort((a, b) => a[1].distance - b[1].distance)[0];
+      
+      this.showInteractionPrompt(closest[1].message);
+    } else {
+      this.hideInteractionPrompt();
+    }
+  }
+  
+  private showInteractionPrompt(message: string) {
+    if (!this.interactionPrompt) {
+      this.interactionPrompt = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height - 100,
+        message,
+        {
+          fontSize: '18px',
+          backgroundColor: '#000000CC',
+          padding: { x: 16, y: 8 },
+          fixedWidth: 300,
+          align: 'center'
+        }
+      );
+      this.interactionPrompt.setOrigin(0.5);
+      this.interactionPrompt.setScrollFactor(0);
+      this.interactionPrompt.setDepth(1000);
+      
+      // Fade in animation
+      this.interactionPrompt.setAlpha(0);
+      this.tweens.add({
+        targets: this.interactionPrompt,
+        alpha: 1,
+        duration: 200
+      });
+    } else if (this.interactionPrompt.text !== message) {
+      // Update text if different
+      this.interactionPrompt.setText(message);
+    }
+  }
+  
+  private hideInteractionPrompt() {
+    if (this.interactionPrompt) {
+      this.tweens.add({
+        targets: this.interactionPrompt,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => {
+          this.interactionPrompt?.destroy();
+          this.interactionPrompt = undefined;
+        }
+      });
+    }
   }
 
 
 
   destroy() {
-    // EventBus listeners already removed - portfolio visualizer is read-only
+    // Clean up farm plot event listeners
+    eventBus.removeAllListeners('plot:contextMenu');
+    eventBus.removeAllListeners('plot:selected');
+    eventBus.removeAllListeners('plot:planted');
+    eventBus.removeAllListeners('plot:harvested');
+    eventBus.removeAllListeners('ui:plantCrop');
+    eventBus.removeAllListeners('ui:waterCrop');
+    eventBus.removeAllListeners('ui:harvestCrop');
+    
+    // Clean up farm plots
+    this.farmPlots.forEach(plot => plot.destroy());
+    this.farmPlots = [];
     
     // Emit system shutdown event
     eventBus.emit('system:shutdown', { systemName: 'MainScene' });
@@ -1591,13 +2053,36 @@ export class MainScene extends Phaser.Scene {
     this.editorOverlay = this.add.graphics();
     this.editorOverlay.lineStyle(3, 0x00ff00, 1);
     
-    const bounds = object.getBounds ? object.getBounds() : object.getCollisionBounds();
+    // For buildings, use collision bounds which are more accurate
+    let bounds;
+    if (object.getCollisionBounds) {
+      bounds = object.getCollisionBounds();
+    } else if (object.getBounds) {
+      bounds = object.getBounds();
+    } else {
+      // Fallback for objects without bounds methods
+      bounds = new Phaser.Geom.Rectangle(
+        object.x - 50,
+        object.y - 50,
+        100,
+        100
+      );
+    }
+    
     this.editorOverlay.strokeRect(
       bounds.x,
       bounds.y,
       bounds.width,
       bounds.height
     );
+    
+    // Draw a small crosshair at the object's actual position
+    this.editorOverlay.lineStyle(2, 0xffff00, 1);
+    this.editorOverlay.moveTo(object.x - 10, object.y);
+    this.editorOverlay.lineTo(object.x + 10, object.y);
+    this.editorOverlay.moveTo(object.x, object.y - 10);
+    this.editorOverlay.lineTo(object.x, object.y + 10);
+    this.editorOverlay.strokePath();
     
     // Add to depth group so it sorts properly
     this.depthGroup.add(this.editorOverlay);
@@ -1644,7 +2129,33 @@ export class MainScene extends Phaser.Scene {
     
     if (!this.isEditorMode) {
       this.clearEditorSelection();
+      // Remove editor mode text
+      if (this.editorModeText) {
+        this.editorModeText.destroy();
+        this.editorModeText = undefined;
+      }
+    } else {
+      // Show editor mode indicator
+      this.createEditorModeIndicator();
     }
+  }
+  
+  createEditorModeIndicator() {
+    if (this.editorModeText) {
+      this.editorModeText.destroy();
+    }
+    
+    this.editorModeText = this.add.text(20, 20, 'EDITOR MODE ACTIVE\nPress ` to exit\nClick to select, then click to move', {
+      fontSize: '16px',
+      fontFamily: 'Arial',
+      color: '#ff0000',
+      backgroundColor: '#000000aa',
+      padding: { x: 10, y: 10 },
+      align: 'left'
+    });
+    
+    this.editorModeText.setScrollFactor(0); // Keep it fixed to camera
+    this.editorModeText.setDepth(10000); // Always on top
   }
   
   setEditorMode(mode: 'info' | 'move') {
@@ -1702,6 +2213,112 @@ buildings: ${JSON.stringify(config.buildings, null, 2)},
     navigator.clipboard.writeText(configString);
     console.log('📋 Building configuration copied to clipboard!');
     console.log(configString);
+  }
+
+  // Save game state to localStorage
+  private saveGameState(): void {
+    // Gather all plot states
+    const plotStates = this.farmPlots.map(plot => {
+      const state = plot.getPlotState();
+      return {
+        plotId: state.id,
+        gridX: state.gridX,
+        gridY: state.gridY,
+        crop: state.crop
+      };
+    });
+
+    // Save to localStorage
+    GamePersistence.saveGameState(
+      this.playerGold,
+      this.playerLevel,
+      this.playerExperience,
+      plotStates
+    );
+  }
+
+  // Load game state from localStorage
+  private loadGameState(): void {
+    const savedState = GamePersistence.loadGameState();
+    if (!savedState) {
+      console.log('🎮 No saved game found, starting fresh');
+      return;
+    }
+
+    console.log('🎮 Loading saved game from', new Date(savedState.lastSaved).toLocaleString());
+
+    // Restore player data
+    this.playerGold = savedState.player.gold;
+    this.playerLevel = savedState.player.level;
+    this.playerExperience = savedState.player.experience;
+
+    // Check for offline harvestable crops
+    const offlineReady = GamePersistence.getOfflineHarvestableCount(savedState);
+    if (offlineReady > 0) {
+      console.log(`🌾 ${offlineReady} crops became ready while you were away!`);
+      // Could show a notification here
+    }
+
+    // Restore crops to plots
+    savedState.plots.forEach(savedPlot => {
+      const plot = this.farmPlots.find(p => p.getPlotState().id === savedPlot.plotId);
+      if (plot && savedPlot.crop) {
+        // Calculate current position for the crop
+        const cropData = GamePersistence.restoreCrop(
+          savedPlot.crop,
+          plot.x,
+          plot.y
+        );
+        
+        // Plant the restored crop
+        plot.plantCrop(savedPlot.crop.type, cropData);
+        
+        console.log(`🌱 Restored ${savedPlot.crop.type} at plot ${savedPlot.plotId}, stage: ${cropData.stage}`);
+      }
+    });
+
+    // Emit event to update UI with loaded gold
+    this.events.emit('goldUpdated', this.playerGold);
+  }
+
+  // Update player gold (called from Game.tsx)
+  public updatePlayerGold(gold: number): void {
+    // Ensure gold never goes negative
+    this.playerGold = Math.max(0, gold);
+    this.saveGameState();
+  }
+
+  // Update crop growth stages periodically
+  private updateCropGrowthStages(): void {
+    let hasChanges = false;
+    
+    this.farmPlots.forEach(plot => {
+      const state = plot.getPlotState();
+      if (state.crop && state.crop.stage !== 'ready') {
+        // Calculate current stage
+        const newStage = GamePersistence.calculateGrowthStage(state.crop.plantedAt, state.crop.type);
+        
+        if (newStage !== state.crop.stage) {
+          // Update the crop data
+          state.crop.stage = newStage;
+          hasChanges = true;
+          
+          // Update the visual representation
+          plot.updateCropGrowth(newStage);
+          console.log(`🌱 ${state.crop.type} grew to ${newStage} stage`);
+          
+          if (newStage === 'ready') {
+            console.log(`🌾 ${state.crop.type} is ready to harvest!`);
+            // Could show a notification here
+          }
+        }
+      }
+    });
+    
+    // Save if any crops changed stage
+    if (hasChanges) {
+      this.saveGameState();
+    }
   }
 }
 

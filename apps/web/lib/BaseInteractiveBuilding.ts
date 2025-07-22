@@ -170,12 +170,16 @@ export abstract class BaseInteractiveBuilding extends Phaser.GameObjects.Contain
   }
 
   public getCollisionBounds(): Phaser.Geom.Rectangle {
-    const bounds = this.buildingSprite.getBounds();
+    // Use a reasonable collision area based on the visual sprite size
+    // Account for the sprite's origin being at bottom-center (0.5, 1)
+    const width = this.buildingSprite.displayWidth * 0.7; // 70% of visual width
+    const height = this.buildingSprite.displayHeight * 0.5; // 50% of visual height (just the base)
+    
     return new Phaser.Geom.Rectangle(
-      this.x - bounds.width / 2,
-      this.y - bounds.height / 2,
-      bounds.width,
-      bounds.height
+      this.x - width / 2,
+      this.y - height, // Since origin is at bottom, collision starts from bottom
+      width,
+      height
     );
   }
 

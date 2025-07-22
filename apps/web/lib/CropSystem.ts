@@ -1,7 +1,11 @@
 /**
- * Portfolio Visualizer - Displays on-chain DeFi positions as crops
- * Read-only visualization of Morpho vault positions
+ * Crop System - Handles both farming game mechanics and portfolio visualization
+ * - Farming game: Plant, grow, and harvest crops for Gold
+ * - Portfolio visualizer: Read-only display of on-chain DeFi positions
  */
+
+import { CropEconomyConfig } from './EconomyConfig';
+import { EventBus, GameEvents } from '../game/EventBus';
 
 export interface CropData {
   id: string;
@@ -39,65 +43,68 @@ export interface CropConfig {
   };
 }
 
+// Mapping based on crop_sprite_bounds_full.json
+// Rows in JSON are 1-indexed, so we subtract 1 for 0-indexed array
+// We pick 5 frames evenly distributed across available growth stages
 export const CROP_CONFIGS: Record<CropType, CropConfig> = {
   potato: {
     name: 'Potato',
     growthTime: 30, // 30 seconds for MVP demo
-    spriteIndex: 0,
+    spriteIndex: 0, // Row 1 in JSON = index 0 (Russet potatoes)
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   },
   carrot: {
     name: 'Carrot',
     growthTime: 30,
-    spriteIndex: 1,
-    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+    spriteIndex: 6, // Row 7 in JSON = index 6 (Carrots)
+    stages: { seed: 0, sprout: 8, growing: 16, mature: 24, ready: 31 }
   },
   lettuce: {
     name: 'Lettuce',
     growthTime: 30,
-    spriteIndex: 2,
+    spriteIndex: 14, // Row 15 in JSON = index 14 (Green onion as placeholder)
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   },
   cabbage: {
     name: 'Cabbage',
     growthTime: 30,
-    spriteIndex: 3,
+    spriteIndex: 11, // Row 12 in JSON = index 11 (Beets as placeholder)
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   },
   tomato: {
     name: 'Tomato',
     growthTime: 30,
-    spriteIndex: 4,
-    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+    spriteIndex: 18, // Row 19 in JSON = index 18 (Red bell pepper as placeholder)
+    stages: { seed: 0, sprout: 2, growing: 4, mature: 6, ready: 8 }
   },
   strawberry: {
     name: 'Strawberry',
     growthTime: 30,
-    spriteIndex: 5,
+    spriteIndex: 12, // Row 13 in JSON = index 12 (Turnips as placeholder)
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   },
   watermelon: {
     name: 'Watermelon',
     growthTime: 30,
-    spriteIndex: 6,
-    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+    spriteIndex: 25, // Row 26 in JSON = index 25 (Watermelon)
+    stages: { seed: 29, sprout: 30, growing: 31, mature: 31, ready: 31 }
   },
   corn: {
     name: 'Corn',
     growthTime: 30,
-    spriteIndex: 7,
-    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+    spriteIndex: 23, // Row 24 in JSON = index 23 (Acorn squash as placeholder)
+    stages: { seed: 29, sprout: 30, growing: 31, mature: 31, ready: 31 }
   },
   pumpkin: {
     name: 'Pumpkin',
     growthTime: 30,
-    spriteIndex: 8,
-    stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
+    spriteIndex: 24, // Row 25 in JSON = index 24 (Cantaloupe as placeholder)
+    stages: { seed: 29, sprout: 30, growing: 31, mature: 31, ready: 31 }
   },
   pepper: {
     name: 'Pepper',
     growthTime: 30,
-    spriteIndex: 9,
+    spriteIndex: 17, // Row 18 in JSON = index 17 (Hot pepper)
     stages: { seed: 0, sprout: 1, growing: 2, mature: 3, ready: 4 }
   }
 };
@@ -283,9 +290,58 @@ export class CropSystem {
     return true;
   }
 
-  // Deprecated - portfolio visualizer is read-only
-  harvestCrop(cropId: string): { success: boolean; reward?: string; goldReward?: number } {
-    return { success: false };
+  /**
+   * Harvest a crop and give gold reward
+   */
+  harvestCrop(cropId: string): { success: boolean; reward?: string; goldReward?: number; xpReward?: number } {
+    const crop = this.crops.get(cropId);
+    
+    // Cannot harvest portfolio crops
+    if (!crop || crop.id.startsWith('morpho_')) {
+      return { success: false };
+    }
+    
+    // Check if crop is ready to harvest
+    if (crop.stage !== 'ready') {
+      return { success: false };
+    }
+    
+    // Get economy configuration
+    const economy = CropEconomyConfig[crop.type];
+    const goldReward = economy.harvestYield;
+    const xpReward = economy.xpReward;
+    
+    // Remove the crop
+    const sprite = this.cropSprites.get(cropId);
+    if (sprite) {
+      // Show harvest effect
+      this.showHarvestEffect(crop.x, crop.y, goldReward);
+      
+      // Remove sprite
+      sprite.destroy();
+      this.cropSprites.delete(cropId);
+    }
+    
+    // Remove from data
+    this.crops.delete(cropId);
+    this.saveCropsToStorage();
+    
+    // Emit event to update player's gold in UI
+    EventBus.emit(GameEvents.PLAYER_GOLD_UPDATED, goldReward);
+    EventBus.emit(GameEvents.CROP_HARVESTED, {
+      cropType: crop.type,
+      goldReward,
+      xpReward
+    });
+    
+    console.log(`🌾 Harvested ${crop.type} for ${goldReward} gold!`);
+    
+    return {
+      success: true,
+      reward: `+${goldReward} Gold`,
+      goldReward,
+      xpReward
+    };
   }
   
   // Deprecated - portfolio visualizer is read-only
@@ -359,10 +415,11 @@ export class CropSystem {
         return;
       }
       
-      // Legacy growth logic for any remaining non-portfolio crops
+      // Growth logic for farming game crops
       const config = CROP_CONFIGS[crop.type];
+      const economyConfig = CropEconomyConfig[crop.type];
       const timeElapsed = (now - crop.plantedAt) / 1000; // Convert to seconds
-      const growthProgress = Math.min(timeElapsed / config.growthTime, 1);
+      const growthProgress = Math.min(timeElapsed / economyConfig.growthTime, 1);
 
       let newStage: GrowthStage;
       if (growthProgress >= 1) {
@@ -401,7 +458,11 @@ export class CropSystem {
     const config = CROP_CONFIGS[crop.type];
     const stageIndex = config.stages[crop.stage];
     
-    const sprite = this.scene.add.sprite(crop.x, crop.y, this.cropSpritesheet, stageIndex);
+    // Calculate the actual frame index in the sprite sheet
+    // The sprite sheet has 32 columns per row (1024px / 32px = 32 columns)
+    const frameIndex = config.spriteIndex * 32 + stageIndex;
+    
+    const sprite = this.scene.add.sprite(crop.x, crop.y, this.cropSpritesheet, frameIndex);
     sprite.setOrigin(0.5, 0.5);
     sprite.setScale(1.5); // Make crops slightly bigger
     
@@ -426,11 +487,12 @@ export class CropSystem {
         this.harvestCrop(crop.id);
       } else {
         // Show growth progress
-        const config = CROP_CONFIGS[crop.type];
+        const economyConfig = CropEconomyConfig[crop.type];
         const timeElapsed = (Date.now() - crop.plantedAt) / 1000;
-        const growthProgress = Math.min(timeElapsed / config.growthTime, 1);
+        const growthProgress = Math.min(timeElapsed / economyConfig.growthTime, 1);
         const percentComplete = Math.floor(growthProgress * 100);
-        console.log(`🌱 Crop growth: ${percentComplete}% complete`);
+        const timeRemaining = Math.max(0, economyConfig.growthTime - timeElapsed);
+        console.log(`🌱 ${crop.type} growth: ${percentComplete}% complete (${Math.ceil(timeRemaining)}s remaining)`);
       }
       
       // Emit event for crop info display
@@ -461,7 +523,11 @@ export class CropSystem {
     const config = CROP_CONFIGS[crop.type];
     const stageIndex = config.stages[crop.stage];
     
-    sprite.setFrame(stageIndex);
+    // Calculate the actual frame index in the sprite sheet
+    // The sprite sheet has 32 columns per row (1024px / 32px = 32 columns)
+    const frameIndex = config.spriteIndex * 32 + stageIndex;
+    
+    sprite.setFrame(frameIndex);
     
     // Add growth animation
     this.scene.tweens.add({
@@ -474,9 +540,63 @@ export class CropSystem {
     });
   }
 
-  // Deprecated - portfolio visualizer is read-only
+  /**
+   * Check if a position is valid for planting
+   */
   canPlantAt(x: number, y: number): boolean {
-    return false;
+    // Check if there's already a crop at this position
+    const existingCrop = this.getCropAtPosition(x, y, 32);
+    if (existingCrop) {
+      return false;
+    }
+    
+    // Check if position is within farm plot bounds
+    // This is a simplified check - you may want to integrate with your farm plot system
+    return true;
+  }
+  
+  /**
+   * Plant a new crop at the specified position
+   */
+  plantCrop(type: CropType, x: number, y: number, playerId: string): { success: boolean; error?: string } {
+    // Check if position is valid
+    if (!this.canPlantAt(x, y)) {
+      return { success: false, error: 'Cannot plant here' };
+    }
+    
+    // Create new crop
+    const cropId = `${playerId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const cropData: CropData = {
+      id: cropId,
+      type,
+      x,
+      y,
+      plantedAt: Date.now(),
+      stage: 'seed',
+      health: 100
+    };
+    
+    // Add to crops
+    this.crops.set(cropId, cropData);
+    
+    // Create sprite if in viewport
+    const bounds = this.getViewportBounds();
+    if (this.isInViewport(x, y, bounds)) {
+      this.createCropSprite(cropData);
+    }
+    
+    // Save to storage
+    this.saveCropsToStorage();
+    
+    // Emit event
+    EventBus.emit(GameEvents.CROP_PLANTED, {
+      cropType: type,
+      position: { x, y }
+    });
+    
+    console.log(`🌱 Planted ${type} at (${x}, ${y})`);
+    
+    return { success: true };
   }
 
   /**
@@ -544,9 +664,9 @@ export class CropSystem {
   /**
    * Show harvest effect animation
    */
-  private showHarvestEffect(x: number, y: number) {
+  private showHarvestEffect(x: number, y: number, goldReward: number = 10) {
     // Create floating text effect
-    const harvestText = this.scene.add.text(x, y, '🎉 +10 Gold!', {
+    const harvestText = this.scene.add.text(x, y, `🎉 +${goldReward} Gold!`, {
       fontSize: '20px',
       color: '#FFD700',
       fontStyle: 'bold'
